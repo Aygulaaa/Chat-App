@@ -1,0 +1,15 @@
+import 'package:my_chat_app/core/common/entities/user_entity.dart';
+import 'package:my_chat_app/features/auth/domain/repositories/auth_repository.dart';
+
+class RegisterUser {
+  final AuthRepository repository;
+
+  RegisterUser(this.repository);
+
+  Future<UserEntity> call({
+    required String username,
+    required String password,
+  }) {
+    return repository.register(username: username, password: password);
+  }
+}

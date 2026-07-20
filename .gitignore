@@ -1,0 +1,52 @@
+cat > .gitignore << 'EOF'
+# ============================================
+# BACKEND (Node.js)
+# ============================================
+backend/node_modules/
+backend/.env
+backend/dist/
+backend/build/
+backend/*.log
+backend/uploads/
+backend/media/
+backend/tmp/
+
+# ============================================
+# FRONTEND (Flutter)
+# ============================================
+frontend/.dart_tool/
+frontend/.pub/
+frontend/build/
+frontend/coverage/
+frontend/.flutter-plugins-dependencies
+frontend/node_modules/
+frontend/.env
+frontend/dist/
+frontend/android/
+frontend/ios/
+frontend/web/
+frontend/macos/
+frontend/linux/
+frontend/windows/
+frontend/*.gen.dart
+frontend/*.g.dart
+frontend/*.freezed.dart
+
+# ============================================
+# GENERAL
+# ============================================
+.DS_Store
+*.log
+*.tmp
+*.swp
+*.swo
+.idea/
+.vscode/
+node_modules/
+.env
+*.iml
+*.ipr
+*.iws
+Thumbs.db
+Desktop.ini
+EOF

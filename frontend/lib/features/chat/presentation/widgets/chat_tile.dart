@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/user_avatar.dart';
 
@@ -37,10 +38,10 @@ final bool isOnline =
 
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(18.r),
         child: InkWell(
           onTap: onTap,
           onLongPress: onLongPress != null
@@ -49,18 +50,18 @@ final bool isOnline =
                   onLongPress!();
                 }
               : null,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(18.r),
           splashColor: const Color(0xFF6366F1).withOpacity(0.10),
           highlightColor: Colors.transparent,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 13.h),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF1E2A3A), Color(0xFF16202E)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(18.r),
               border: Border.all(
                 color: unread
                     ? const Color(0xFF6366F1).withOpacity(0.35)
@@ -84,26 +85,26 @@ final bool isOnline =
             child: Row(
               children: [
                 UserAvatar(name: name, imageUrl: avatarUrl, isOnline: isOnline),
-                const SizedBox(width: 13),
+                SizedBox(width: 13.w),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(
-                          fontSize: 15,
+                        style: TextStyle(
+                          fontSize: 15.sp,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFFF1F5F9),
+                          color: const Color(0xFFF1F5F9),
                           letterSpacing: -0.1,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 3),
+                      SizedBox(height: 3.h),
                       Text(
                         message,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 13.sp,
                           color: unread
                               ? const Color(0xFF94A3B8)
                               : const Color(0xFF64748B),
@@ -117,7 +118,7 @@ final bool isOnline =
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10.w),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -125,16 +126,14 @@ final bool isOnline =
                     Text(
                       time,
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 11.5.sp,
                         color: unread
                             ? const Color(0xFF818CF8)
                             : const Color(0xFF475569),
-                        fontWeight: unread
-                            ? FontWeight.w600
-                            : FontWeight.w400,
+                        fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: 6.h),
                     if (unread) _UnreadBadge(count: unreadCount),
                   ],
                 ),

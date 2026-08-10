@@ -2,8 +2,10 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/core/utils/mime_utils.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
@@ -206,30 +208,40 @@ print(amplitude.current);
   Widget build(BuildContext context) {
     return SafeArea(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        color: const Color(0xFF161D2A),
+        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          border: Border(top: BorderSide(color: context.glassBorder, width: 0.8)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
         child: Row(
           children: [
             if (_isRecording)
               IconButton(
-                icon: const Icon(Icons.close, color: Colors.redAccent),
+                icon: Icon(Icons.close, color: Colors.redAccent, size: 22.sp),
                 onPressed: _cancelRecording,
               )
             else
               _isSendingFile
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
+                  ? Padding(
+                      padding: EdgeInsets.all(12.r),
                       child: SizedBox(
-                        width: 20,
-                        height: 20,
+                        width: 20.r,
+                        height: 20.r,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.grey,
+                          color: context.textTertiary,
                         ),
                       ),
                     )
                   : IconButton(
-                      icon: const Icon(Icons.attach_file, color: Colors.grey),
+                      icon: Icon(Icons.attach_file, color: context.textTertiary, size: 22.sp),
                       onPressed: _pickAndSendFile,
                     ),
 
@@ -241,25 +253,32 @@ print(amplitude.current);
                       onChanged: (val) => ref
                           .read(messageProvider(widget.chatId).notifier)
                           .sendTypingEvent(val.isNotEmpty),
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: context.textPrimary, fontSize: 15.sp),
                       decoration: InputDecoration(
                         hintText: 'Message...',
-                        hintStyle: const TextStyle(color: Colors.grey),
+                        hintStyle: TextStyle(color: context.textTertiary, fontSize: 15.sp),
                         filled: true,
-                        fillColor: const Color(0xFF1E2A38),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
+                        fillColor: context.glassBg,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 14.w,
+                          vertical: 10.h,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide.none,
+                          borderRadius: BorderRadius.circular(22.r),
+                          borderSide: BorderSide(color: context.glassBorder, width: 0.8),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22.r),
+                          borderSide: BorderSide(color: context.glassBorder, width: 0.8),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22.r),
+                          borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
                         ),
                       ),
                     ),
             ),
 
-            // ✅ Cleaned up the formatting and matching brackets here
             ValueListenableBuilder<TextEditingValue>(
               valueListenable: _controller,
               builder: (_, value, __) {
@@ -267,28 +286,21 @@ print(amplitude.current);
 
                 if (_isRecording) {
                   return IconButton(
-                    icon: const Icon(
-                      Icons
-                          .stop_circle, // Or Icons.send if you prefer the airplane style
-                      color: Color(0xFF6366F1),
-                      size: 32,
-                    ),
-                    onPressed:
-                        _stopAndSend, // ✅ Correctly invokes the audio saving/upload pipeline
+                    icon: Icon(Icons.stop_circle, color: const Color(0xFF6366F1), size: 30.sp),
+                    onPressed: _stopAndSend,
                   );
                 }
 
                 if (hasText) {
                   return IconButton(
-                    icon: const Icon(Icons.send, color: Color(0xFF4CC9F0)),
-                    onPressed:
-                        _onSend, // ✅ Correctly invokes text message pipeline
+                    icon: Icon(Icons.send_rounded, color: const Color(0xFF6366F1), size: 22.sp),
+                    onPressed: _onSend,
                   );
                 }
 
                 return IconButton(
-                  icon: const Icon(Icons.mic, color: Colors.grey),
-                  onPressed: _startRecording, // ✅ Correctly starts recording
+                  icon: Icon(Icons.mic_rounded, color: context.textTertiary, size: 22.sp),
+                  onPressed: _startRecording,
                 );
               },
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/contacts/presentation/pages/contacts_screen.dart';
 import 'package:my_chat_app/features/app_shell/presentation/widgets/glass_nav_bar.dart';
 import 'package:my_chat_app/features/chat/presentation/pages/home_page.dart';
@@ -16,19 +17,16 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-     final pages = [
+    final pages = [
       const HomePage(),
       const ContactsScreen(),
       const ProfileScreen(),
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1C1C1E),
+      backgroundColor: context.appBg,
       extendBody: true,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
-      ),
+      body: IndexedStack(index: _currentIndex, children: pages),
       bottomNavigationBar: GlassNavBar(
         index: _currentIndex,
         onChanged: (val) => setState(() => _currentIndex = val),

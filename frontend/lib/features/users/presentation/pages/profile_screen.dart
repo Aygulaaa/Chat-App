@@ -1,6 +1,9 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/core/utils/format_last_seen.dart';
 import 'package:my_chat_app/features/auth/presentation/pages/auth_page.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
@@ -12,69 +15,45 @@ import 'package:my_chat_app/features/users/presentation/widgets/profile_avatar.d
 
 class ProfileScreen extends ConsumerWidget {
   final UserEntity? user;
-
   const ProfileScreen({super.key, this.user});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    print("profile screen use data ${user}");
-    if (user != null) {
-      return _OtherProfile(user: user!);
-    }
+    if (user != null) return _OtherProfile(user: user!);
 
     final profileAsync = ref.watch(userProfileProvider);
     final authState = ref.watch(authProvider);
 
     if (authState.isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF0B0F14),
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF6366F1)),
-        ),
+      return Scaffold(
+        backgroundColor: context.appBg,
+        body: const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1))),
       );
     }
-
     if (authState.user == null) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF0B0F14),
-        body: Center(
-          child: Text('Please log in', style: TextStyle(color: Colors.white54)),
-        ),
+      return Scaffold(
+        backgroundColor: context.appBg,
+        body: Center(child: Text('Please log in', style: TextStyle(color: context.textSecondary))),
       );
     }
-
     return profileAsync.when(
-      loading: () => const Scaffold(
-        backgroundColor: Color(0xFF0B0F14),
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF6366F1)),
-        ),
+      loading: () => Scaffold(
+        backgroundColor: context.appBg,
+        body: const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1))),
       ),
       error: (e, _) => Scaffold(
-        backgroundColor: const Color(0xFF0B0F14),
+        backgroundColor: context.appBg,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.error_outline,
-                color: Colors.redAccent,
-                size: 48,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '$e',
-                style: const TextStyle(color: Colors.white54),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
+              Icon(Icons.error_outline, color: Colors.redAccent, size: 48.sp),
+              SizedBox(height: 16.h),
+              Text('$e', style: TextStyle(color: context.textSecondary), textAlign: TextAlign.center),
+              SizedBox(height: 16.h),
               TextButton(
-                onPressed: () =>
-                    ref.read(userProfileProvider.notifier).fetchProfile(),
-                child: const Text(
-                  'Retry',
-                  style: TextStyle(color: Color(0xFF6366F1)),
-                ),
+                onPressed: () => ref.read(userProfileProvider.notifier).fetchProfile(),
+                child: const Text('Retry', style: TextStyle(color: Color(0xFF6366F1))),
               ),
             ],
           ),
@@ -82,9 +61,9 @@ class ProfileScreen extends ConsumerWidget {
       ),
       data: (me) {
         if (me == null) {
-          return const Scaffold(
-            backgroundColor: Color(0xFF0B0F14),
-            body: Center(child: CircularProgressIndicator()),
+          return Scaffold(
+            backgroundColor: context.appBg,
+            body: const Center(child: CircularProgressIndicator()),
           );
         }
         return _MyProfile(user: me);
@@ -94,7 +73,6 @@ class ProfileScreen extends ConsumerWidget {
 }
 
 // ─── My Profile ───────────────────────────────────────────────────────────────
-
 class _MyProfile extends StatelessWidget {
   final UserEntity user;
   const _MyProfile({required this.user});
@@ -102,18 +80,18 @@ class _MyProfile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0F14),
+      backgroundColor: context.appBg,
       body: CustomScrollView(
         slivers: [
           _ProfileAppBar(user: user, isMe: true),
           SliverToBoxAdapter(
             child: Column(
               children: [
-                const SizedBox(height: 24),
+                SizedBox(height: 24.h),
                 _InfoCard(user: user),
-                const SizedBox(height: 12),
+                SizedBox(height: 12.h),
                 _ActionCard(user: user),
-                const SizedBox(height: 100),
+                SizedBox(height: 100.h),
               ],
             ),
           ),
@@ -124,37 +102,29 @@ class _MyProfile extends StatelessWidget {
 }
 
 // ─── Other Profile ────────────────────────────────────────────────────────────
-
-// ─── Other Profile ────────────────────────────────────────────────────────────
-
 class _OtherProfile extends ConsumerWidget {
   final UserEntity user;
   const _OtherProfile({required this.user});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 1. Watch the provider that fetches the complete profile from your database/backend
     final fullUserAsync = ref.watch(userByIdProvider(user.id));
-    
     final effectiveUser = fullUserAsync.maybeWhen(
       data: (fetchedUser) => fetchedUser ?? user,
       orElse: () => user,
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0F14),
+      backgroundColor: context.appBg,
       body: CustomScrollView(
         slivers: [
-          // 3. Pass the dynamic, updated user entity down to the sub-widgets
           _ProfileAppBar(user: effectiveUser, isMe: false),
           SliverToBoxAdapter(
             child: Column(
               children: [
-                const SizedBox(height: 24),
-                _InfoCard(
-                  user: effectiveUser,
-                ), // 🌟 The bio row now receives the full data!
-                const SizedBox(height: 100),
+                SizedBox(height: 24.h),
+                _InfoCard(user: effectiveUser),
+                SizedBox(height: 100.h),
               ],
             ),
           ),
@@ -165,18 +135,14 @@ class _OtherProfile extends ConsumerWidget {
 }
 
 // ─── AppBar ───────────────────────────────────────────────────────────────────
-
 class _ProfileAppBar extends ConsumerWidget {
   final UserEntity user;
   final bool isMe;
-
   const _ProfileAppBar({required this.user, required this.isMe});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isOnline =
-        ref.watch(userStatusProvider).onlineUsers[user.id] ?? false;
-
+    final isOnline = ref.watch(userStatusProvider).onlineUsers[user.id] ?? false;
     final socketLastSeen = ref.watch(userStatusProvider).lastSeen[user.id];
 
     if (!isMe) {
@@ -184,26 +150,25 @@ class _ProfileAppBar extends ConsumerWidget {
       userAsync.whenData((fetchedUser) {
         if (fetchedUser?.lastSeen != null &&
             !ref.read(userStatusProvider).lastSeen.containsKey(user.id)) {
-          Future.microtask(
-            () => ref
-                .read(userStatusProvider.notifier)
-                .setLastSeen(user.id, fetchedUser!.lastSeen),
-          );
+          Future.microtask(() => ref
+              .read(userStatusProvider.notifier)
+              .setLastSeen(user.id, fetchedUser!.lastSeen));
         }
       });
     }
 
     final effectiveLastSeen = socketLastSeen ?? user.lastSeen;
+    final isDark = !context.isLight;
 
     return SliverAppBar(
-      expandedHeight: 260,
+      expandedHeight: 280.h,
       pinned: true,
-      backgroundColor: const Color(0xFF0F172A),
-      iconTheme: const IconThemeData(color: Colors.white),
+      backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF1F5F9),
+      iconTheme: IconThemeData(color: context.textPrimary),
       actions: [
         if (isMe)
           IconButton(
-            icon: const Icon(Icons.edit_outlined, color: Colors.white),
+            icon: Icon(Icons.edit_outlined, color: context.textPrimary),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => EditProfileScreen(user: user)),
@@ -211,37 +176,71 @@ class _ProfileAppBar extends ConsumerWidget {
           ),
       ],
       flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 60),
-              ProfileAvatar(
-                username: user.username,
-                imageUrl: user.avatar,
-                isMe: isMe,
+        background: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Gradient background
+            Container(
+              decoration: BoxDecoration(
+                gradient: isDark
+                    ? const LinearGradient(
+                        colors: [Color(0xFF0B1120), Color(0xFF1E293B)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      )
+                    : const LinearGradient(
+                        colors: [Color(0xFFE2E8F0), Color(0xFFF8FAFC)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
               ),
-              const SizedBox(height: 14),
-              Text(
-                user.username,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.3,
+            ),
+            // Glass shimmer band
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 80.h,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        context.appBg.withOpacity(0.6),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 4),
-              _StatusLabel(isOnline: isOnline, lastSeen: effectiveLastSeen),
-            ],
-          ),
+            ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(height: 60.h),
+                ProfileAvatar(
+                  username: user.username,
+                  imageUrl: user.avatar,
+                  isMe: isMe,
+                ),
+                SizedBox(height: 14.h),
+                Text(
+                  user.username,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    fontSize: 22.sp,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                SizedBox(height: 4.h),
+                _StatusLabel(isOnline: isOnline, lastSeen: effectiveLastSeen),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -251,7 +250,6 @@ class _ProfileAppBar extends ConsumerWidget {
 class _StatusLabel extends StatelessWidget {
   final bool isOnline;
   final DateTime? lastSeen;
-
   const _StatusLabel({required this.isOnline, this.lastSeen});
 
   @override
@@ -261,35 +259,29 @@ class _StatusLabel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 7,
-            height: 7,
+            width: 7.r,
+            height: 7.r,
             decoration: const BoxDecoration(
-              color: Colors.greenAccent,
+              color: Color(0xFF4ADE80),
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 5),
-          const Text(
-            'Online',
-            style: TextStyle(color: Colors.greenAccent, fontSize: 13),
-          ),
+          SizedBox(width: 5.w),
+          Text('Online', style: TextStyle(color: const Color(0xFF4ADE80), fontSize: 13.sp)),
         ],
       );
     }
-
     if (lastSeen != null) {
       return Text(
         TimeUtils.formatLastSeen(lastSeen!),
-        style: const TextStyle(color: Colors.grey, fontSize: 13),
+        style: TextStyle(color: Colors.grey, fontSize: 13.sp),
       );
     }
-
-    // ✅ null lastSeen = user has hideLastSeen on — show nothing
     return const SizedBox.shrink();
   }
 }
-// ─── Info Card ────────────────────────────────────────────────────────────────
 
+// ─── Info Card ────────────────────────────────────────────────────────────────
 class _InfoCard extends StatelessWidget {
   final UserEntity user;
   const _InfoCard({required this.user});
@@ -297,11 +289,18 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: EdgeInsets.symmetric(horizontal: 16.w),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E2A3A),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        color: context.cardBg,
+        borderRadius: BorderRadius.circular(18.r),
+        border: Border.all(color: context.glassBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -310,19 +309,18 @@ class _InfoCard extends StatelessWidget {
             label: 'Bio',
             value: user.bio?.isNotEmpty == true ? user.bio! : 'No bio set',
           ),
-          const Divider(color: Colors.white10, height: 1, indent: 52),
+          Divider(color: context.glassBorder, height: 1, indent: 52.w),
           _InfoRow(
             icon: Icons.alternate_email_rounded,
             label: 'Username',
             value: '@${user.username}',
           ),
           if (user.birthDate != null) ...[
-            const Divider(color: Colors.white10, height: 1, indent: 52),
+            Divider(color: context.glassBorder, height: 1, indent: 52.w),
             _InfoRow(
               icon: Icons.cake_outlined,
               label: 'Birthday',
-              value:
-                  '${user.birthDate!.day}/${user.birthDate!.month}/${user.birthDate!.year}',
+              value: '${user.birthDate!.day}/${user.birthDate!.month}/${user.birthDate!.year}',
             ),
           ],
         ],
@@ -335,44 +333,39 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-
-  const _InfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
+  const _InfoRow({required this.icon, required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: 32.r,
+            height: 32.r,
             decoration: BoxDecoration(
               color: const Color(0xFF6366F1).withOpacity(0.12),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(8.r),
             ),
-            child: Icon(icon, color: const Color(0xFF818CF8), size: 17),
+            child: Icon(icon, color: const Color(0xFF818CF8), size: 17.sp),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12.w),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 14.sp,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
                   label,
-                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                  style: TextStyle(color: context.textTertiary, fontSize: 11.sp),
                 ),
               ],
             ),
@@ -383,8 +376,7 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-// ─── Action Card (my profile only) ───────────────────────────────────────────
-
+// ─── Action Card ─────────────────────────────────────────────────────────────
 class _ActionCard extends ConsumerWidget {
   final UserEntity user;
   const _ActionCard({required this.user});
@@ -392,11 +384,18 @@ class _ActionCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: EdgeInsets.symmetric(horizontal: 16.w),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E2A3A),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        color: context.cardBg,
+        borderRadius: BorderRadius.circular(18.r),
+        border: Border.all(color: context.glassBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -409,7 +408,7 @@ class _ActionCard extends ConsumerWidget {
               MaterialPageRoute(builder: (_) => const SettingsScreen()),
             ),
           ),
-          const Divider(color: Colors.white10, height: 1, indent: 52),
+          Divider(color: context.glassBorder, height: 1, indent: 52.w),
           _ActionRow(
             icon: Icons.edit_outlined,
             iconColor: Colors.blueAccent,
@@ -419,24 +418,21 @@ class _ActionCard extends ConsumerWidget {
               MaterialPageRoute(builder: (_) => EditProfileScreen(user: user)),
             ),
           ),
-          const Divider(color: Colors.white10, height: 1, indent: 52),
+          Divider(color: context.glassBorder, height: 1, indent: 52.w),
           _ActionRow(
-  icon: Icons.logout_rounded,
-  iconColor: Colors.redAccent,
-  label: 'Log Out',
-  labelColor: Colors.redAccent,
-  onTap: () {
-    // 1. Trigger the logout logic
-    ref.read(authProvider.notifier).logout();
-    
-    // 2. Perform the navigation
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const AuthPage()),
-      (route) => false,
-    );
-  },
-),
+            icon: Icons.logout_rounded,
+            iconColor: Colors.redAccent,
+            label: 'Log Out',
+            labelColor: Colors.redAccent,
+            onTap: () {
+              ref.read(authProvider.notifier).logout();
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const AuthPage()),
+                (route) => false,
+              );
+            },
+          ),
         ],
       ),
     );
@@ -449,7 +445,6 @@ class _ActionRow extends StatelessWidget {
   final String label;
   final Color labelColor;
   final VoidCallback onTap;
-
   const _ActionRow({
     required this.icon,
     required this.iconColor,
@@ -462,32 +457,32 @@ class _ActionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18.r),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
         child: Row(
           children: [
             Container(
-              width: 32,
-              height: 32,
+              width: 32.r,
+              height: 32.r,
               decoration: BoxDecoration(
                 color: iconColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
               ),
-              child: Icon(icon, color: iconColor, size: 17),
+              child: Icon(icon, color: iconColor, size: 17.sp),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             Expanded(
               child: Text(
                 label,
                 style: TextStyle(
-                  color: labelColor,
-                  fontSize: 14,
+                  color: labelColor == Colors.white ? context.textPrimary : labelColor,
+                  fontSize: 14.sp,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 18),
+            Icon(Icons.chevron_right_rounded, color: context.textTertiary, size: 18.sp),
           ],
         ),
       ),

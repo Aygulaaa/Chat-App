@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message_content.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message_status_tick.dart';
@@ -21,7 +22,7 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 12),
+      padding: EdgeInsets.symmetric(vertical: 2.h, horizontal: 12.w),
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Column(
@@ -34,7 +35,7 @@ class MessageBubble extends StatelessWidget {
               time: time,
             ),
             if (reactions.isNotEmpty) ...[
-              const SizedBox(height: 4),
+              SizedBox(height: 4.h),
               ReactionRow(reactions: reactions),
             ],
           ],
@@ -61,7 +62,7 @@ class _BubbleBody extends StatelessWidget {
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.72,
       ),
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+      padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 14.w),
       decoration: BoxDecoration(
         gradient: isMe
             ? const LinearGradient(
@@ -72,10 +73,10 @@ class _BubbleBody extends StatelessWidget {
             : null,
         color: isMe ? null : const Color(0xFF1E2A3A),
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(18),
-          topRight: const Radius.circular(18),
-          bottomLeft: Radius.circular(isMe ? 18 : 4),
-          bottomRight: Radius.circular(isMe ? 4 : 18),
+          topLeft: Radius.circular(18.r),
+          topRight: Radius.circular(18.r),
+          bottomLeft: Radius.circular(isMe ? 18.r : 4.r),
+          bottomRight: Radius.circular(isMe ? 4.r : 18.r),
         ),
         border: isMe
             ? null
@@ -85,7 +86,7 @@ class _BubbleBody extends StatelessWidget {
             color: isMe
                 ? const Color(0xFF6366F1).withOpacity(0.30)
                 : Colors.black.withOpacity(0.15),
-            blurRadius: isMe ? 16 : 6,
+            blurRadius: isMe ? 20 : 8,
             offset: const Offset(0, 4),
           ),
         ],
@@ -93,21 +94,21 @@ class _BubbleBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          MessageContent(message: message, isMe:isMe),
+          MessageContent(message: message, isMe: isMe),
           if (time != null) ...[
-            const SizedBox(height: 4),
+            SizedBox(height: 4.h),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   time!,
                   style: TextStyle(
-                    fontSize: 10.5,
+                    fontSize: 10.sp,
                     color: Colors.white.withOpacity(0.5),
                   ),
                 ),
                 if (isMe) ...[
-                  const SizedBox(width: 3),
+                  SizedBox(width: 3.w),
                   MessageStatusTick(status: message.status),
                 ],
               ],
@@ -117,4 +118,4 @@ class _BubbleBody extends StatelessWidget {
       ),
     );
   }
-}
+}

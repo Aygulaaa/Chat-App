@@ -11,14 +11,44 @@ class ApiClient {
     _token = token;
   }
 
+  void clearToken() {
+    _token = null;
+  }
+
   Uri _uri(String path) {
     return Uri.parse('${ApiConfig.baseUrl}$path');
   }
 
+  // ✅ УБРАЛИ apikey! Только для вашего бэкенда
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
     if (_token != null) 'Authorization': 'Bearer $_token',
   };
+
+  // ✅ Для публичных запросов (регистрация, логин) - БЕЗ токена!
+  Map<String, String> get _publicHeaders => {
+    'Content-Type': 'application/json',
+  };
+
+  // ✅ Публичный POST (для регистрации и логина)
+  Future<dynamic> postPublic(String path, Map<String, dynamic>? body) async {
+    final response = await http.post(
+      _uri(path),
+      headers: _publicHeaders, // ← БЕЗ токена!
+      body: body != null ? jsonEncode(body) : null,
+    );
+    return _handleResponse(response);
+  }
+
+  // ✅ Защищенный POST (с токеном)
+  Future<dynamic> post(String path, Map<String, dynamic>? body) async {
+    final response = await http.post(
+      _uri(path),
+      headers: _headers,
+      body: body != null ? jsonEncode(body) : null,
+    );
+    return _handleResponse(response);
+  }
 
   Future<dynamic> get(String path) async {
     print('🌐 GET ${ApiConfig.baseUrl}$path');
@@ -27,16 +57,6 @@ class ApiClient {
 
     print('📬 Status: ${response.statusCode}');
     print('📬 Body: ${response.body}');
-    return _handleResponse(response);
-  }
-
-  Future<dynamic> post(String path, Map<String, dynamic>? body) async {
-    final response = await http.post(
-      _uri(path),
-      headers: _headers,
-      body: body != null ? jsonEncode(body) : null,
-    );
-
     return _handleResponse(response);
   }
 
@@ -51,7 +71,6 @@ class ApiClient {
 
   Future<dynamic> delete(String path) async {
     final response = await http.delete(_uri(path), headers: _headers);
-
     return _handleResponse(response);
   }
 
@@ -71,6 +90,7 @@ class ApiClient {
     print('📋 Headers: ${response.headers}');
     print('📦 Body: ${response.body}');
     print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
     final contentType = response.headers['content-type'] ?? '';
 
     if (!contentType.contains('application/json')) {
@@ -87,19 +107,11 @@ class ApiClient {
 
     final errorMessage = (data is Map && data.containsKey('error'))
         ? data['error'].toString()
-        : 'Request failed with status: ${response.statusCode}';
+        : data is Map && data.containsKey('message')
+            ? data['message'].toString()
+            : 'Request failed with status: ${response.statusCode}';
 
     throw Exception(errorMessage);
-
-    // if (response.statusCode >= 200 && response.statusCode < 300) {
-    //   return data;
-    // } else {
-    //   data is Map && data.containsKey('error')
-    //       ? throw Exception(data['error'])
-    //       : throw Exception(
-    //           'Request failed with status: ${response.statusCode}',
-    //         );
-    // }
   }
 
   Future<dynamic> postMultipartBytes(

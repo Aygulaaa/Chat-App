@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/contact_list.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/contacts_search_bar.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/search_results_list.dart';
@@ -26,26 +28,27 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
     final isSearching = _query.isNotEmpty;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0F14),
+      backgroundColor: context.appBg,
       body: NestedScrollView(
         headerSliverBuilder: (context, _) => [
           SliverAppBar(
             pinned: true,
             floating: true,
-            backgroundColor: const Color(0xFF0F172A),
+            backgroundColor: context.appBg,
             elevation: 0,
-            title: const Text(
+            title: Text(
               'Contacts',
               style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 18,
+                color: context.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 20.sp,
+                letterSpacing: -0.3,
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(64),
+              preferredSize: Size.fromHeight(64.h),
               child: ColoredBox(
-                color: const Color(0xFF0F172A),
+                color: context.appBg,
                 child: ContactsSearchBar(
                   controller: _searchController,
                   onChanged: (val) => setState(() => _query = val),
@@ -58,9 +61,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
             ),
           ),
         ],
-        body: isSearching
-            ? SearchResultsList(query: _query)
-            : const ContactsList(),
+        body: isSearching ? SearchResultsList(query: _query) : const ContactsList(),
       ),
     );
   }

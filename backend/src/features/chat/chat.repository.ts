@@ -25,9 +25,9 @@ export const chatRepository = {
             'chatId', m.chat_id,
             'senderId', m.sender_id,
             'text', m.text,
-            'createdAt', m.created_at,
-            'deliveredAt', m.delivered_at,
-            'readAt', m.read_at
+            'createdAt', to_json(m.created_at),
+            'deliveredAt', to_json(m.delivered_at),
+            'readAt', to_json(m.read_at)
           )
           FROM messages m
           WHERE m.chat_id = c.id
@@ -97,9 +97,9 @@ export const chatRepository = {
             'chatId', m.chat_id,
             'senderId', m.sender_id,
             'text', m.text,
-            'createdAt', m.created_at,
-            'deliveredAt', m.delivered_at,
-            'readAt', m.read_at
+            'createdAt', to_json(m.created_at),
+            'deliveredAt', to_json(m.delivered_at),
+            'readAt', to_json(m.read_at)
           )
           FROM messages m
           WHERE m.chat_id = c.id

@@ -6,7 +6,7 @@ class TimeUtils {
     if (diff.inMinutes < 1) {
       return 'last seen just now';
     }
-    if (diff.inMinutes>1 && diff.inMinutes < 60) {
+    if (diff.inMinutes >= 1 && diff.inMinutes < 60) {
       return 'last seen ${diff.inMinutes}m ago';
     }
     if (diff.inHours < 24) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat_lis.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat_search_bar.dart';
@@ -23,7 +24,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   void initState() {
     super.initState();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final chatState = ref.read(chatProvider);
       if (chatState.chats.isEmpty && !chatState.isLoading) {
@@ -41,14 +41,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0F14),
-
-      // ───────────────── APP BAR ─────────────────
+      backgroundColor: context.appBg,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: const Color(0xFF0F172A),
-        foregroundColor: Colors.white,
-
+        backgroundColor: context.appBg,
+        foregroundColor: context.textPrimary,
         title: AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),
           child: _isSearching
@@ -63,27 +60,26 @@ class _HomePageState extends ConsumerState<HomePage> {
                     });
                   },
                 )
-              : const Text(
+              : Text(
                   'Chats',
-                  key: ValueKey('title'),
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                  key: const ValueKey('title'),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 20.sp,
+                    color: context.textPrimary,
+                    letterSpacing: -0.3,
+                  ),
                 ),
         ),
-
         actions: _isSearching
             ? []
             : [
                 IconButton(
-                  icon: const Icon(Icons.search_rounded),
-                  onPressed: () {
-                    setState(() {
-                      _isSearching = true;
-                    });
-                  },
+                  icon: Icon(Icons.search_rounded, color: context.textSecondary),
+                  onPressed: () => setState(() => _isSearching = true),
                 ),
-
                 IconButton(
-                  icon: const Icon(Icons.group_add_outlined),
+                  icon: Icon(Icons.group_add_outlined, color: context.textSecondary),
                   onPressed: () {
                     showModalBottomSheet(
                       context: context,
@@ -95,15 +91,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ],
       ),
-
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF0B0F14), Color(0xFF111827)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
+        decoration: BoxDecoration(gradient: context.appBgGradient),
         child: _isSearching
             ? ChatSearchResults(query: _query)
             : const ChatList(),

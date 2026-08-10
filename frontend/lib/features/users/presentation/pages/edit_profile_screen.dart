@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/users/presentation/providers/user_provider.dart';
 import 'package:my_chat_app/features/users/presentation/widgets/profile_avatar.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   final UserEntity user;
-
   const EditProfileScreen({super.key, required this.user});
 
   @override
@@ -22,10 +23,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _usernameController =
-        TextEditingController(text: widget.user.username);
-    _bioController =
-        TextEditingController(text: widget.user.bio ?? '');
+    _usernameController = TextEditingController(text: widget.user.username);
+    _bioController = TextEditingController(text: widget.user.bio ?? '');
     _selectedDate = widget.user.birthDate;
   }
 
@@ -55,14 +54,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       );
       return;
     }
-
     setState(() => _isSaving = true);
     try {
       await ref.read(userProfileProvider.notifier).updateInfo({
         'username': username,
         'bio': _bioController.text.trim(),
-        if (_selectedDate != null)
-          'birthDate': _selectedDate!.toIso8601String(),
+        if (_selectedDate != null) 'birthDate': _selectedDate!.toIso8601String(),
       });
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -79,26 +76,27 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0F14),
+      backgroundColor: context.appBg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F172A),
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: context.appBg,
         elevation: 0,
-        title: const Text(
+        iconTheme: IconThemeData(color: context.textPrimary),
+        title: Text(
           'Edit Profile',
           style: TextStyle(
-            color: Colors.white,
+            color: context.textPrimary,
             fontWeight: FontWeight.w600,
+            fontSize: 17.sp,
           ),
         ),
         actions: [
           _isSaving
-              ? const Padding(
-                  padding: EdgeInsets.all(16),
+              ? Padding(
+                  padding: EdgeInsets.all(16.r),
                   child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
+                    width: 20.r,
+                    height: 20.r,
+                    child: const CircularProgressIndicator(
                       color: Color(0xFF6366F1),
                       strokeWidth: 2,
                     ),
@@ -106,23 +104,23 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 )
               : TextButton(
                   onPressed: _save,
-                  child: const Text(
+                  child: Text(
                     'Save',
                     style: TextStyle(
-                      color: Color(0xFF6366F1),
+                      color: const Color(0xFF6366F1),
                       fontWeight: FontWeight.w700,
-                      fontSize: 15,
+                      fontSize: 15.sp,
                     ),
                   ),
                 ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(20.r),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ✅ Avatar at top of edit screen too
+            // Avatar
             Center(
               child: ProfileAvatar(
                 username: widget.user.username,
@@ -130,14 +128,21 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 isMe: true,
               ),
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: 8.h),
+            Center(
+              child: Text(
+                'Tap avatar to change photo',
+                style: TextStyle(color: context.textTertiary, fontSize: 12.sp),
+              ),
+            ),
+            SizedBox(height: 32.h),
 
             _Field(
               label: 'Username',
               controller: _usernameController,
               hint: 'Enter your username',
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16.h),
 
             _Field(
               label: 'Bio',
@@ -146,42 +151,45 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               maxLines: 4,
               maxLength: 150,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16.h),
 
             // Birthday picker
-            const Text(
+            Text(
               'Birthday',
-              style: TextStyle(color: Colors.white54, fontSize: 13),
+              style: TextStyle(color: context.textSecondary, fontSize: 13.sp),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8.h),
             GestureDetector(
               onTap: _pickDate,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 15),
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 15.h),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
+                  color: context.glassBg,
+                  borderRadius: BorderRadius.circular(14.r),
+                  border: Border.all(color: context.glassBorder),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.cake_outlined,
-                        color: Colors.white38, size: 18),
-                    const SizedBox(width: 12),
+                    Icon(Icons.cake_outlined, color: context.textTertiary, size: 18.sp),
+                    SizedBox(width: 12.w),
                     Text(
                       _selectedDate != null
                           ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
                           : 'Set birthday',
                       style: TextStyle(
-                        color: _selectedDate != null
-                            ? Colors.white
-                            : Colors.white38,
-                        fontSize: 15,
+                        color: _selectedDate != null ? context.textPrimary : context.textTertiary,
+                        fontSize: 15.sp,
                       ),
                     ),
                     const Spacer(),
-                    const Icon(Icons.edit_outlined,
-                        color: Colors.white24, size: 15),
+                    Icon(Icons.edit_outlined, color: context.textTertiary, size: 15.sp),
                   ],
                 ),
               ),
@@ -213,26 +221,35 @@ class _Field extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style:
-                const TextStyle(color: Colors.white54, fontSize: 13)),
-        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(color: context.textSecondary, fontSize: 13.sp),
+        ),
+        SizedBox(height: 8.h),
         TextField(
           controller: controller,
           maxLines: maxLines,
           maxLength: maxLength,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: context.textPrimary, fontSize: 15.sp),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(color: Colors.white24),
+            hintStyle: TextStyle(color: context.textTertiary),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
+            fillColor: context.glassBg,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(14.r),
+              borderSide: BorderSide(color: context.glassBorder),
             ),
-            contentPadding: const EdgeInsets.all(16),
-            counterStyle: const TextStyle(color: Colors.white24),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14.r),
+              borderSide: BorderSide(color: context.glassBorder),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14.r),
+              borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
+            ),
+            contentPadding: EdgeInsets.all(16.r),
+            counterStyle: TextStyle(color: context.textTertiary),
           ),
         ),
       ],

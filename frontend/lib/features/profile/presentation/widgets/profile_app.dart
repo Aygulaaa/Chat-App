@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:my_chat_app/core/utils/format_last_seen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
-import 'package:my_chat_app/features/users/presentation/pages/edit_profile_screen.dart';
-import 'package:my_chat_app/features/users/presentation/widgets/profile_avatar.dart';
+import 'package:my_chat_app/features/profile/presentation/pages/edit_profile_screen.dart';
+import 'package:my_chat_app/features/profile/presentation/widgets/profile_avatar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ProfileAppBar extends ConsumerWidget implements PreferredSizeWidget {

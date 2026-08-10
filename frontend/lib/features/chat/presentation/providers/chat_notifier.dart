@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
@@ -260,7 +261,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     final updatedChats = state.chats.map((chat) {
       if (chat.id == chatId) {
         print("chatId: ${chat.id}, unreadCount: ${chat.unreadCount}");
-        return chat.copyWith(unreadCount: chat.unreadCount);
+        return chat.copyWith(unreadCount: chat.unreadCount +1);
       }
       return chat;
     }).toList();
@@ -271,6 +272,52 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(
       chats: state.chats.where((c) => c.id != chatId).toList(),
     );
+  }
+
+  Future<void> updateGroupInfo(int chatId, {String? name, Uint8List? avatarBytes, String? filename, String? mimeType}) async {
+    try {
+      final updatedData = await ref.read(chatRepositoryProvider).updateGroupInfo(
+        chatId, 
+        name: name, 
+        avatarBytes: avatarBytes, 
+        filename: filename, 
+        mimeType: mimeType
+      );
+      
+      final updatedChats = state.chats.map((chat) {
+        if (chat.id == chatId) {
+          return chat.copyWith(
+            name: updatedData['name'],
+            avatar: updatedData['avatar'],
+          );
+        }
+        return chat;
+      }).toList();
+      state = state.copyWith(chats: updatedChats);
+    } catch (e) {
+      print('❌ updateGroupInfo error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> addMember(int chatId, int userId) async {
+    try {
+      await ref.read(chatRepositoryProvider).addMember(chatId, userId);
+      await loadChats(); 
+    } catch (e) {
+      print('❌ addMember error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> removeMember(int chatId, int userId) async {
+    try {
+      await ref.read(chatRepositoryProvider).removeMember(chatId, userId);
+      await loadChats();
+    } catch (e) {
+      print('❌ removeMember error: $e');
+      rethrow;
+    }
   }
 
   @override

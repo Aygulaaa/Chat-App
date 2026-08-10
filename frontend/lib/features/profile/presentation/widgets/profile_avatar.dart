@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:my_chat_app/features/users/presentation/providers/user_provider.dart';
+import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
 
 class ProfileAvatar extends ConsumerStatefulWidget {
   final String username;

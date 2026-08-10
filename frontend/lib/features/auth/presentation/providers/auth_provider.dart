@@ -3,7 +3,7 @@ import 'package:my_chat_app/core/network/api_client.dart';
 import 'package:my_chat_app/core/storage/secure_storage.dart';
 import 'package:my_chat_app/features/auth/domain/usecases/logout_user.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
-import 'package:my_chat_app/features/users/presentation/providers/user_provider.dart';
+import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/usecases/login_user.dart';

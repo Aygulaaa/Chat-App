@@ -101,6 +101,16 @@ export const chatSocket = (io: Server) => {
         socket.emit("initial_online_users", Array.from(onlineUsers.keys()));
       });
 
+      socket.on("typing", ({ chatId, userId }: { chatId: number, userId: number }) => {
+        if (!socket.user || !chatId) return;
+        socket.to(`chat_${chatId}`).emit("user_typing", { chatId, userId, isTyping: true });
+      });
+
+      socket.on("stop_typing", ({ chatId, userId }: { chatId: number, userId: number }) => {
+        if (!socket.user || !chatId) return;
+        socket.to(`chat_${chatId}`).emit("user_typing", { chatId, userId, isTyping: false });
+      });
+
 
       socket.on("message_received", async ({ messageId }: MessageReceivedPayload) => {
         try {

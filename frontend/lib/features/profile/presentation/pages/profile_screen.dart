@@ -9,9 +9,9 @@ import 'package:my_chat_app/features/auth/presentation/pages/auth_page.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
 import 'package:my_chat_app/features/settings/presentation/pages/settings_screen.dart';
-import 'package:my_chat_app/features/users/presentation/pages/edit_profile_screen.dart';
-import 'package:my_chat_app/features/users/presentation/providers/user_provider.dart';
-import 'package:my_chat_app/features/users/presentation/widgets/profile_avatar.dart';
+import 'package:my_chat_app/features/profile/presentation/pages/edit_profile_screen.dart';
+import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
+import 'package:my_chat_app/features/profile/presentation/widgets/profile_avatar.dart';
 
 class ProfileScreen extends ConsumerWidget {
   final UserEntity? user;

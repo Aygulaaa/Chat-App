@@ -99,4 +99,30 @@ class ChatRemoteDatatsources {
   Future<void> removeMember(int chatId, int userId) async {
     await api.delete(ApiEndpoints.removeMember(chatId, userId));
   }
+
+  Future<Map<String, dynamic>> updateGroupInfo(
+    int chatId, {
+    String? name,
+    Uint8List? avatarBytes,
+    String? filename,
+    String? mimeType,
+  }) async {
+    final fields = <String, String>{};
+    if (name != null) fields['name'] = name;
+
+    if (avatarBytes != null && filename != null && mimeType != null) {
+      final response = await api.patchMultipartBytes(
+        ApiEndpoints.groupInfo(chatId),
+        fields: fields,
+        bytes: avatarBytes,
+        filename: filename,
+        field: 'avatar',
+        mimeType: mimeType,
+      );
+      return response as Map<String, dynamic>;
+    } else {
+      final response = await api.patch(ApiEndpoints.groupInfo(chatId), fields);
+      return response as Map<String, dynamic>;
+    }
+  }
 }

@@ -164,10 +164,21 @@ export const chatController = {
     async updateGroupInfo(req: AuthRequest, res: Response) {
         try {
             const chatId = Number(req.params.chatId);
-            const { name, avatar } = req.body;
-            const result = await chatService.updateGroupInfo(chatId, name, avatar);
+            const { name } = req.body;
+            let avatarUrl = req.body.avatar;
+
+            if (req.file) {
+                avatarUrl = await chatService.uploadGroupAvatar(
+                    req.file.buffer,
+                    req.file.originalname,
+                    req.file.mimetype
+                );
+            }
+
+            const result = await chatService.updateGroupInfo(chatId, name, avatarUrl);
             res.json(result);
         } catch (err) {
+            console.error('Group info update error:', err);
             res.status(500).json({ error: 'Failed to update group' });
         }
     },

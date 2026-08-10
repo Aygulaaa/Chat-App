@@ -5,12 +5,14 @@ class MessageState {
   final bool isLoading;
   final String? error;
   final String? typingStatus;
+  final int? typingUserId;
 
   const MessageState({
     this.messages = const [],
     this.isLoading = false,
     this.error,
     this.typingStatus,
+    this.typingUserId,
   });
 
   MessageState copyWith({
@@ -19,6 +21,7 @@ class MessageState {
     String? error,
     bool clearError = false,      
     String? typingStatus,
+    int? typingUserId,
     bool clearTyping = false,    
   }) {
     return MessageState(
@@ -26,6 +29,7 @@ class MessageState {
       isLoading: isLoading ?? this.isLoading,   
       error: clearError ? null : error ?? this.error,
       typingStatus: clearTyping ? null : typingStatus ?? this.typingStatus,
+      typingUserId: clearTyping ? null : typingUserId ?? this.typingUserId,
     );
   }
 }

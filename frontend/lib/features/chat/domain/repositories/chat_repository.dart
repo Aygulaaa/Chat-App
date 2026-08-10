@@ -21,5 +21,15 @@ abstract class ChatRepository {
     String mimeType,
   );
 
+  Future<void> addMember(int chatId, int userId);
+  Future<void> removeMember(int chatId, int userId);
+  Future<Map<String, dynamic>> updateGroupInfo(
+    int chatId, {
+    String? name,
+    Uint8List? avatarBytes,
+    String? filename,
+    String? mimeType,
+  });
+
   // Future<void> deleteChat(String chatId);
 }

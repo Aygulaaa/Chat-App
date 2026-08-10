@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class TypingIndicator extends StatefulWidget {
-  const TypingIndicator({super.key});
+  final String? avatarUrl;
+
+  const TypingIndicator({
+    super.key,
+    this.avatarUrl,
+  });
 
   @override
   State<TypingIndicator> createState() => _TypingIndicatorState();
@@ -32,25 +38,39 @@ class _TypingIndicatorState extends State<TypingIndicator>
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Align(
         alignment: Alignment.centerLeft,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E2A3A),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(18),
-              topRight: Radius.circular(18),
-              bottomRight: Radius.circular(18),
-              bottomLeft: Radius.circular(4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (widget.avatarUrl != null) ...[
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: const Color(0xFF1E2A3A),
+                backgroundImage: CachedNetworkImageProvider(widget.avatarUrl!),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E2A3A),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(18),
+                  topRight: Radius.circular(18),
+                  bottomRight: Radius.circular(18),
+                  bottomLeft: Radius.circular(4),
+                ),
+                border: Border.all(color: Colors.white.withOpacity(0.07)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(
+                  3,
+                  (i) => _Dot(index: i, controller: _controller),
+                ),
+              ),
             ),
-            border: Border.all(color: Colors.white.withOpacity(0.07)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(
-              3,
-              (i) => _Dot(index: i, controller: _controller),
-            ),
-          ),
+          ],
         ),
       ),
     );

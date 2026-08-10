@@ -85,6 +85,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         isOnline: isGroup ? false : isOnline,
         otherUser: otherUser,
         groupAvatar: isGroup ? chat.avatar : null,
+        isGroup: isGroup,
       ),
       body: Container(
         decoration: BoxDecoration(gradient: context.appBgGradient),
@@ -101,6 +102,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       messages: state.messages,
                       userId: userId,
                       isTyping: typingStatus != null,
+                      typingUserId: state.typingUserId,
+                      isGroup: isGroup,
+                      participants: users,
                     ),
             ),
             MessageInput(chatId: widget.chatId),

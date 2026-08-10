@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/typing_status.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/user_avatar.dart';
-import 'package:my_chat_app/features/users/presentation/pages/profile_screen.dart';
+import 'package:my_chat_app/features/profile/presentation/pages/profile_screen.dart';
+import 'package:my_chat_app/features/chat/presentation/pages/group_profile_screen.dart';
 
 class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int chatId;
@@ -10,6 +11,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool isOnline;
   final UserModel? otherUser;
   final String? groupAvatar;
+  final bool isGroup;
 
   const ChatAppBar({
     super.key,
@@ -17,7 +19,8 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.username,
     required this.isOnline, 
     this.otherUser,
-    this.groupAvatar
+    this.groupAvatar,
+    this.isGroup = false,
   });
 
   @override
@@ -30,7 +33,11 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
       titleSpacing: 0,
       title: InkWell(
         onTap: (){
-          Navigator.push(context, MaterialPageRoute(builder: (_)=> ProfileScreen(user:otherUser)));
+          if (isGroup) {
+            Navigator.push(context, MaterialPageRoute(builder: (_)=> GroupProfileScreen(chatId: chatId)));
+          } else {
+            Navigator.push(context, MaterialPageRoute(builder: (_)=> ProfileScreen(user: otherUser)));
+          }
         },
         child: Row(
           children: [

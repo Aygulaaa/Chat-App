@@ -52,96 +52,94 @@ class MessageNotifier extends StateNotifier<MessageState> {
     required this.chatId,
   }) : _datasource = datasource,
        super(const MessageState()) {
-        loadMessages();
+    loadMessages();
     _init();
   }
-Future<void> _init() async {
-  if (_initialized) return;
-  _initialized = true;
+  Future<void> _init() async {
+    if (_initialized) return;
+    _initialized = true;
 
-  _listenToMessages();
-  _listenToTyping();
-  _listenToReadReceipts();
-  _listenToChatRead();
-  _listenToDelivered();
+    _listenToMessages();
+    _listenToTyping();
+    _listenToReadReceipts();
+    _listenToChatRead();
+    _listenToDelivered();
 
-  await joinChat(chatId);
+    await joinChat(chatId);
 
-  await loadMessages();
-}
+    await loadMessages();
+  }
 
-void _listenToMessages() {
-  _messageSub?.cancel();
+  void _listenToMessages() {
+    _messageSub?.cancel();
 
-  _messageSub = _datasource.onMessage().listen((data) {
-    try {
-      final newMessage = MessageModel.fromJson(data);
-      if (newMessage.chatId != chatId) return;
-      print('📥 RAW SOCKET MESSAGE RECEIVED: $data');
-      final myId = ref.read(authProvider).user?.id;
-      final isMyMessage = newMessage.senderId == myId;
+    _messageSub = _datasource.onMessage().listen((data) {
+      try {
+        final newMessage = MessageModel.fromJson(data);
+        if (newMessage.chatId != chatId) return;
+        print('📥 RAW SOCKET MESSAGE RECEIVED: $data');
+        final myId = ref.read(authProvider).user?.id;
+        final isMyMessage = newMessage.senderId == myId;
 
-      // 2. If it's MY message, check if we have a temporary optimistic message to swap out
-      if (isMyMessage) {
-        final tempIndex = state.messages.indexWhere(
-          (m) =>
-              m.text == newMessage.text &&
-              m.id.toString().length > 10, // matches temporary local ID length
-        );
+        // 2. If it's MY message, check if we have a temporary optimistic message to swap out
+        if (isMyMessage) {
+          final tempIndex = state.messages.indexWhere(
+            (m) =>
+                m.text == newMessage.text &&
+                m.id.toString().length >
+                    10, // matches temporary local ID length
+          );
 
-        if (tempIndex != -1) {
-          final updated = List<Message>.from(state.messages);
-          updated[tempIndex] = newMessage;
-          state = state.copyWith(messages: updated);
+          if (tempIndex != -1) {
+            final updated = List<Message>.from(state.messages);
+            updated[tempIndex] = newMessage;
+            state = state.copyWith(messages: updated);
+          }
+          // If no temp message found and it's already in the list, do nothing to avoid duplicates
+          return;
         }
-        // If no temp message found and it's already in the list, do nothing to avoid duplicates
-        return; 
+
+        // 3. If it's FROM SOMEONE ELSE: handle normal insertion
+        final exists = state.messages.any((m) => m.id == newMessage.id);
+        if (!exists) {
+          state = state.copyWith(messages: [newMessage, ...state.messages]);
+        }
+      } catch (e) {
+        print('❌ Socket parse error: $e');
       }
+    });
+  }
 
-      // 3. If it's FROM SOMEONE ELSE: handle normal insertion
-      final exists = state.messages.any((m) => m.id == newMessage.id);
-      if (!exists) {
-        state = state.copyWith(messages: [newMessage, ...state.messages]);
-      }
-    } catch (e) {
-      print('❌ Socket parse error: $e');
-    }
-  });
-}
+  void _listenToDelivered() {
+    _deliveredSub?.cancel();
 
-void _listenToDelivered() {
-  _deliveredSub?.cancel();
+    _deliveredSub = _datasource.onMessagesDelivered().listen((data) {
+      print('📦 messages_delivered: $data');
 
-  _deliveredSub =
-      _datasource.onMessagesDelivered().listen((data) {
-    print('📦 messages_delivered: $data');
+      final List<dynamic> messageIds = data['messageIds'] ?? [];
 
-    final List<dynamic> messageIds =
-        data['messageIds'] ?? [];
-
-    final updated = state.messages.map((m) {
-      final inList = messageIds.any(
-        (id) => int.tryParse(id.toString()) == m.id,
-      );
-
-      if (inList &&
-          m.status != MessageStatus.read) {
-        return m.copyWith(
-          status: MessageStatus.delivered,
-          deliveredAt: DateTime.now(),
+      final updated = state.messages.map((m) {
+        final inList = messageIds.any(
+          (id) => int.tryParse(id.toString()) == m.id,
         );
-      }
 
-      return m;
-    }).toList();
+        if (inList && m.status != MessageStatus.read) {
+          return m.copyWith(
+            status: MessageStatus.delivered,
+            deliveredAt: DateTime.now(),
+          );
+        }
 
-    state = state.copyWith(messages: updated);
-  });
-}
+        return m;
+      }).toList();
+
+      state = state.copyWith(messages: updated);
+    });
+  }
 
   void _listenToChatRead() {
     _chatReadSub?.cancel();
-    _chatReadSub = _datasource.onMessagesRead().listen((data) {
+    _chatReadSub = _datasource.onChatRead().listen((data) {
       print('📖 chat_read received: $data');
       final incomingChatId = int.tryParse(data['chatId'].toString());
       print('📖 chatId: $incomingChatId vs this.chatId: $chatId');
@@ -152,44 +150,40 @@ void _listenToDelivered() {
     });
   }
 
-void _listenToReadReceipts() {
-  _readSub?.cancel();
+  void _listenToReadReceipts() {
+    _readSub?.cancel();
 
-  _readSub = _datasource.onMessagesRead().listen((data) {
-    print('📩 messages_read received: $data');
+    _readSub = _datasource.onMessagesRead().listen((data) {
+      print('📩 messages_read received: $data');
 
-    final incomingChatId = int.tryParse(
-      data['chatId'].toString(),
-    );
+      final incomingChatId = int.tryParse(data['chatId'].toString());
 
-    if (incomingChatId != chatId) return;
+      if (incomingChatId != chatId) return;
 
-    final List<dynamic> rawIds =
-        data['messageIds'] ?? [];
+      final List<dynamic> rawIds = data['messageIds'] ?? [];
 
-    final ids = rawIds
-        .map((e) => int.tryParse(e.toString()))
-        .whereType<int>()
-        .toSet();
+      final ids = rawIds
+          .map((e) => int.tryParse(e.toString()))
+          .whereType<int>()
+          .toSet();
 
-    final updated = state.messages.map((m) {
-      if (ids.contains(m.id)) {
-        return m.copyWith(
-          status: MessageStatus.read,
-          deliveredAt:
-              m.deliveredAt ?? DateTime.now(),
-          readAt: DateTime.now(),
-        );
-      }
+      final updated = state.messages.map((m) {
+        if (ids.contains(m.id)) {
+          return m.copyWith(
+            status: MessageStatus.read,
+            deliveredAt: m.deliveredAt ?? DateTime.now(),
+            readAt: DateTime.now(),
+          );
+        }
 
-      return m;
-    }).toList();
+        return m;
+      }).toList();
 
-    state = state.copyWith(messages: updated);
+      state = state.copyWith(messages: updated);
 
-    print('✅ Updated ${ids.length} messages to READ');
-  });
-}
+      print('✅ Updated ${ids.length} messages to READ');
+    });
+  }
 
   void _listenToTyping() {
     _typingSub?.cancel();
@@ -197,6 +191,9 @@ void _listenToReadReceipts() {
 
     _typingSub = _datasource.onUserTyping().listen((data) {
       print('🔔 RAW typing data: $data');
+      final incomingChatId = int.tryParse(data['chatId'].toString());
+      if (incomingChatId != chatId) return;
+
       final typingUserId = int.tryParse(data['userId'].toString());
       final bool isTyping = data['isTyping'] == true;
       final myId = ref.read(authProvider).user?.id;
@@ -207,7 +204,10 @@ void _listenToReadReceipts() {
 
       _typingTimer?.cancel();
       if (isTyping) {
-        state = state.copyWith(typingStatus: 'typing...');
+        state = state.copyWith(
+          typingStatus: 'typing...',
+          typingUserId: typingUserId,
+        );
 
         _typingTimer = Timer(const Duration(seconds: 3), () {
           if (mounted) state = state.copyWith(clearTyping: true);

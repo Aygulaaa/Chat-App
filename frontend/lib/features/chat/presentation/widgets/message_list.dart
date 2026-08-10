@@ -1,20 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:my_chat_app/core/utils/date_formatter.dart';
+import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/date_divider.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message_bubble.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/typing_indicator.dart';
+import 'package:my_chat_app/features/profile/presentation/pages/profile_screen.dart';
+import 'package:collection/collection.dart';
 
 class MessageList extends StatelessWidget {
   final List<Message> messages;
   final int? userId;
   final bool isTyping;
+  final int? typingUserId;
+  final bool isGroup;
+  final List<UserModel> participants;
 
   const MessageList({
     super.key,
     required this.messages,
     required this.userId,
     required this.isTyping,
+    this.typingUserId,
+    this.isGroup = false,
+    this.participants = const [],
   });
 
   @override
@@ -34,11 +43,16 @@ class MessageList extends StatelessWidget {
       itemCount: itemCount,
       itemBuilder: (context, index) {
         if (isTyping && index == 0) {
-          return const TypingIndicator();
+          final typist = participants.firstWhereOrNull((p) => p.id == typingUserId);
+          return TypingIndicator(
+            avatarUrl: isGroup ? typist?.avatar : null,
+          );
         }
 
         final msgIndex = isTyping ? index - 1 : index;
         final msg = messages[msgIndex];
+        
+        final sender = participants.firstWhereOrNull((p) => p.id == msg.senderId);
 
         final showDateHeader =
             msgIndex == messages.length - 1 ||
@@ -52,6 +66,16 @@ class MessageList extends StatelessWidget {
               message: msg,
               isMe: msg.senderId == userId,
               time: DateFormatter.formatTime(msg.createdAt),
+              isGroup: isGroup,
+              senderAvatar: sender?.avatar,
+              onAvatarTap: sender != null
+                  ? () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfileScreen(user: sender),
+                        ),
+                      )
+                  : null,
             ),
           ],
         );

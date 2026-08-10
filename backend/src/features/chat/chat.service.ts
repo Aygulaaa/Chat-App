@@ -145,6 +145,29 @@ export const chatService = {
     return result.rows[0];
   },
 
+  async uploadGroupAvatar(fileBuffer: Buffer, originalName: string, mimeType: string) {
+    const resourceType = getResourceType(mimeType);
+
+    const fileUrl = await new Promise<string>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'group_avatars',
+          resource_type: resourceType,
+          public_id: `${Date.now()}_${originalName.replace(/\\s+/g, '_')}`,
+          use_filename: true,
+          unique_filename: false,
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result!.secure_url);
+        }
+      );
+      stream.end(fileBuffer);
+    });
+
+    return fileUrl;
+  },
+
   async updateGroupInfo(chatId: number, name?: string, avatar?: string) {
     const result = await chatRepository.updateGroupInfo(chatId, name, avatar);
     return result.rows[0];

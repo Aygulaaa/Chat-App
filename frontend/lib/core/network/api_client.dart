@@ -147,4 +147,42 @@ class ApiClient {
 
     return _handleResponse(response);
   }
+
+  Future<dynamic> patchMultipartBytes(
+    String path, {
+    required Map<String, String> fields,
+    Uint8List? bytes,
+    String? filename,
+    String? field,
+    String? mimeType,
+  }) async {
+    print('🌐 PATCH multipart: ${ApiConfig.baseUrl}$path');
+
+    final request = http.MultipartRequest('PATCH', _uri(path));
+
+    if (_token != null) {
+      request.headers['Authorization'] = 'Bearer $_token';
+    }
+
+    request.fields.addAll(fields);
+
+    if (bytes != null && field != null && filename != null && mimeType != null) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          field,
+          bytes,
+          filename: filename,
+          contentType: MediaType.parse(mimeType),
+        ),
+      );
+    }
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    print('📬 status: ${response.statusCode}');
+    print('📬 body: ${response.body}');
+
+    return _handleResponse(response);
+  }
 }

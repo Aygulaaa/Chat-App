@@ -28,6 +28,6 @@ router.post(
 
 router.post('/:chatId/members', chatController.addMember);
 router.delete('/:chatId/members/:userId', chatController.removeMember);
-router.patch('/:chatId/group', chatController.updateGroupInfo);
+router.patch('/:chatId/group', upload.single('avatar'), chatController.updateGroupInfo);
 
 export default router;

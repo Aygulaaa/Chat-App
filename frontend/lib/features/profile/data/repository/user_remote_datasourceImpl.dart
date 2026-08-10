@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
-import 'package:my_chat_app/features/users/data/datasources/user_remote_datasource.dart';
-import 'package:my_chat_app/features/users/domain/repository/user_repository.dart';
+import 'package:my_chat_app/features/profile/data/datasources/user_remote_datasource.dart';
+import 'package:my_chat_app/features/profile/domain/repository/user_repository.dart';
 
 class UserRepositoryImpl implements UserRepository {
   final UserRemoteDatasource  remoteDatasource;

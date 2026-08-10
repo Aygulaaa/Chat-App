@@ -75,4 +75,31 @@ class ChatRepositoryImpl implements ChatRepository {
       rethrow;
     }
   }
+
+  @override
+  Future<void> addMember(int chatId, int userId) {
+    return remote.addMember(chatId, userId);
+  }
+
+  @override
+  Future<void> removeMember(int chatId, int userId) {
+    return remote.removeMember(chatId, userId);
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateGroupInfo(
+    int chatId, {
+    String? name,
+    Uint8List? avatarBytes,
+    String? filename,
+    String? mimeType,
+  }) {
+    return remote.updateGroupInfo(
+      chatId,
+      name: name,
+      avatarBytes: avatarBytes,
+      filename: filename,
+      mimeType: mimeType,
+    );
+  }
 }

@@ -3,7 +3,7 @@ import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/contacts/presentation/pages/contacts_screen.dart';
 import 'package:my_chat_app/features/app_shell/presentation/widgets/glass_nav_bar.dart';
 import 'package:my_chat_app/features/chat/presentation/pages/home_page.dart';
-import 'package:my_chat_app/features/users/presentation/pages/profile_screen.dart';
+import 'package:my_chat_app/features/profile/presentation/pages/profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});

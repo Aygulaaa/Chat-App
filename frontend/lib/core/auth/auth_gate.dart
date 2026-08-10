@@ -5,7 +5,7 @@ import 'package:my_chat_app/features/auth/presentation/pages/auth_page.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_state.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
-import 'package:my_chat_app/features/users/presentation/providers/user_provider.dart';
+import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
 
 class AuthGate extends ConsumerStatefulWidget {
   const AuthGate({super.key});

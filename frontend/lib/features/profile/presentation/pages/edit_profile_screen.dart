@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
-import 'package:my_chat_app/features/users/presentation/providers/user_provider.dart';
-import 'package:my_chat_app/features/users/presentation/widgets/profile_avatar.dart';
+import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
+import 'package:my_chat_app/features/profile/presentation/widgets/profile_avatar.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   final UserEntity user;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message_content.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message_status_tick.dart';
@@ -10,6 +11,9 @@ class MessageBubble extends StatelessWidget {
   final bool isMe;
   final String? time;
   final List<String> reactions;
+  final bool isGroup;
+  final String? senderAvatar;
+  final VoidCallback? onAvatarTap;
 
   const MessageBubble({
     super.key,
@@ -17,27 +21,58 @@ class MessageBubble extends StatelessWidget {
     required this.isMe,
     this.time,
     this.reactions = const [],
+    this.isGroup = false,
+    this.senderAvatar,
+    this.onAvatarTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final showAvatar = isGroup && !isMe;
+
+
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 2.h, horizontal: 12.w),
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-        child: Column(
-          crossAxisAlignment:
-              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            _BubbleBody(
-              message: message,
-              isMe: isMe,
-              time: time,
+            if (showAvatar)
+              Padding(
+                padding: EdgeInsets.only(right: 8.w),
+                child: GestureDetector(
+                  onTap: onAvatarTap,
+                  child: CircleAvatar(
+                    radius: 12.r,
+                    backgroundColor: const Color(0xFF1E2A3A),
+                    backgroundImage: senderAvatar != null
+                        ? CachedNetworkImageProvider(senderAvatar!)
+                        : null,
+                    child: senderAvatar == null
+                        ? Icon(Icons.person, size: 16.r, color: Colors.white54)
+                        : null,
+                  ),
+                ),
+              ),
+            Flexible(
+              child: Column(
+                crossAxisAlignment:
+                    isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: [
+                  _BubbleBody(
+                    message: message,
+                    isMe: isMe,
+                    time: time,
+                  ),
+                  if (reactions.isNotEmpty) ...[
+                    SizedBox(height: 4.h),
+                    ReactionRow(reactions: reactions),
+                  ],
+                ],
+              ),
             ),
-            if (reactions.isNotEmpty) ...[
-              SizedBox(height: 4.h),
-              ReactionRow(reactions: reactions),
-            ],
           ],
         ),
       ),

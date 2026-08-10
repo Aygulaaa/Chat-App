@@ -29,6 +29,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
     Future.microtask(() async {
       final datasource = ref.read(chatSocketDataSourceProvider);
+      datasource.setActiveChat(widget.chatId);
       await datasource.joinChat(widget.chatId);
       await datasource.markChatAsRead(widget.chatId);
     });
@@ -37,6 +38,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    _socketDataSource.setActiveChat(null);
     _socketDataSource.leaveChat(widget.chatId);
     super.dispose();
   }

@@ -27,48 +27,15 @@ export const chatSocket = (io: Server) => {
 
       if (!onlineUsers.has(userId)) {
         onlineUsers.set(userId, new Set());
-        io.emit("user_status", { userId, status: "online" });
+
       }
       onlineUsers.get(userId)!.add(socket.id);
 
       await socket.join(`user_${userId}`);
 
+      io.emit("user_status", { userId, status: "online" });
+
       socket.emit("initial_online_users", Array.from(onlineUsers.keys()));
-
-      // Update all pending offline messages sent to this user as DELIVERED
-      try {
-        const offlineDelivered = await db.query(
-          `UPDATE messages
-           SET delivered_at = COALESCE(delivered_at, NOW())
-           WHERE chat_id IN (SELECT chat_id FROM chat_members WHERE user_id = $1)
-             AND sender_id != $1
-             AND delivered_at IS NULL
-           RETURNING id, chat_id as "chatId", sender_id as "senderId"`,
-          [userId]
-        );
-
-        if (offlineDelivered.rows.length > 0) {
-          // Group by senderId to emit in bulk
-          const senderGrouped: { [key: number]: { chatId: number, messageIds: number[] } } = {};
-          for (const row of offlineDelivered.rows) {
-            const sId = row.senderId;
-            if (!senderGrouped[sId]) {
-              senderGrouped[sId] = { chatId: row.chatId, messageIds: [] };
-            }
-            senderGrouped[sId].messageIds.push(row.id);
-          }
-
-          for (const [senderIdStr, data] of Object.entries(senderGrouped)) {
-            const senderId = parseInt(senderIdStr);
-            io.to(`user_${senderId}`).emit("messages_delivered", {
-              chatId: data.chatId,
-              messageIds: data.messageIds,
-            });
-          }
-        }
-      } catch (deliveryError) {
-        console.error("Error marking offline messages as delivered:", deliveryError);
-      }
 
       socket.on("join_chat", async ({ chatId }: { chatId: number }) => {
         try {
@@ -130,7 +97,11 @@ export const chatSocket = (io: Server) => {
         }
       });
 
-      
+      socket.on("request_online_users", () => {
+        socket.emit("initial_online_users", Array.from(onlineUsers.keys()));
+      });
+
+
       socket.on("message_received", async ({ messageId }: MessageReceivedPayload) => {
         try {
           if (!messageId) return;
@@ -175,7 +146,12 @@ export const chatSocket = (io: Server) => {
         if (currentUserSettings.hideReadReceipts) {
           return;
         }
-
+        io.to(`chat_${chatId}`).emit("chat_read", {
+          chatId,
+          readBy: currentUserId,
+          messageIds: readMessages.map((m: any) => m.id)
+        });
+        
         const senderIds = [
           ...new Set(
             readMessages.map(
@@ -215,7 +191,7 @@ export const chatSocket = (io: Server) => {
           );
         }
       }
-
+      const disconnectTimers = new Map<number, NodeJS.Timeout>();
       socket.on("disconnect", async () => {
         try {
           if (!userId) return;
@@ -225,15 +201,23 @@ export const chatSocket = (io: Server) => {
           userConnections.delete(socket.id);
 
           if (userConnections.size === 0) {
-            onlineUsers.delete(userId);
-            await userService.updateLastSeen(userId);
-            const settings = await settingsService.getSettings(userId);
+            const timer = setTimeout(async () => {
+              const currentConnections = onlineUsers.get(userId);
+              if (!currentConnections || currentConnections.size === 0) {
+                onlineUsers.delete(userId);
+                await userService.updateLastSeen(userId);
+                const settings = await settingsService.getSettings(userId);
 
-            io.emit("user_status", {
-              userId,
-              status: "offline",
-              lastSeen: settings.hideLastSeen ? null : new Date().toISOString(),
-            });
+                io.emit("user_status", {
+                  userId,
+                  status: "offline",
+                  lastSeen: settings.hideLastSeen ? null : new Date().toISOString(),
+                });
+              }
+              disconnectTimers.delete(userId);
+            }, 3000);
+
+            disconnectTimers.set(userId, timer);
           }
         } catch (error) {
           console.error("disconnect error:", error);

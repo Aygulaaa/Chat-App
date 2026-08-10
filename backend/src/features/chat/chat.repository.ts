@@ -25,9 +25,9 @@ export const chatRepository = {
             'chatId', m.chat_id,
             'senderId', m.sender_id,
             'text', m.text,
-            'createdAt', to_json(m.created_at),
-            'deliveredAt', to_json(m.delivered_at),
-            'readAt', to_json(m.read_at)
+            'createdAt', m.created_at,
+            'deliveredAt', m.delivered_at,
+            'readAt', m.read_at
           )
           FROM messages m
           WHERE m.chat_id = c.id
@@ -97,9 +97,9 @@ export const chatRepository = {
             'chatId', m.chat_id,
             'senderId', m.sender_id,
             'text', m.text,
-            'createdAt', to_json(m.created_at),
-            'deliveredAt', to_json(m.delivered_at),
-            'readAt', to_json(m.read_at)
+            'createdAt', m.created_at,
+            'deliveredAt', m.delivered_at,
+            'readAt', m.read_at
           )
           FROM messages m
           WHERE m.chat_id = c.id
@@ -160,8 +160,8 @@ export const chatRepository = {
   async sendMessage(chatId: number, senderId: number, text: string) {
     try {
       return await db.query(`
-      INSERT INTO messages (chat_id, sender_id, text)
-      VALUES ($1, $2, $3)
+      INSERT INTO messages (chat_id, sender_id, text, delivered_at, read_at)
+      VALUES ($1, $2, $3, NULL, NULL)
       RETURNING 
         id,
         chat_id as "chatId",

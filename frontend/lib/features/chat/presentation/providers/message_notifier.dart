@@ -52,6 +52,7 @@ class MessageNotifier extends StateNotifier<MessageState> {
     required this.chatId,
   }) : _datasource = datasource,
        super(const MessageState()) {
+        loadMessages();
     _init();
   }
 Future<void> _init() async {
@@ -76,34 +77,31 @@ void _listenToMessages() {
     try {
       final newMessage = MessageModel.fromJson(data);
       if (newMessage.chatId != chatId) return;
-
+      print('📥 RAW SOCKET MESSAGE RECEIVED: $data');
       final myId = ref.read(authProvider).user?.id;
       final isMyMessage = newMessage.senderId == myId;
 
-      final tempIndex = state.messages.indexWhere(
-        (m) =>
-            m.text == newMessage.text &&
-            m.senderId == newMessage.senderId &&
-            m.id.toString().length > 10,
-      );
+      // 2. If it's MY message, check if we have a temporary optimistic message to swap out
+      if (isMyMessage) {
+        final tempIndex = state.messages.indexWhere(
+          (m) =>
+              m.text == newMessage.text &&
+              m.id.toString().length > 10, // matches temporary local ID length
+        );
 
-      if (tempIndex != -1) {
-        final updated = List<Message>.from(state.messages);
-        updated[tempIndex] = newMessage;
-        state = state.copyWith(messages: updated);
-      } else {
-        final exists = state.messages.any((m) => m.id == newMessage.id);
-        if (!exists) {
-          state = state.copyWith(messages: [newMessage, ...state.messages]);
+        if (tempIndex != -1) {
+          final updated = List<Message>.from(state.messages);
+          updated[tempIndex] = newMessage;
+          state = state.copyWith(messages: updated);
         }
+        // If no temp message found and it's already in the list, do nothing to avoid duplicates
+        return; 
       }
 
-      // ✅ Update last message for everyone
-      ref.read(chatProvider.notifier).updateChatLastMessage(newMessage);
-
-      // ✅ Only increment unread for messages from others
-      if (!isMyMessage) {
-        ref.read(chatProvider.notifier).incrementUnreadCount(chatId);
+      // 3. If it's FROM SOMEONE ELSE: handle normal insertion
+      final exists = state.messages.any((m) => m.id == newMessage.id);
+      if (!exists) {
+        state = state.copyWith(messages: [newMessage, ...state.messages]);
       }
     } catch (e) {
       print('❌ Socket parse error: $e');
@@ -143,7 +141,7 @@ void _listenToDelivered() {
 
   void _listenToChatRead() {
     _chatReadSub?.cancel();
-    _chatReadSub = _datasource.onChatRead().listen((data) {
+    _chatReadSub = _datasource.onMessagesRead().listen((data) {
       print('📖 chat_read received: $data');
       final incomingChatId = int.tryParse(data['chatId'].toString());
       print('📖 chatId: $incomingChatId vs this.chatId: $chatId');

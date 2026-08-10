@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
+import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat_lis.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat_search_bar.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat_search_result.dart';
@@ -24,6 +25,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   void initState() {
     super.initState();
+    ref.read(chatSocketDataSourceProvider);
+  ref.read(chatProvider);
+  ref.read(userStatusProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final chatState = ref.read(chatProvider);
       if (chatState.chats.isEmpty && !chatState.isLoading) {

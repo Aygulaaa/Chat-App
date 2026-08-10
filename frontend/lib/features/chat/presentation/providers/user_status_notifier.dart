@@ -59,7 +59,6 @@ class UserStatusNotifier extends StateNotifier<UserStatusState> {
   }
 
   
-
   void setLastSeen(int userId, DateTime? lastSeen) {
     if (state.lastSeen.containsKey(userId)) return;
     final updated = Map<int, DateTime?>.from(state.lastSeen);

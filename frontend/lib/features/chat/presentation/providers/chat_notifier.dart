@@ -19,6 +19,7 @@ import 'package:my_chat_app/features/chat/domain/usecases/get_messages.dart';
 import 'package:my_chat_app/features/chat/domain/usecases/send_message.dart';
 
 import 'package:my_chat_app/features/chat/presentation/providers/chat_state.dart';
+import 'package:my_chat_app/features/chat/presentation/providers/message_notifier.dart';
 
 /// ───────────────── REMOTE DATASOURCE ─────────────────
 
@@ -80,6 +81,7 @@ final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
   return ChatNotifier(
     getChats: ref.read(getChatsProvider),
     datasource: ref.read(chatSocketDataSourceProvider),
+    ref: ref,
   );
 });
 
@@ -87,29 +89,37 @@ final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
 
 class ChatNotifier extends StateNotifier<ChatState> {
   final GetChats getChats;
-
   final ChatSocketDatasource datasource;
+  final Ref ref;
 
   StreamSubscription? _messageSub;
   StreamSubscription? _readSub;
   StreamSubscription? _deliveredSub;
 
-  ChatNotifier({required this.getChats, required this.datasource})
-    : super(const ChatState()) {
+  ChatNotifier({
+    required this.getChats,
+    required this.datasource,
+    required this.ref,
+  }) : super(const ChatState()) {
     _listenSocketEvents();
-
     loadChats();
   }
 
   /// ───────────────── SOCKET EVENTS ─────────────────
 
   void _listenSocketEvents() {
+    _messageSub?.cancel();
     /// ✅ NEW MESSAGE
     _messageSub = datasource.onMessage().listen((data) {
       try {
         final message = MessageModel.fromJson(data);
+        final myId = ref.read(authProvider).user?.id;
 
         updateChatLastMessage(message);
+        
+        if (message.senderId != myId) {
+          incrementUnreadCount(message.chatId);
+        }
 
         print('📨 ChatNotifier received message ${message.id}');
       } catch (e) {
@@ -191,6 +201,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
       });
 
       state = state.copyWith(chats: chats, isLoading: false);
+
+      // 🔥 CRITICAL FIX: Initialize messageProvider for each chat
+      // This ensures socket listeners are active even when not viewing a chat
+      for (final chat in chats) {
+        print('🚀 Pre-initializing messageProvider for chatId: ${chat.id}');
+        ref.read(messageProvider(chat.id));
+      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -199,6 +216,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   /// ───────────────── RESET UNREAD ─────────────────
 
   void resetUnreadCount(int chatId) {
+    print('🧹 resetUnreadCount called for chat $chatId');
     final updated = state.chats.map((chat) {
       if (chat.id == chatId) {
         return chat.copyWith(unreadCount: 0);
@@ -211,16 +229,22 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   void updateChatLastMessage(Message message) {
-    final updatedChats = state.chats.map((chat) {
+    bool chatFound = false;
+    
+   final updatedChats = state.chats.map((chat) {
       if (chat.id == message.chatId) {
+        chatFound = true;
         return chat.copyWith(
           lastMessage: message,
-          // ✅ Don't increment here — only increment for incoming messages
-          // sendMessageFunction calls this for own messages so unreadCount stays 0
         );
       }
       return chat;
     }).toList();
+    if (!chatFound) {
+      // 🚨 The chat wasn't in the list yet! Force a reload so it appears with the new message.
+      loadChats();
+      return;
+    }
 
     updatedChats.sort((a, b) {
       final aDate = a.lastMessage?.createdAt ?? DateTime(0);
@@ -228,13 +252,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
       return bDate.compareTo(aDate);
     });
 
+
     state = state.copyWith(chats: updatedChats);
   }
 
   void incrementUnreadCount(int chatId) {
     final updatedChats = state.chats.map((chat) {
       if (chat.id == chatId) {
-        return chat.copyWith(unreadCount: chat.unreadCount + 1);
+        print("chatId: ${chat.id}, unreadCount: ${chat.unreadCount}");
+        return chat.copyWith(unreadCount: chat.unreadCount);
       }
       return chat;
     }).toList();

@@ -2,14 +2,16 @@
 import { Response } from 'express';
 import { chatService } from '../chat/chat.service';
 import { AuthRequest } from '../../middleware/auth.middleware';
+import db from '../../db';
 
 export const chatController = {
     async getChats(req: AuthRequest, res: Response) {
         try {
-            const userId = req.user!.id;
             if (!req.user) {
                 return res.status(401).json({ error: "Unauthorized" });
             }
+            const userId = req.user!.id;
+            
             const chats = await chatService.getChats(userId);
             res.json(chats);
         } catch (err) {
@@ -40,17 +42,24 @@ export const chatController = {
 
     async sendMessage(req: AuthRequest, res: Response) {
         try {
-            const chatId = Number(req.params.chatId);
-            const senderId = req.user!.id;
             if (!req.user) {
                 return res.status(401).json({ error: "Unauthorized" });
             }
+            const chatId = Number(req.params.chatId);
+            const senderId = req.user!.id;
+            
             const { text } = req.body;
 
             const message = await chatService.sendMessage(chatId, senderId, text);
             const io = req.app.get('io');
             if (io) {
-                io.to(`chat_${chatId}`).emit('message', message);
+                const membersResult = await db.query(
+                    `SELECT user_id FROM chat_members WHERE chat_id = $1`,
+                    [chatId]
+                );
+                for (const member of membersResult.rows) {
+                    io.to(`user_${member.user_id}`).emit('message', message);
+                }
             } else {
                 console.error("Socket.io instance not found on app settings");
             }
@@ -99,7 +108,13 @@ export const chatController = {
 
             const io = req.app.get('io');
             if (io) {
-                io.to(`chat_${chatId}`).emit('message', message);
+                const membersResult = await db.query(
+                    `SELECT user_id FROM chat_members WHERE chat_id = $1`,
+                    [chatId]
+                );
+                for (const member of membersResult.rows) {
+                    io.to(`user_${member.user_id}`).emit('message', message);
+                }
             }
 
             res.json(message);

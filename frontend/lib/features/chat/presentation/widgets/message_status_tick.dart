@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 
 class MessageStatusTick extends StatelessWidget {
@@ -10,19 +11,18 @@ class MessageStatusTick extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (status) {
       case MessageStatus.sent:
-        return Icon(
+        return const Icon(
           Icons.check_rounded,
           size: 14,
-          color: Colors.white.withOpacity(0.5),
+          color: AppColors.darkTextTertiary,
         );
       case MessageStatus.delivered:
-        return Icon(
+        return const Icon(
           Icons.done_all_rounded,
           size: 14,
-          color: Colors.white.withOpacity(0.5),
+          color: AppColors.darkTextTertiary,
         );
       case MessageStatus.read:
-       
         return const Icon(
           Icons.done_all_rounded,
           size: 14,

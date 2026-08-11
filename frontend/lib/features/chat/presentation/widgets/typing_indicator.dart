@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 
 class TypingIndicator extends StatefulWidget {
   final String? avatarUrl;
@@ -45,7 +46,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
             if (widget.avatarUrl != null) ...[
               CircleAvatar(
                 radius: 12,
-                backgroundColor: const Color(0xFF1E2A3A),
+                backgroundColor: AppColors.darkCard,
                 backgroundImage: CachedNetworkImageProvider(widget.avatarUrl!),
               ),
               const SizedBox(width: 8),
@@ -53,14 +54,14 @@ class _TypingIndicatorState extends State<TypingIndicator>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E2A3A),
+                color: AppColors.darkCard,
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(18),
                   topRight: Radius.circular(18),
                   bottomRight: Radius.circular(18),
                   bottomLeft: Radius.circular(4),
                 ),
-                border: Border.all(color: Colors.white.withOpacity(0.07)),
+                border: Border.all(color: AppColors.darkBorder),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -112,7 +113,7 @@ class _Dot extends StatelessWidget {
           width: 7,
           height: 7,
           decoration: const BoxDecoration(
-            color: Color(0xFF64748B),
+            color: AppColors.darkTextTertiary,
             shape: BoxShape.circle,
           ),
         ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/core/utils/format_last_seen.dart';
 import 'package:my_chat_app/features/auth/presentation/pages/auth_page.dart';
@@ -27,7 +28,7 @@ class ProfileScreen extends ConsumerWidget {
     if (authState.isLoading) {
       return Scaffold(
         backgroundColor: context.appBg,
-        body: const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1))),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
     if (authState.user == null) {
@@ -39,7 +40,7 @@ class ProfileScreen extends ConsumerWidget {
     return profileAsync.when(
       loading: () => Scaffold(
         backgroundColor: context.appBg,
-        body: const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1))),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
       ),
       error: (e, _) => Scaffold(
         backgroundColor: context.appBg,
@@ -47,13 +48,13 @@ class ProfileScreen extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline, color: Colors.redAccent, size: 48.sp),
+              Icon(Icons.error_outline, color: AppColors.error, size: 48.sp),
               SizedBox(height: 16.h),
               Text('$e', style: TextStyle(color: context.textSecondary), textAlign: TextAlign.center),
               SizedBox(height: 16.h),
               TextButton(
                 onPressed: () => ref.read(userProfileProvider.notifier).fetchProfile(),
-                child: const Text('Retry', style: TextStyle(color: Color(0xFF6366F1))),
+                child: const Text('Retry', style: TextStyle(color: AppColors.primary)),
               ),
             ],
           ),
@@ -262,19 +263,19 @@ class _StatusLabel extends StatelessWidget {
             width: 7.r,
             height: 7.r,
             decoration: const BoxDecoration(
-              color: Color(0xFF4ADE80),
+              color: AppColors.online,
               shape: BoxShape.circle,
             ),
           ),
           SizedBox(width: 5.w),
-          Text('Online', style: TextStyle(color: const Color(0xFF4ADE80), fontSize: 13.sp)),
+          const Text('Online', style: TextStyle(color: AppColors.online, fontSize: 13)),
         ],
       );
     }
     if (lastSeen != null) {
       return Text(
         TimeUtils.formatLastSeen(lastSeen!),
-        style: TextStyle(color: Colors.grey, fontSize: 13.sp),
+        style: const TextStyle(color: AppColors.darkTextTertiary, fontSize: 13),
       );
     }
     return const SizedBox.shrink();
@@ -345,10 +346,10 @@ class _InfoRow extends StatelessWidget {
             width: 32.r,
             height: 32.r,
             decoration: BoxDecoration(
-              color: const Color(0xFF6366F1).withOpacity(0.12),
+              color: AppColors.primary.withOpacity(0.12),
               borderRadius: BorderRadius.circular(8.r),
             ),
-            child: Icon(icon, color: const Color(0xFF818CF8), size: 17.sp),
+            child: const Icon(icon, color: AppColors.accent, size: 17),
           ),
           SizedBox(width: 12.w),
           Expanded(
@@ -401,7 +402,7 @@ class _ActionCard extends ConsumerWidget {
         children: [
           _ActionRow(
             icon: Icons.settings_outlined,
-            iconColor: const Color(0xFF6366F1),
+            iconColor: AppColors.primary,
             label: 'Settings',
             onTap: () => Navigator.push(
               context,
@@ -421,9 +422,9 @@ class _ActionCard extends ConsumerWidget {
           Divider(color: context.glassBorder, height: 1, indent: 52.w),
           _ActionRow(
             icon: Icons.logout_rounded,
-            iconColor: Colors.redAccent,
+            iconColor: AppColors.error,
             label: 'Log Out',
-            labelColor: Colors.redAccent,
+            labelColor: AppColors.error,
             onTap: () {
               ref.read(authProvider.notifier).logout();
               Navigator.pushAndRemoveUntil(
@@ -469,7 +470,7 @@ class _ActionRow extends StatelessWidget {
                 color: iconColor.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(8.r),
               ),
-              child: Icon(icon, color: iconColor, size: 17.sp),
+              child: Icon(icon, color: iconColor, size: 17),
             ),
             SizedBox(width: 12.w),
             Expanded(
@@ -482,7 +483,7 @@ class _ActionRow extends StatelessWidget {
                 ),
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: context.textTertiary, size: 18.sp),
+            Icon(Icons.chevron_right_rounded, color: context.textTertiary, size: 18),
           ],
         ),
       ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/contact_tile.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/empty_contacts.dart';
@@ -12,21 +13,27 @@ class ContactsList extends ConsumerWidget {
     final contactsAsync = ref.watch(contactsProvider);
 
     return contactsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      ),
       error: (e, _) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
+            const Icon(Icons.error_outline, color: AppColors.error, size: 40),
             const SizedBox(height: 12),
-            Text('$e',
-                style: const TextStyle(color: Colors.white54),
-                textAlign: TextAlign.center),
+            Text(
+              '$e',
+              style: const TextStyle(color: AppColors.darkTextTertiary),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 12),
             TextButton(
               onPressed: () => ref.read(contactsProvider.notifier).refresh(),
-              child: const Text('Retry',
-                  style: TextStyle(color: Color(0xFF6366F1))),
+              child: const Text(
+                'Retry',
+                style: TextStyle(color: AppColors.primary),
+              ),
             ),
           ],
         ),
@@ -38,7 +45,7 @@ class ContactsList extends ConsumerWidget {
           padding: const EdgeInsets.only(top: 8, bottom: 100),
           itemCount: contacts.length,
           separatorBuilder: (_, __) => const Divider(
-            color: Colors.white10,
+            color: AppColors.darkBorder,
             indent: 70,
             height: 1,
           ),
@@ -57,7 +64,7 @@ class ContactsList extends ConsumerWidget {
                     child: Text(
                       contact.username[0].toUpperCase(),
                       style: const TextStyle(
-                        color: Color(0xFF6366F1),
+                        color: AppColors.primary,
                         fontWeight: FontWeight.w700,
                         fontSize: 12,
                         letterSpacing: 1,

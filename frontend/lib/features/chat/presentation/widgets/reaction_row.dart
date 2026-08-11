@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 
 class ReactionRow extends StatelessWidget {
   final List<String> reactions;
@@ -13,11 +14,17 @@ class ReactionRow extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
+            color: AppColors.darkBorder,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
+            border: Border.all(color: AppColors.darkBorder),
           ),
-          child: Text(r, style: const TextStyle(fontSize: 13)),
+          child: Text(
+            r,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.darkTextPrimary,
+            ),
+          ),
         );
       }).toList(),
     );

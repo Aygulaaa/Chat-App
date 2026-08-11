@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 
 class ContactsSearchBar extends StatefulWidget {
   final TextEditingController controller;
@@ -42,10 +43,10 @@ class _ContactsSearchBarState extends State<ContactsSearchBar> {
       child: TextField(
         controller: widget.controller,
 
-        cursorColor: Colors.white,
+        cursorColor: AppColors.darkTextPrimary,
 
         style: const TextStyle(
-          color: Colors.white,
+          color: AppColors.darkTextPrimary,
           fontSize: 15,
         ),
 
@@ -53,17 +54,17 @@ class _ContactsSearchBarState extends State<ContactsSearchBar> {
 
         decoration: InputDecoration(
           filled: true,
-          fillColor: const Color(0xFF1E2A3A),
+          fillColor: AppColors.darkInputFill,
 
           hintText: 'Search users...',
           hintStyle: TextStyle(
-            color: Colors.white.withOpacity(0.3),
+            color: AppColors.darkTextTertiary,
             fontSize: 15,
           ),
 
           prefixIcon: Icon(
             Icons.search_rounded,
-            color: Colors.white.withOpacity(0.3),
+            color: AppColors.darkTextTertiary,
             size: 20,
           ),
 
@@ -71,7 +72,7 @@ class _ContactsSearchBarState extends State<ContactsSearchBar> {
               ? IconButton(
                   icon: Icon(
                     Icons.close_rounded,
-                    color: Colors.white.withOpacity(0.3),
+                    color: AppColors.darkTextTertiary,
                     size: 20,
                   ),
                   onPressed: () {

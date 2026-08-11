@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
-import 'package:my_chat_app/core/theme/theme_ext.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/utils/mime_utils.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
@@ -102,7 +102,7 @@ class _MessageInputState extends ConsumerState<MessageInput> {
       );
       final amplitude = await _recorder.getAmplitude();
 
-print(amplitude.current);
+      print(amplitude.current);
 
       if (mounted) setState(() => _isRecording = true);
     } catch (e) {
@@ -142,17 +142,16 @@ print(amplitude.current);
 
       final amplitude = await _recorder.getAmplitude();
 
-print(amplitude.current);
+      print(amplitude.current);
 
       final length = await file.length();
 
-    print('📦 FILE SIZE = $length');
+      print('📦 FILE SIZE = $length');
 
-    if (length < 1000) {
-      print('❌ Recording too small');
-      return;
-    }
-    
+      if (length < 1000) {
+        print('❌ Recording too small');
+        return;
+      }
 
       final bytes = await file.readAsBytes();
       print('🎙️ Recording size: ${bytes.length} bytes');
@@ -210,8 +209,8 @@ print(amplitude.current);
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
         decoration: BoxDecoration(
-          color: context.cardBg,
-          border: Border(top: BorderSide(color: context.glassBorder, width: 0.8)),
+          color: AppColors.darkCard,
+          border: const Border(top: BorderSide(color: AppColors.darkBorder, width: 0.8)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
@@ -224,7 +223,7 @@ print(amplitude.current);
           children: [
             if (_isRecording)
               IconButton(
-                icon: Icon(Icons.close, color: Colors.redAccent, size: 22.sp),
+                icon: Icon(Icons.close, color: AppColors.error, size: 22.sp),
                 onPressed: _cancelRecording,
               )
             else
@@ -234,14 +233,14 @@ print(amplitude.current);
                       child: SizedBox(
                         width: 20.r,
                         height: 20.r,
-                        child: CircularProgressIndicator(
+                        child: const CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: context.textTertiary,
+                          color: AppColors.darkTextTertiary,
                         ),
                       ),
                     )
                   : IconButton(
-                      icon: Icon(Icons.attach_file, color: context.textTertiary, size: 22.sp),
+                      icon: Icon(Icons.attach_file, color: AppColors.darkTextTertiary, size: 22.sp),
                       onPressed: _pickAndSendFile,
                     ),
 
@@ -253,27 +252,27 @@ print(amplitude.current);
                       onChanged: (val) => ref
                           .read(messageProvider(widget.chatId).notifier)
                           .sendTypingEvent(val.isNotEmpty),
-                      style: TextStyle(color: context.textPrimary, fontSize: 15.sp),
+                      style: TextStyle(color: AppColors.darkTextPrimary, fontSize: 15.sp),
                       decoration: InputDecoration(
                         hintText: 'Message...',
-                        hintStyle: TextStyle(color: context.textTertiary, fontSize: 15.sp),
+                        hintStyle: TextStyle(color: AppColors.darkTextTertiary, fontSize: 15.sp),
                         filled: true,
-                        fillColor: context.glassBg,
+                        fillColor: AppColors.darkInputFill,
                         contentPadding: EdgeInsets.symmetric(
                           horizontal: 14.w,
                           vertical: 10.h,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(22.r),
-                          borderSide: BorderSide(color: context.glassBorder, width: 0.8),
+                          borderSide: const BorderSide(color: AppColors.darkBorder, width: 0.8),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(22.r),
-                          borderSide: BorderSide(color: context.glassBorder, width: 0.8),
+                          borderSide: const BorderSide(color: AppColors.darkBorder, width: 0.8),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(22.r),
-                          borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
+                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                         ),
                       ),
                     ),
@@ -286,20 +285,20 @@ print(amplitude.current);
 
                 if (_isRecording) {
                   return IconButton(
-                    icon: Icon(Icons.stop_circle, color: const Color(0xFF6366F1), size: 30.sp),
+                    icon: Icon(Icons.stop_circle, color: AppColors.primary, size: 30.sp),
                     onPressed: _stopAndSend,
                   );
                 }
 
                 if (hasText) {
                   return IconButton(
-                    icon: Icon(Icons.send_rounded, color: const Color(0xFF6366F1), size: 22.sp),
+                    icon: Icon(Icons.send_rounded, color: AppColors.primary, size: 22.sp),
                     onPressed: _onSend,
                   );
                 }
 
                 return IconButton(
-                  icon: Icon(Icons.mic_rounded, color: context.textTertiary, size: 22.sp),
+                  icon: Icon(Icons.mic_rounded, color: AppColors.darkTextTertiary, size: 22.sp),
                   onPressed: _startRecording,
                 );
               },
@@ -348,7 +347,7 @@ class _RecordingIndicatorState extends State<_RecordingIndicator>
             width: 8,
             height: 8,
             decoration: const BoxDecoration(
-              color: Colors.redAccent,
+              color: AppColors.error,
               shape: BoxShape.circle,
             ),
           ),
@@ -356,7 +355,7 @@ class _RecordingIndicatorState extends State<_RecordingIndicator>
         const SizedBox(width: 8),
         const Text(
           'Recording...',
-          style: TextStyle(color: Colors.white70, fontSize: 14),
+          style: TextStyle(color: AppColors.darkTextSecondary, fontSize: 14),
         ),
       ],
     );

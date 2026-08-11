@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 
 class GlassNavBar extends StatelessWidget {
   final int index;
@@ -18,10 +19,10 @@ class GlassNavBar extends StatelessWidget {
           child: Container(
             height: 64,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
+              color: AppColors.darkCard,
               borderRadius: BorderRadius.circular(40),
               border: Border.all(
-                color: Colors.white.withOpacity(0.12),
+                color: AppColors.darkBorder,
                 width: 1,
               ),
               boxShadow: [
@@ -94,12 +95,12 @@ class _NavItem extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: isActive
-              ? const Color(0xFF6366F1).withOpacity(0.25)
+              ? AppColors.primary.withOpacity(0.25)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(30),
           border: isActive
               ? Border.all(
-                  color: const Color(0xFF6366F1).withOpacity(0.4),
+                  color: AppColors.primary.withOpacity(0.4),
                   width: 1,
                 )
               : null,
@@ -110,16 +111,16 @@ class _NavItem extends StatelessWidget {
             Icon(
               isActive ? activeIcon : icon,
               color: isActive
-                  ? const Color(0xFF818CF8)
-                  : Colors.white38,
+                  ? AppColors.accent
+                  : AppColors.darkTextTertiary,
               size: 22,
             ),
             if (isActive) ...[
               const SizedBox(width: 6),
-              Text(
+               Text(
                 label,
-                style: const TextStyle(
-                  color: Color(0xFF818CF8),
+                style: TextStyle(
+                  color: AppColors.accent,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),

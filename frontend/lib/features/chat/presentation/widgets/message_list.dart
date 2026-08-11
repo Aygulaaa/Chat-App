@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/utils/date_formatter.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
@@ -30,7 +31,10 @@ class MessageList extends StatelessWidget {
   Widget build(BuildContext context) {
     if (messages.isEmpty && !isTyping) {
       return const Center(
-        child: Text('No messages yet', style: TextStyle(color: Colors.white38)),
+        child: Text(
+          'No messages yet',
+          style: TextStyle(color: AppColors.darkTextTertiary),
+        ),
       );
     }
 

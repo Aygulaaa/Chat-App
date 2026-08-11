@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/domain/entities/chat.dart';
@@ -36,7 +37,7 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
             hintText: 'Enter group name',
             hintStyle: TextStyle(color: context.textTertiary),
             enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: context.glassBorder)),
-            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF6366F1))),
+            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
           ),
         ),
         actions: [
@@ -54,7 +55,7 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
                 Navigator.pop(ctx);
               }
             },
-            child: const Text('Save', style: TextStyle(color: Color(0xFF6366F1))),
+            child: const Text('Save', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
@@ -95,13 +96,13 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
               builder: (context, ref, child) {
                 final contactsAsync = ref.watch(contactsProvider);
                 return contactsAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1))),
-                  error: (e, _) => Center(child: Text('Error loading contacts: $e', style: const TextStyle(color: Colors.redAccent))),
+                  loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                  error: (e, _) => Center(child: Text('Error loading contacts: $e', style: const TextStyle(color: AppColors.error))),
                   data: (contacts) {
                     final currentMemberIds = currentMembers.map((m) => m.id).toSet();
                     final addableContacts = contacts.where((c) => !currentMemberIds.contains(c.id)).toList();
                     if (addableContacts.isEmpty) {
-                      return const Center(child: Text('No contacts available to add.', style: TextStyle(color: Colors.grey)));
+                      return const Center(child: Text('No contacts available to add.', style: TextStyle(color: AppColors.darkTextTertiary)));
                     }
                     return ListView.builder(
                       controller: scrollController,
@@ -111,12 +112,12 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
                         return ListTile(
                           leading: CircleAvatar(
                             backgroundImage: contact.avatar != null ? NetworkImage(contact.avatar!) : null,
-                            backgroundColor: const Color(0xFF6366F1),
+                            backgroundColor: AppColors.primary,
                             child: contact.avatar == null ? Text(contact.username[0].toUpperCase(), style: const TextStyle(color: Colors.white)) : null,
                           ),
                           title: Text(contact.username, style: TextStyle(color: context.textPrimary)),
                           trailing: IconButton(
-                            icon: const Icon(Icons.add_circle_outline, color: Color(0xFF6366F1)),
+                            icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
                             onPressed: () async {
                               Navigator.pop(ctx);
                               await ref.read(chatProvider.notifier).addMember(widget.chatId, contact.id);
@@ -143,7 +144,7 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
     if (chats.isEmpty) {
       return Scaffold(
         backgroundColor: context.appBg,
-        body: const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1))),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
     
@@ -158,7 +159,7 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
           SliverAppBar(
             expandedHeight: 280.h,
             pinned: true,
-            backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF1F5F9),
+            backgroundColor: isDark ? AppColors.darkCard : const Color(0xFFF1F5F9),
             iconTheme: IconThemeData(color: context.textPrimary),
             actions: [
               IconButton(
@@ -173,7 +174,7 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
                   Container(
                     decoration: BoxDecoration(
                       gradient: isDark
-                          ? const LinearGradient(colors: [Color(0xFF0B1120), Color(0xFF1E293B)], begin: Alignment.topCenter, end: Alignment.bottomCenter)
+                          ? const LinearGradient(colors: [AppColors.darkCard, AppColors.darkInputFill], begin: Alignment.topCenter, end: Alignment.bottomCenter)
                           : const LinearGradient(colors: [Color(0xFFE2E8F0), Color(0xFFF8FAFC)], begin: Alignment.topCenter, end: Alignment.bottomCenter),
                     ),
                   ),
@@ -205,7 +206,7 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 image: chat.avatar != null ? DecorationImage(image: NetworkImage(chat.avatar!), fit: BoxFit.cover) : null,
-                                gradient: chat.avatar == null ? const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF818CF8)]) : null,
+                                gradient: chat.avatar == null ? const LinearGradient(colors: [AppColors.primary, AppColors.accent]) : null,
                               ),
                               child: chat.avatar == null
                                   ? Center(child: Text(chat.name != null && chat.name!.isNotEmpty ? chat.name![0].toUpperCase() : 'G', style: TextStyle(color: Colors.white, fontSize: 34.sp, fontWeight: FontWeight.bold)))
@@ -218,7 +219,7 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
                                 bottom: 0, right: 0,
                                 child: Container(
                                   padding: EdgeInsets.all(6.r),
-                                  decoration: const BoxDecoration(color: Color(0xFF6366F1), shape: BoxShape.circle),
+                                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                                   child: Icon(Icons.camera_alt, color: Colors.white, size: 16.sp),
                                 ),
                               ),
@@ -250,8 +251,8 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
                       Text('Members', style: TextStyle(color: context.textPrimary, fontSize: 16.sp, fontWeight: FontWeight.bold)),
                       TextButton.icon(
                         onPressed: () => _showAddMemberDialog(context, chat.participants),
-                        icon: const Icon(Icons.person_add, color: Color(0xFF6366F1)),
-                        label: const Text('Add', style: TextStyle(color: Color(0xFF6366F1))),
+                        icon: const Icon(Icons.person_add, color: AppColors.primary),
+                        label: const Text('Add', style: TextStyle(color: AppColors.primary)),
                       )
                     ],
                   ),
@@ -276,7 +277,7 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
                       return ListTile(
                         leading: CircleAvatar(
                           backgroundImage: member.avatar != null ? NetworkImage(member.avatar!) : null,
-                          backgroundColor: const Color(0xFF6366F1).withOpacity(0.8),
+                          backgroundColor: AppColors.primary.withOpacity(0.8),
                           child: member.avatar == null ? Text(member.username[0].toUpperCase(), style: const TextStyle(color: Colors.white)) : null,
                         ),
                         title: Text(isCurrentUser ? 'You' : member.username, style: TextStyle(color: context.textPrimary)),
@@ -286,7 +287,7 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
                           }
                         },
                         trailing: isCurrentUser ? null : IconButton(
-                          icon: const Icon(Icons.remove_circle_outline, color: Colors.redAccent),
+                          icon: const Icon(Icons.remove_circle_outline, color: AppColors.error),
                           onPressed: () async {
                             await ref.read(chatProvider.notifier).removeMember(widget.chatId, member.id);
                           },

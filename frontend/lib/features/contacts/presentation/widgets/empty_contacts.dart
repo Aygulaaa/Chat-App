@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 
 class EmptyContacts extends StatelessWidget {
   final String message;
@@ -18,12 +19,12 @@ class EmptyContacts extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.white12, size: 72),
+          Icon(icon, color: AppColors.darkBorder, size: 72),
           const SizedBox(height: 16),
           Text(
             message,
             style: const TextStyle(
-              color: Colors.white38,
+              color: AppColors.darkTextTertiary,
               fontSize: 17,
               fontWeight: FontWeight.w500,
             ),
@@ -31,7 +32,7 @@ class EmptyContacts extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             subtitle,
-            style: const TextStyle(color: Colors.white24, fontSize: 13),
+            style: const TextStyle(color: AppColors.darkBorder, fontSize: 13),
           ),
         ],
       ),

@@ -116,6 +116,17 @@ export const chatSocket = (io: Server) => {
         try {
           if (!messageId) return;
           console.log(`message_received for messageId ${messageId} from user ${socket.user?.id}`);
+          
+          const msgResult = await db.query(
+            `SELECT sender_id FROM messages WHERE id = $1`, [messageId]
+          );
+          if (msgResult.rowCount === 0) return;
+          const msg = msgResult.rows[0];
+          
+          if (msg.sender_id === socket.user?.id) {
+             return;
+          }
+
           const result = await db.query(
             `UPDATE messages SET delivered_at = COALESCE(delivered_at, NOW()) WHERE id = $1 RETURNING *`,
             [messageId]

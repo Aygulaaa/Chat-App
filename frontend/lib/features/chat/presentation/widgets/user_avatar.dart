@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 
 class UserAvatar extends StatelessWidget {
   final String name;
-  final String? imageUrl; // Added: Optional image URL
-  final bool isOnline;    // Toggle: Controls the visibility of the green dot
+  final String? imageUrl;
+  final bool isOnline;
   final double size;
 
   const UserAvatar({
@@ -34,13 +35,8 @@ class UserAvatar extends StatelessWidget {
                       fit: BoxFit.cover,
                     )
                   : null,
-              gradient: hasImage
-                  ? null
-                  : const LinearGradient(
-                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                    ),
+              gradient: hasImage ? null : AppColors.primaryGradient,
             ),
-
             child: hasImage
                 ? null
                 : Center(
@@ -63,15 +59,15 @@ class UserAvatar extends StatelessWidget {
                 width: size * 0.25,
                 height: size * 0.25,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981), 
+                  color: AppColors.online,
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: const Color(0xFF16202E), 
+                    color: AppColors.darkCardAlt,
                     width: 2,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.5),
+                      color: AppColors.online.withValues(alpha: 0.5),
                       blurRadius: 4,
                       spreadRadius: 1,
                     )

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/inlineAudioPlayer.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -16,7 +17,7 @@ class MessageContent extends StatelessWidget {
         return Text(
           message.text ?? '',
           style: const TextStyle(
-            color: Colors.white,
+            color: AppColors.darkTextPrimary,
             fontSize: 15,
             height: 1.45,
           ),
@@ -29,8 +30,13 @@ class MessageContent extends StatelessWidget {
             message.fileUrl!,
             width: 200,
             fit: BoxFit.cover,
-            loadingBuilder: (_, child, progress) =>
-                progress == null ? child : const CircularProgressIndicator(),
+            loadingBuilder: (_, child, progress) => progress == null
+                ? child
+                : const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.primary,
+                    ),
+                  ),
           ),
         );
 
@@ -46,7 +52,7 @@ class MessageContent extends StatelessWidget {
       case MessageType.audio:
         return InlineAudioPlayer(
           url: message.fileUrl!,
-          color: isMe ? Colors.white : const Color(0xFF4CC9F0),
+          color: isMe ? AppColors.darkTextPrimary : const Color(0xFF4CC9F0),
         );
 
       case MessageType.pdf:
@@ -55,7 +61,7 @@ class MessageContent extends StatelessWidget {
           label: message.originalName ?? 'Document.pdf',
           fileSize: message.fileSize,
           url: message.fileUrl,
-          color: Colors.redAccent,
+          color: AppColors.error,
         );
 
       case MessageType.archive:
@@ -73,7 +79,7 @@ class MessageContent extends StatelessWidget {
           label: message.originalName ?? 'File',
           fileSize: message.fileSize,
           url: message.fileUrl,
-          color: Colors.blueAccent,
+          color: AppColors.accent,
         );
     }
   }
@@ -114,9 +120,9 @@ class _FileTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.06),
+          color: AppColors.darkBorder,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: AppColors.darkBorder),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -130,7 +136,7 @@ class _FileTile extends StatelessWidget {
                   Text(
                     label,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: AppColors.darkTextPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
@@ -140,8 +146,8 @@ class _FileTile extends StatelessWidget {
                   if (fileSize != null)
                     Text(
                       _formatSize(fileSize),
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
+                      style: const TextStyle(
+                        color: AppColors.darkTextTertiary,
                         fontSize: 11,
                       ),
                     ),
@@ -149,9 +155,9 @@ class _FileTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(
+            const Icon(
               Icons.download_outlined,
-              color: Colors.white.withOpacity(0.3),
+              color: AppColors.darkTextTertiary,
               size: 18,
             ),
           ],

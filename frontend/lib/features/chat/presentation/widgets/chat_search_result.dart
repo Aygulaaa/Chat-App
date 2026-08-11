@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:my_chat_app/core/theme/app_colors.dart'; // Make sure to import your AppColors file
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 
@@ -42,11 +43,9 @@ class ChatSearchResults extends ConsumerWidget {
         title = (otherUser?.username ?? '').toLowerCase();
       }
 
-      final lastMessage =
-          (chat.lastMessage?.text ?? '').toLowerCase();
+      final lastMessage = (chat.lastMessage?.text ?? '').toLowerCase();
 
-      return title.contains(q) ||
-          lastMessage.contains(q);
+      return title.contains(q) || lastMessage.contains(q);
     }).toList();
 
     if (query.trim().isEmpty) {
@@ -54,7 +53,7 @@ class ChatSearchResults extends ConsumerWidget {
         child: Text(
           'Search your conversations',
           style: TextStyle(
-            color: Colors.white38,
+            color: AppColors.darkTextTertiary, // Updated to AppColors
           ),
         ),
       );
@@ -65,7 +64,7 @@ class ChatSearchResults extends ConsumerWidget {
         child: Text(
           'No chats found',
           style: TextStyle(
-            color: Colors.white38,
+            color: AppColors.darkTextTertiary, // Updated to AppColors
           ),
         ),
       );
@@ -80,8 +79,7 @@ class ChatSearchResults extends ConsumerWidget {
       itemBuilder: (_, index) {
         final chat = filteredChats[index];
 
-        final users =
-            chat.participants.whereType<UserModel>().toList();
+        final users = chat.participants.whereType<UserModel>().toList();
 
         UserModel? otherUser;
 
@@ -96,9 +94,7 @@ class ChatSearchResults extends ConsumerWidget {
             ? (chat.name ?? 'Group')
             : (otherUser?.username ?? 'Unknown');
 
-        final avatar = chat.isGroup
-            ? chat.avatar
-            : otherUser?.avatar;
+        final avatar = chat.isGroup ? chat.avatar : otherUser?.avatar;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
@@ -106,8 +102,7 @@ class ChatSearchResults extends ConsumerWidget {
             userId: otherUser?.id ?? 0,
             name: title,
             avatarUrl: avatar,
-            message:
-                chat.lastMessage?.text ?? 'No messages yet',
+            message: chat.lastMessage?.text ?? 'No messages yet',
             time: '',
             unread: chat.unreadCount > 0,
             unreadCount: chat.unreadCount,

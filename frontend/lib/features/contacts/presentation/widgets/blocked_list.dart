@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/contact_tile.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/empty_contacts.dart';
@@ -12,9 +13,11 @@ class BlockedList extends ConsumerWidget {
     final blockedAsync = ref.watch(blockedContactsProvider);
 
     return blockedAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      ),
       error: (e, _) => Center(
-        child: Text('$e', style: const TextStyle(color: Colors.redAccent)),
+        child: Text('$e', style: const TextStyle(color: AppColors.error)),
       ),
       data: (blocked) => blocked.isEmpty
           ? const EmptyContacts(
@@ -26,7 +29,7 @@ class BlockedList extends ConsumerWidget {
               padding: const EdgeInsets.only(top: 8, bottom: 100),
               itemCount: blocked.length,
               separatorBuilder: (_, __) => const Divider(
-                color: Colors.white10,
+                color: AppColors.darkBorder,
                 indent: 70,
                 height: 1,
               ),

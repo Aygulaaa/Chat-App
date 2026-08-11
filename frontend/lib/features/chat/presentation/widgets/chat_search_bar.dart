@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 
 class ChatSearchBar extends StatelessWidget {
   final TextEditingController controller;
@@ -46,7 +47,7 @@ class ChatSearchBar extends StatelessWidget {
                 child: TextField(
                   controller: controller,
                   autofocus: true,
-                  cursorColor: const Color(0xFF6366F1),
+                  cursorColor: AppColors.primary,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 15,

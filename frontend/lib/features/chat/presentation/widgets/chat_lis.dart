@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
@@ -14,7 +15,7 @@ class ChatList extends ConsumerWidget {
   void _showChatOptions(BuildContext context, Chat chat) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E2A3A),
+      backgroundColor: AppColors.darkCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
           top: Radius.circular(20),
@@ -77,7 +78,7 @@ class ChatList extends ConsumerWidget {
     if (state.isLoading) {
       return const Center(
         child: CircularProgressIndicator(
-          color: Color(0xFF6366F1),
+          color: AppColors.primary,
         ),
       );
     }
@@ -125,8 +126,8 @@ class ChatList extends ConsumerWidget {
         await ref.read(chatProvider.notifier).loadChats();
       },
 
-      color: const Color(0xFF6366F1),
-      backgroundColor: const Color(0xFF1E2A3A),
+      color: AppColors.primary,
+      backgroundColor: AppColors.darkCard,
 
       child: ListView.builder(
         physics: const BouncingScrollPhysics(

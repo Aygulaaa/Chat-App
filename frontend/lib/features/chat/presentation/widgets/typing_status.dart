@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/utils/format_last_seen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/message_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
@@ -26,18 +27,18 @@ class TypingStatusText extends ConsumerWidget {
     final lastSeen = ref.watch(userStatusProvider).lastSeen[otherUserId];
 
     if (typingStatus != null) {
-      return Text(
+      return const Text(
         'typing...',
-        style: const TextStyle(fontSize: 12, color: Color(0xFF4CC9F0)),
+        style: TextStyle(fontSize: 12, color: AppColors.accent),
       );
     }
 
     if (isOnline) {
-      return Text(
+      return const Text(
         'online',
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
-          color: Color(0xFF4CC9F0),
+          color: AppColors.online,
           fontWeight: FontWeight.bold,
         ),
       );
@@ -47,7 +48,7 @@ class TypingStatusText extends ConsumerWidget {
     if (lastSeen != null) {
       return Text(
         TimeUtils.formatLastSeen(lastSeen),
-        style: const TextStyle(fontSize: 12, color: Colors.grey),
+        style: const TextStyle(fontSize: 12, color: AppColors.darkTextTertiary),
       );
     }
 

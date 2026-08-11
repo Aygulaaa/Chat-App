@@ -26,8 +26,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   void initState() {
     super.initState();
     ref.read(chatSocketDataSourceProvider);
-  ref.read(chatProvider);
-  ref.read(userStatusProvider);
+    ref.read(chatProvider);
+    ref.read(userStatusProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final chatState = ref.read(chatProvider);
       if (chatState.chats.isEmpty && !chatState.isLoading) {

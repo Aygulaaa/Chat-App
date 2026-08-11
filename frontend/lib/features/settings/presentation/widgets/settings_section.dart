@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 
 class SettingsSection extends StatelessWidget {
   final String title;
@@ -20,7 +21,7 @@ class SettingsSection extends StatelessWidget {
           child: Text(
             title.toUpperCase(),
             style: const TextStyle(
-              color: Colors.white38,
+              color: AppColors.darkTextTertiary,
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
@@ -30,9 +31,9 @@ class SettingsSection extends StatelessWidget {
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E2A3A),
+            color: AppColors.darkCard,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
+            border: Border.all(color: AppColors.darkBorder),
           ),
           child: Column(
             children: children
@@ -43,7 +44,7 @@ class SettingsSection extends StatelessWidget {
                         e.value,
                         if (e.key < children.length - 1)
                           const Divider(
-                            color: Colors.white10,
+                            color: AppColors.darkBorder,
                             height: 1,
                             indent: 56,
                           ),

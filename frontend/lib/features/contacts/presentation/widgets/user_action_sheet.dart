@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/contacts/domain/entities/contact.dart';
@@ -8,7 +9,7 @@ import 'package:my_chat_app/features/contacts/presentation/providers/contacts_pr
 void showUserActionSheet(BuildContext context, Contact contact) {
   showModalBottomSheet(
     context: context,
-    backgroundColor: const Color(0xFF1E2A3A),
+    backgroundColor: AppColors.darkCard,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -25,7 +26,7 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: AppColors.darkBorder,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -42,7 +43,7 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                         backgroundImage: contact.avatar != null
                             ? NetworkImage(contact.avatar!)
                             : null,
-                        backgroundColor: const Color(0xFF6366F1),
+                        backgroundColor: AppColors.primary,
                         child: contact.avatar == null
                             ? (contact.username.isNotEmpty
                                   ? Text(
@@ -66,7 +67,7 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                             Text(
                               contact.username,
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: AppColors.darkTextPrimary,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 16,
                               ),
@@ -75,7 +76,7 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                               Text(
                                 contact.bio!,
                                 style: const TextStyle(
-                                  color: Colors.white54,
+                                  color: AppColors.darkTextTertiary,
                                   fontSize: 13,
                                 ),
                               ),
@@ -87,18 +88,18 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                 ),
 
                 const SizedBox(height: 12),
-                const Divider(color: Colors.white10),
+                const Divider(color: AppColors.darkBorder),
 
                 if (!contact.isBlocked) ...[
                   if (!contact.isContact)
                     ListTile(
                       leading: const Icon(
                         Icons.person_add_outlined,
-                        color: Colors.greenAccent,
+                        color: AppColors.online,
                       ),
                       title: const Text(
                         'Add to contacts',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(color: AppColors.darkTextPrimary),
                       ),
                       onTap: () {
                         Navigator.pop(context);
@@ -115,7 +116,7 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                       ),
                       title: const Text(
                         'Remove from contacts',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(color: AppColors.darkTextPrimary),
                       ),
                       onTap: () {
                         Navigator.pop(context);
@@ -128,11 +129,11 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                   ListTile(
                     leading: const Icon(
                       Icons.chat_bubble_outline,
-                      color: Color(0xFF6366F1),
+                      color: AppColors.primary,
                     ),
                     title: const Text(
                       'Send message',
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(color: AppColors.darkTextPrimary),
                     ),
                     onTap: () async {
                       try {
@@ -168,10 +169,10 @@ void showUserActionSheet(BuildContext context, Contact contact) {
 
                 if (!contact.isBlocked)
                   ListTile(
-                    leading: const Icon(Icons.block, color: Colors.redAccent),
+                    leading: const Icon(Icons.block, color: AppColors.error),
                     title: const Text(
                       'Block user',
-                      style: TextStyle(color: Colors.redAccent),
+                      style: TextStyle(color: AppColors.error),
                     ),
                     onTap: () {
                       Navigator.pop(context);
@@ -182,11 +183,11 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                   ListTile(
                     leading: const Icon(
                       Icons.lock_open_outlined,
-                      color: Colors.greenAccent,
+                      color: AppColors.online,
                     ),
                     title: const Text(
                       'Unblock user',
-                      style: TextStyle(color: Colors.greenAccent),
+                      style: TextStyle(color: AppColors.online),
                     ),
                     onTap: () {
                       Navigator.pop(context);

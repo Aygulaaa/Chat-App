@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 
 class SettingsTile extends StatelessWidget {
   final IconData icon;
@@ -34,7 +35,7 @@ class SettingsTile extends StatelessWidget {
       title: Text(
         title,
         style: const TextStyle(
-          color: Colors.white,
+          color: AppColors.darkTextPrimary,
           fontSize: 15,
           fontWeight: FontWeight.w500,
         ),
@@ -42,12 +43,12 @@ class SettingsTile extends StatelessWidget {
       subtitle: subtitle != null
           ? Text(
               subtitle!,
-              style: const TextStyle(color: Colors.white38, fontSize: 12),
+              style: const TextStyle(color: AppColors.darkTextTertiary, fontSize: 12),
             )
           : null,
       trailing: trailing ??
           const Icon(Icons.chevron_right_rounded,
-              color: Colors.white24, size: 20),
+              color: AppColors.darkBorder, size: 20),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message_content.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message_status_tick.dart';
@@ -30,7 +31,6 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final showAvatar = isGroup && !isMe;
 
-
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 2.h, horizontal: 12.w),
       child: Align(
@@ -46,12 +46,16 @@ class MessageBubble extends StatelessWidget {
                   onTap: onAvatarTap,
                   child: CircleAvatar(
                     radius: 12.r,
-                    backgroundColor: const Color(0xFF1E2A3A),
+                    backgroundColor: AppColors.darkCard,
                     backgroundImage: senderAvatar != null
                         ? CachedNetworkImageProvider(senderAvatar!)
                         : null,
                     child: senderAvatar == null
-                        ? Icon(Icons.person, size: 16.r, color: Colors.white54)
+                        ? Icon(
+                            Icons.person,
+                            size: 16.r,
+                            color: AppColors.darkTextTertiary,
+                          )
                         : null,
                   ),
                 ),
@@ -99,14 +103,8 @@ class _BubbleBody extends StatelessWidget {
       ),
       padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 14.w),
       decoration: BoxDecoration(
-        gradient: isMe
-            ? const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF818CF8)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : null,
-        color: isMe ? null : const Color(0xFF1E2A3A),
+        gradient: isMe ? AppColors.primaryGradient : null,
+        color: isMe ? null : AppColors.darkCard,
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(18.r),
           topRight: Radius.circular(18.r),
@@ -115,11 +113,11 @@ class _BubbleBody extends StatelessWidget {
         ),
         border: isMe
             ? null
-            : Border.all(color: Colors.white.withOpacity(0.07)),
+            : Border.all(color: AppColors.darkBorder),
         boxShadow: [
           BoxShadow(
             color: isMe
-                ? const Color(0xFF6366F1).withOpacity(0.30)
+                ? AppColors.primary.withOpacity(0.30)
                 : Colors.black.withOpacity(0.15),
             blurRadius: isMe ? 20 : 8,
             offset: const Offset(0, 4),
@@ -139,7 +137,7 @@ class _BubbleBody extends StatelessWidget {
                   time!,
                   style: TextStyle(
                     fontSize: 10.sp,
-                    color: Colors.white.withOpacity(0.5),
+                    color: AppColors.darkTextTertiary,
                   ),
                 ),
                 if (isMe) ...[
@@ -153,4 +151,4 @@ class _BubbleBody extends StatelessWidget {
       ),
     );
   }
-}
+}

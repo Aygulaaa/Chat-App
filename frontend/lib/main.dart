@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/auth/auth_gate.dart';
 import 'package:my_chat_app/core/constants/api_config.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/app_shell/presentation/pages/main__screen.dart';
 import 'package:my_chat_app/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -46,24 +47,24 @@ class MyApp extends ConsumerWidget {
             useMaterial3: true,
             brightness: Brightness.light,
             colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF6366F1),
+              seedColor: AppColors.primary,
               brightness: Brightness.light,
             ),
-            scaffoldBackgroundColor: const Color(0xFFF1F5F9),
+            scaffoldBackgroundColor: AppColors.lightBg,
             appBarTheme: const AppBarTheme(
               centerTitle: true,
               elevation: 0,
-              backgroundColor: Color(0xFFF1F5F9),
-              foregroundColor: Color(0xFF0F172A),
+              backgroundColor: AppColors.lightBg,
+              foregroundColor: AppColors.lightTextPrimary,
             ),
             textTheme: const TextTheme(
               titleMedium: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF0F172A),
+                color: AppColors.lightTextPrimary,
               ),
-              bodyMedium: TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
-              bodySmall: TextStyle(fontSize: 11, color: Color(0xFF475569)),
+              bodyMedium: TextStyle(fontSize: 13, color: AppColors.lightTextPrimary),
+              bodySmall: TextStyle(fontSize: 11, color: AppColors.lightTextSecondary),
             ),
             elevatedButtonTheme: ElevatedButtonThemeData(
               style: ElevatedButton.styleFrom(
@@ -78,24 +79,24 @@ class MyApp extends ConsumerWidget {
             useMaterial3: true,
             brightness: Brightness.dark,
             colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF6366F1),
+              seedColor: AppColors.primary,
               brightness: Brightness.dark,
             ),
-            scaffoldBackgroundColor: const Color(0xFF090D16),
+            scaffoldBackgroundColor: AppColors.darkBg,
             appBarTheme: const AppBarTheme(
               centerTitle: true,
               elevation: 0,
-              backgroundColor: Color(0xFF090D16),
-              foregroundColor: Colors.white,
+              backgroundColor: AppColors.darkBg,
+              foregroundColor: AppColors.darkTextPrimary,
             ),
             textTheme: const TextTheme(
               titleMedium: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: AppColors.darkTextPrimary,
               ),
-              bodyMedium: TextStyle(fontSize: 13, color: Colors.white),
-              bodySmall: TextStyle(fontSize: 11, color: Colors.white54),
+              bodyMedium: TextStyle(fontSize: 13, color: AppColors.darkTextPrimary),
+              bodySmall: TextStyle(fontSize: 11, color: AppColors.darkTextSecondary),
             ),
             elevatedButtonTheme: ElevatedButtonThemeData(
               style: ElevatedButton.styleFrom(

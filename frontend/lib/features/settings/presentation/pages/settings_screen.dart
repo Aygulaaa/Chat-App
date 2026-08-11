@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/settings/presentation/providers/settings_provider.dart';
 import 'package:my_chat_app/features/settings/presentation/widgets/blocked_contacts.dart';
@@ -32,7 +33,7 @@ class SettingsScreen extends ConsumerWidget {
       body: settingsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
-          child: Text('$e', style: TextStyle(color: Colors.redAccent, fontSize: 13.sp)),
+          child: Text('$e', style: TextStyle(color: AppColors.error, fontSize: 13.sp)),
         ),
         data: (settings) => ListView(
           padding: EdgeInsets.only(bottom: 40.h),
@@ -43,12 +44,12 @@ class SettingsScreen extends ConsumerWidget {
               children: [
                 SettingsTile(
                   icon: Icons.notifications_outlined,
-                  iconColor: const Color(0xFF6366F1),
+                  iconColor: AppColors.primary,
                   title: 'Push Notifications',
                   subtitle: 'Receive message notifications',
                   trailing: Switch(
                     value: settings?.notificationsEnabled ?? true,
-                    activeColor: const Color(0xFF6366F1),
+                    activeColor: AppColors.primary,
                     onChanged: (val) => ref
                         .read(settingsProvider.notifier)
                         .updateSettings({'notificationsEnabled': val}),
@@ -68,7 +69,7 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: "Others won't see when you were last online",
                   trailing: Switch(
                     value: settings?.hideLastSeen ?? false,
-                    activeColor: const Color(0xFF6366F1),
+                    activeColor: AppColors.primary,
                     onChanged: (val) => ref
                         .read(settingsProvider.notifier)
                         .updateSettings({'hideLastSeen': val}),
@@ -81,7 +82,7 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: "Others won't see when you've read messages",
                   trailing: Switch(
                     value: settings?.hideReadReceipts ?? false,
-                    activeColor: const Color(0xFF6366F1),
+                    activeColor: AppColors.primary,
                     onChanged: (val) => ref
                         .read(settingsProvider.notifier)
                         .updateSettings({'hideReadReceipts': val}),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/utils/format_last_seen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
 import 'package:my_chat_app/features/profile/presentation/pages/edit_profile_screen.dart';
@@ -25,7 +26,7 @@ class ProfileAppBar extends ConsumerWidget implements PreferredSizeWidget {
       actions: [
         if (isMe)
           IconButton(
-            icon: const Icon(Icons.edit_outlined, color: Colors.white),
+            icon: const Icon(Icons.edit_outlined, color: AppColors.darkTextPrimary),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => EditProfileScreen(user: user)),
@@ -34,7 +35,7 @@ class ProfileAppBar extends ConsumerWidget implements PreferredSizeWidget {
       ],
       expandedHeight: 280,
       pinned: true,
-      backgroundColor: const Color(0xFF1C1C1E),
+      backgroundColor: AppColors.darkCard,
       flexibleSpace: FlexibleSpaceBar(
         background: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -48,7 +49,7 @@ class ProfileAppBar extends ConsumerWidget implements PreferredSizeWidget {
             Text(
               user.username,
               style: const TextStyle(
-                color: Colors.white,
+                color: AppColors.darkTextPrimary,
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
@@ -61,9 +62,9 @@ class ProfileAppBar extends ConsumerWidget implements PreferredSizeWidget {
               children: [
                 const SizedBox(width: 6),
                 Text(
-                  isOnline ? 'Online' : ' ${TimeUtils.formatLastSeen(userLastSeen!)}',
+                  isOnline ? 'Online' : (userLastSeen != null ? ' ${TimeUtils.formatLastSeen(userLastSeen)}' : 'Offline'),
                   style: TextStyle(
-                    color: isOnline ? Colors.greenAccent : Colors.grey[400],
+                    color: isOnline ? AppColors.online : AppColors.darkTextTertiary,
                     fontSize: 14,
                   ),
                 ),

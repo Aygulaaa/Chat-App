@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/user_avatar.dart';
 import 'package:my_chat_app/features/contacts/domain/entities/contact.dart';
@@ -25,7 +26,8 @@ class ContactTile extends ConsumerWidget {
             Stack(
               children: [
                 UserAvatar(name: contact.username, isOnline: isOnline, imageUrl: contact.avatar),
-              ],),
+              ],
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -34,7 +36,7 @@ class ContactTile extends ConsumerWidget {
                   Text(
                     contact.username,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: AppColors.darkTextPrimary,
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
                     ),
@@ -48,10 +50,10 @@ class ContactTile extends ConsumerWidget {
                             : contact.bio ?? 'No bio',
                     style: TextStyle(
                       color: contact.isBlocked
-                          ? Colors.redAccent.withOpacity(0.7)
+                          ? AppColors.error.withOpacity(0.7)
                           : isOnline
-                              ? Colors.greenAccent
-                              : Colors.white38,
+                              ? AppColors.online
+                              : AppColors.darkTextTertiary,
                       fontSize: 12,
                     ),
                     maxLines: 1,
@@ -60,9 +62,9 @@ class ContactTile extends ConsumerWidget {
                 ],
               ),
             ),
-            Icon(
+            const Icon(
               Icons.chevron_right_rounded,
-              color: Colors.white12,
+              color: AppColors.darkBorder,
               size: 20,
             ),
           ],

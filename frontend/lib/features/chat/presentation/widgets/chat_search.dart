@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
-import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/chat_tile.dart';
-import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
+
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
+import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
+import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
+import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/chat_tile.dart';
 
 class SearchChats extends ConsumerWidget {
   final String query;
@@ -43,7 +45,7 @@ class SearchChats extends ConsumerWidget {
 
     if (state.isLoading) {
       return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF6366F1)),
+        child: CircularProgressIndicator(color: AppColors.primary),
       );
     }
 
@@ -51,7 +53,7 @@ class SearchChats extends ConsumerWidget {
       return const Center(
         child: Text(
           'No chats found',
-          style: TextStyle(color: Colors.white38),
+          style: TextStyle(color: AppColors.darkTextTertiary),
         ),
       );
     }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/user_avatar.dart';
 
@@ -31,11 +32,8 @@ class ChatTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-final userStatusState = ref.watch(userStatusProvider);
-
-final bool isOnline =
-    userStatusState.onlineUsers[userId] == true;
-
+    final userStatusState = ref.watch(userStatusProvider);
+    final bool isOnline = userStatusState.onlineUsers[userId] == true;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
@@ -51,27 +49,27 @@ final bool isOnline =
                 }
               : null,
           borderRadius: BorderRadius.circular(18.r),
-          splashColor: const Color(0xFF6366F1).withOpacity(0.10),
+          splashColor: AppColors.primary.withOpacity(0.10),
           highlightColor: Colors.transparent,
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 13.h),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF1E2A3A), Color(0xFF16202E)],
+                colors: [AppColors.darkCard, AppColors.darkCardAlt],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(18.r),
               border: Border.all(
                 color: unread
-                    ? const Color(0xFF6366F1).withOpacity(0.35)
+                    ? AppColors.primary.withOpacity(0.35)
                     : Colors.white.withOpacity(0.07),
                 width: unread ? 1.5 : 1,
               ),
               boxShadow: [
                 if (unread)
                   BoxShadow(
-                    color: const Color(0xFF6366F1).withOpacity(0.12),
+                    color: AppColors.primary.withOpacity(0.12),
                     blurRadius: 20,
                     spreadRadius: 0,
                   ),
@@ -95,7 +93,7 @@ final bool isOnline =
                         style: TextStyle(
                           fontSize: 15.sp,
                           fontWeight: FontWeight.w600,
-                          color: const Color(0xFFF1F5F9),
+                          color: AppColors.lightBg,
                           letterSpacing: -0.1,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -107,7 +105,7 @@ final bool isOnline =
                           fontSize: 13.sp,
                           color: unread
                               ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B),
+                              : AppColors.lightTextTertiary,
                           fontWeight: unread
                               ? FontWeight.w500
                               : FontWeight.w400,
@@ -128,8 +126,8 @@ final bool isOnline =
                       style: TextStyle(
                         fontSize: 11.5.sp,
                         color: unread
-                            ? const Color(0xFF818CF8)
-                            : const Color(0xFF475569),
+                            ? AppColors.accent
+                            : AppColors.lightTextSecondary,
                         fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
                       ),
                     ),
@@ -157,15 +155,11 @@ class _UnreadBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
       constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6366F1), Color(0xFF818CF8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: AppColors.primaryGradient,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6366F1).withOpacity(0.4),
+            color: AppColors.primary.withOpacity(0.4),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

@@ -114,7 +114,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     ref.read(chatSocketDataSourceProvider).disconnect();
     await ref.read(secureStorageProvider).deleteToken();
-    state = AuthState();
+    state = AuthState(isLoading: false);
 
     print("🔒 Logout complete: Socket closed and state reset.");
   }

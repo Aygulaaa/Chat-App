@@ -19,7 +19,7 @@ class AuthRemoteDatasource {
     await storage.saveToken(token);
     api.setToken(token);
 
-    return UserModel.fromJson(response);
+    return UserModel.fromJson(response['user']);
   }
 
   Future<UserModel> register( String username, String password) async {
@@ -32,7 +32,7 @@ class AuthRemoteDatasource {
     await storage.saveToken(token); 
     api.setToken(token); 
 
-    return UserModel.fromJson(response);
+    return UserModel.fromJson(response['user']);
   }
 
   Future<void> logout() async {

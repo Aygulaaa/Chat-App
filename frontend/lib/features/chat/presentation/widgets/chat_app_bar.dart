@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/typing_status.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/user_avatar.dart';
@@ -17,7 +18,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
     required this.chatId,
     required this.username,
-    required this.isOnline, 
+    required this.isOnline,
     this.otherUser,
     this.groupAvatar,
     this.isGroup = false,
@@ -29,14 +30,14 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: const Color(0xFF161D2A),
+      backgroundColor: AppColors.darkAppBar,
       titleSpacing: 0,
       title: InkWell(
-        onTap: (){
+        onTap: () {
           if (isGroup) {
-            Navigator.push(context, MaterialPageRoute(builder: (_)=> GroupProfileScreen(chatId: chatId)));
+            Navigator.push(context, MaterialPageRoute(builder: (_) => GroupProfileScreen(chatId: chatId)));
           } else {
-            Navigator.push(context, MaterialPageRoute(builder: (_)=> ProfileScreen(user: otherUser)));
+            Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(user: otherUser)));
           }
         },
         child: Row(
@@ -56,8 +57,8 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                     maxLines: 1,
                   ),
-                  if(otherUser != null)
-                  TypingStatusText(chatId: chatId, otherUserId: otherUser!.id, isOnline: isOnline),
+                  if (otherUser != null)
+                    TypingStatusText(chatId: chatId, otherUserId: otherUser!.id, isOnline: isOnline),
                 ],
               ),
             ),

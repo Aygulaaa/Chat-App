@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
 import 'package:my_chat_app/features/profile/presentation/widgets/profile_avatar.dart';
@@ -97,7 +98,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     width: 20.r,
                     height: 20.r,
                     child: const CircularProgressIndicator(
-                      color: Color(0xFF6366F1),
+                      color: AppColors.primary,
                       strokeWidth: 2,
                     ),
                   ),
@@ -107,7 +108,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   child: Text(
                     'Save',
                     style: TextStyle(
-                      color: const Color(0xFF6366F1),
+                      color: AppColors.primary,
                       fontWeight: FontWeight.w700,
                       fontSize: 15.sp,
                     ),
@@ -246,7 +247,7 @@ class _Field extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14.r),
-              borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
+              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
             ),
             contentPadding: EdgeInsets.all(16.r),
             counterStyle: TextStyle(color: context.textTertiary),

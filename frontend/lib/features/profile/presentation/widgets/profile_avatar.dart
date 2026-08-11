@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
 
 class ProfileAvatar extends ConsumerStatefulWidget {
@@ -84,7 +85,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF818CF8)],
+                colors: [AppColors.primary, AppColors.accent],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -102,7 +103,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
                       : null,
                   gradient: latestUrl == null
                       ? const LinearGradient(
-                          colors: [Color(0xFF6366F1), Color(0xFF818CF8)],
+                          colors: [AppColors.primary, AppColors.accent],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         )
@@ -156,7 +157,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
                 height: 30.r,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF6366F1), Color(0xFF818CF8)],
+                    colors: [AppColors.primary, AppColors.accent],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -167,7 +168,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF6366F1).withOpacity(0.5),
+                      color: AppColors.primary.withOpacity(0.5),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -209,10 +210,10 @@ class _AvatarPickerSheet extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.09),
+              color: AppColors.darkCard,
               borderRadius: BorderRadius.circular(24.r),
               border: Border.all(
-                color: Colors.white.withOpacity(0.15),
+                color: AppColors.darkBorder,
                 width: 1,
               ),
             ),
@@ -225,7 +226,7 @@ class _AvatarPickerSheet extends StatelessWidget {
                   width: 36.w,
                   height: 4.h,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.3),
+                    color: AppColors.darkBorder,
                     borderRadius: BorderRadius.circular(4.r),
                   ),
                 ),
@@ -233,7 +234,7 @@ class _AvatarPickerSheet extends StatelessWidget {
                 Text(
                   'Profile Photo',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppColors.darkTextPrimary,
                     fontSize: 16.sp,
                     fontWeight: FontWeight.w600,
                     letterSpacing: -0.3,
@@ -243,7 +244,7 @@ class _AvatarPickerSheet extends StatelessWidget {
                 Text(
                   'Choose how to update your photo',
                   style: TextStyle(
-                    color: Colors.white54,
+                    color: AppColors.darkTextTertiary,
                     fontSize: 13.sp,
                   ),
                 ),
@@ -254,7 +255,7 @@ class _AvatarPickerSheet extends StatelessWidget {
                   icon: Icons.camera_alt_rounded,
                   label: 'Take Photo',
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF6366F1), Color(0xFF818CF8)],
+                    colors: [AppColors.primary, AppColors.accent],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -267,7 +268,7 @@ class _AvatarPickerSheet extends StatelessWidget {
                   icon: Icons.photo_library_rounded,
                   label: 'Choose from Gallery',
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF4CC9F0), Color(0xFF818CF8)],
+                    colors: [Color(0xFF4CC9F0), AppColors.accent],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -283,17 +284,17 @@ class _AvatarPickerSheet extends StatelessWidget {
                     padding: EdgeInsets.symmetric(vertical: 14.h),
                     margin: EdgeInsets.symmetric(horizontal: 0),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: AppColors.darkInputFill,
                       borderRadius: BorderRadius.circular(16.r),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.08),
+                        color: AppColors.darkBorder,
                       ),
                     ),
                     child: Text(
                       'Cancel',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Colors.white70,
+                        color: AppColors.darkTextSecondary,
                         fontSize: 14.sp,
                         fontWeight: FontWeight.w500,
                       ),
@@ -331,9 +332,9 @@ class _PickerOption extends StatelessWidget {
         width: double.infinity,
         padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.06),
+          color: AppColors.darkInputFill,
           borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: AppColors.darkBorder),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
@@ -352,7 +353,7 @@ class _PickerOption extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12.r),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF6366F1).withOpacity(0.4),
+                    color: AppColors.primary.withOpacity(0.4),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -364,16 +365,16 @@ class _PickerOption extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white,
+                color: AppColors.darkTextPrimary,
                 fontSize: 15.sp,
                 fontWeight: FontWeight.w500,
               ),
             ),
             const Spacer(),
-            Icon(
+            const Icon(
               Icons.chevron_right_rounded,
-              color: Colors.white38,
-              size: 18.sp,
+              color: AppColors.darkTextTertiary,
+              size: 18,
             ),
           ],
         ),

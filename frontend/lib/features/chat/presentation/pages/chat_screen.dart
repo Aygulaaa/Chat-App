@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
@@ -54,7 +55,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return Scaffold(
         backgroundColor: context.appBg,
         body: const Center(
-          child: CircularProgressIndicator(color: Color(0xFF6366F1)),
+          child: CircularProgressIndicator(color: AppColors.primary),
         ),
       );
     }
@@ -95,7 +96,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               child: state.isLoading
                   ? const Center(
                       child: CircularProgressIndicator(
-                        color: Color(0xFF6366F1),
+                        color: AppColors.primary,
                       ),
                     )
                   : MessageList(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/app_shell/presentation/pages/main__screen.dart';
 import 'package:my_chat_app/features/auth/presentation/pages/auth_page.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
@@ -46,10 +48,10 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     });
 
     if (state.isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF0B0F14),
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF6366F1)),
+      return Scaffold(
+        backgroundColor: context.appBg,
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
         ),
       );
     }

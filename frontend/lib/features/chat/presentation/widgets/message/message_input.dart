@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/core/utils/mime_utils.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
@@ -25,6 +27,9 @@ class _MessageInputState extends ConsumerState<MessageInput> {
   final AudioRecorder _recorder = AudioRecorder();
   bool _isRecording = false;
   bool _isSendingFile = false;
+  String? _recordedPath;
+  Timer? _recordTimer;
+  int _recordDuration = 0;
 
   @override
   void initState() {
@@ -36,6 +41,7 @@ class _MessageInputState extends ConsumerState<MessageInput> {
   void dispose() {
     _controller.dispose();
     _recorder.dispose();
+    _recordTimer?.cancel();
     super.dispose();
   }
 
@@ -72,7 +78,6 @@ class _MessageInputState extends ConsumerState<MessageInput> {
 
   Future<void> _startRecording() async {
     final hasPermission = await _recorder.hasPermission();
-    print("🎤 PERMISSION: $hasPermission");
     if (!hasPermission) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -100,13 +105,16 @@ class _MessageInputState extends ConsumerState<MessageInput> {
         ),
         path: path,
       );
-      final amplitude = await _recorder.getAmplitude();
 
-      print(amplitude.current);
-
-      if (mounted) setState(() => _isRecording = true);
+      if (mounted) {
+        setState(() {
+          _isRecording = true;
+          _recordedPath = null;
+          _recordDuration = 0;
+        });
+        _startTimer();
+      }
     } catch (e) {
-      print('❌ Recording start error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not start recording: $e')),
@@ -115,59 +123,67 @@ class _MessageInputState extends ConsumerState<MessageInput> {
     }
   }
 
-  Future<void> _stopAndSend() async {
+  void _startTimer() {
+    _recordTimer?.cancel();
+    _recordTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_recordDuration >= 180) {
+        _stopRecording();
+      } else {
+        setState(() => _recordDuration++);
+      }
+    });
+  }
+
+  Future<void> _stopRecording() async {
+    _recordTimer?.cancel();
     if (!_isRecording) return;
     try {
       final path = await _recorder.stop();
-      if (mounted) setState(() => _isRecording = false);
-
-      if (path == null) {
-        print('❌ Recording path is null');
-        return;
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _recordedPath = path;
+        });
       }
+    } catch (e) {
+      print('❌ Recording stop error: $e');
+    }
+  }
 
-      print('🎙️ Recording saved to: $path');
+  void _deleteRecording() {
+    setState(() {
+      _recordedPath = null;
+      _recordDuration = 0;
+    });
+  }
 
-      await Future.delayed(const Duration(seconds: 1));
-
-      final file = File(path);
+  Future<void> _sendRecording() async {
+    if (_recordedPath == null) return;
+    try {
+      final file = File(_recordedPath!);
       final exists = await file.exists();
 
-      print('📁 Exists: $exists');
-
-      if (!exists) {
-        print('❌ File missing');
-        return;
-      }
-
-      final amplitude = await _recorder.getAmplitude();
-
-      print(amplitude.current);
+      if (!exists) return;
 
       final length = await file.length();
-
-      print('📦 FILE SIZE = $length');
-
-      if (length < 1000) {
-        print('❌ Recording too small');
-        return;
-      }
+      if (length < 1000) return;
 
       final bytes = await file.readAsBytes();
-      print('🎙️ Recording size: ${bytes.length} bytes');
-
-      if (bytes.isEmpty) {
-        print('❌ Recording is empty');
-        return;
-      }
+      if (bytes.isEmpty) return;
 
       final filename = 'recording_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
       await ref
           .read(messageProvider(widget.chatId).notifier)
           .sendFileMessage(bytes, filename, 'audio/mp4');
+
+      if (mounted) {
+        setState(() {
+          _recordedPath = null;
+          _recordDuration = 0;
+        });
+      }
     } catch (e) {
-      print('❌ Stop and send error: $e');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -177,8 +193,13 @@ class _MessageInputState extends ConsumerState<MessageInput> {
   }
 
   Future<void> _cancelRecording() async {
+    _recordTimer?.cancel();
     await _recorder.cancel();
-    setState(() => _isRecording = false);
+    setState(() {
+      _isRecording = false;
+      _recordDuration = 0;
+      _recordedPath = null;
+    });
   }
 
   void _onSend() {
@@ -209,11 +230,15 @@ class _MessageInputState extends ConsumerState<MessageInput> {
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
         decoration: BoxDecoration(
-          color: AppColors.darkCard,
-          border: const Border(top: BorderSide(color: AppColors.darkBorder, width: 0.8)),
+          color: context.cardBg,
+          border: Border(
+            top: BorderSide(color: context.glassBorder, width: 0.8),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: context.isLight
+                  ? Colors.black.withValues(alpha: 0.04)
+                  : Colors.black.withValues(alpha: 0.08),
               blurRadius: 12,
               offset: const Offset(0, -3),
             ),
@@ -226,6 +251,11 @@ class _MessageInputState extends ConsumerState<MessageInput> {
                 icon: Icon(Icons.close, color: AppColors.error, size: 22.sp),
                 onPressed: _cancelRecording,
               )
+            else if (_recordedPath != null)
+              IconButton(
+                icon: Icon(Icons.delete, color: AppColors.error, size: 22.sp),
+                onPressed: _deleteRecording,
+              )
             else
               _isSendingFile
                   ? Padding(
@@ -233,49 +263,79 @@ class _MessageInputState extends ConsumerState<MessageInput> {
                       child: SizedBox(
                         width: 20.r,
                         height: 20.r,
-                        child: const CircularProgressIndicator(
+                        child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: AppColors.darkTextTertiary,
+                          color: context.textTertiary,
                         ),
                       ),
                     )
                   : IconButton(
-                      icon: Icon(Icons.attach_file, color: AppColors.darkTextTertiary, size: 22.sp),
+                      icon: Icon(
+                        Icons.attach_file,
+                        color: context.textTertiary,
+                        size: 22.sp,
+                      ),
                       onPressed: _pickAndSendFile,
                     ),
 
             Expanded(
               child: _isRecording
-                  ? _RecordingIndicator()
-                  : TextField(
-                      controller: _controller,
-                      onChanged: (val) => ref
-                          .read(messageProvider(widget.chatId).notifier)
-                          .sendTypingEvent(val.isNotEmpty),
-                      style: TextStyle(color: AppColors.darkTextPrimary, fontSize: 15.sp),
-                      decoration: InputDecoration(
-                        hintText: 'Message...',
-                        hintStyle: TextStyle(color: AppColors.darkTextTertiary, fontSize: 15.sp),
-                        filled: true,
-                        fillColor: AppColors.darkInputFill,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 14.w,
-                          vertical: 10.h,
+                  ? _RecordingIndicator(duration: _recordDuration)
+                  : _recordedPath != null
+                      ? Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 14.w),
+                          child: Text(
+                            'Audio recorded: ${_recordDuration ~/ 60}:${(_recordDuration % 60).toString().padLeft(2, '0')}',
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 15.sp,
+                            ),
+                          ),
+                        )
+                      : TextField(
+                          controller: _controller,
+                          onChanged: (val) => ref
+                              .read(messageProvider(widget.chatId).notifier)
+                              .sendTypingEvent(val.isNotEmpty),
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 15.sp,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Message...',
+                            hintStyle: TextStyle(
+                              color: context.textTertiary,
+                              fontSize: 15.sp,
+                            ),
+                            filled: true,
+                            fillColor: context.cardBg,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 14.w,
+                              vertical: 10.h,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(22.r),
+                              borderSide: BorderSide(
+                                color: context.glassBorder,
+                                width: 0.8,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(22.r),
+                              borderSide: BorderSide(
+                                color: context.glassBorder,
+                                width: 0.8,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(22.r),
+                              borderSide: const BorderSide(
+                                color: AppColors.primary,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22.r),
-                          borderSide: const BorderSide(color: AppColors.darkBorder, width: 0.8),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22.r),
-                          borderSide: const BorderSide(color: AppColors.darkBorder, width: 0.8),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22.r),
-                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                        ),
-                      ),
-                    ),
             ),
 
             ValueListenableBuilder<TextEditingValue>(
@@ -285,20 +345,43 @@ class _MessageInputState extends ConsumerState<MessageInput> {
 
                 if (_isRecording) {
                   return IconButton(
-                    icon: Icon(Icons.stop_circle, color: AppColors.primary, size: 30.sp),
-                    onPressed: _stopAndSend,
+                    icon: Icon(
+                      Icons.stop_circle,
+                      color: AppColors.primary,
+                      size: 30.sp,
+                    ),
+                    onPressed: _stopRecording,
+                  );
+                }
+
+                if (_recordedPath != null) {
+                  return IconButton(
+                    icon: Icon(
+                      Icons.send_rounded,
+                      color: AppColors.primary,
+                      size: 22.sp,
+                    ),
+                    onPressed: _sendRecording,
                   );
                 }
 
                 if (hasText) {
                   return IconButton(
-                    icon: Icon(Icons.send_rounded, color: AppColors.primary, size: 22.sp),
+                    icon: Icon(
+                      Icons.send_rounded,
+                      color: AppColors.primary,
+                      size: 22.sp,
+                    ),
                     onPressed: _onSend,
                   );
                 }
 
                 return IconButton(
-                  icon: Icon(Icons.mic_rounded, color: AppColors.darkTextTertiary, size: 22.sp),
+                  icon: Icon(
+                    Icons.mic_rounded,
+                    color: context.textTertiary,
+                    size: 22.sp,
+                  ),
                   onPressed: _startRecording,
                 );
               },
@@ -311,6 +394,10 @@ class _MessageInputState extends ConsumerState<MessageInput> {
 }
 
 class _RecordingIndicator extends StatefulWidget {
+  final int duration;
+
+  const _RecordingIndicator({required this.duration});
+
   @override
   State<_RecordingIndicator> createState() => _RecordingIndicatorState();
 }
@@ -338,6 +425,10 @@ class _RecordingIndicatorState extends State<_RecordingIndicator>
 
   @override
   Widget build(BuildContext context) {
+    final min = widget.duration ~/ 60;
+    final sec = widget.duration % 60;
+    final formattedTime = '$min:${sec.toString().padLeft(2, '0')}';
+
     return Row(
       children: [
         const SizedBox(width: 12),
@@ -353,9 +444,12 @@ class _RecordingIndicatorState extends State<_RecordingIndicator>
           ),
         ),
         const SizedBox(width: 8),
-        const Text(
-          'Recording...',
-          style: TextStyle(color: AppColors.darkTextSecondary, fontSize: 14),
+        Text(
+          'Recording... $formattedTime',
+          style: TextStyle(
+            color: context.textSecondary,
+            fontSize: 14.sp,
+          ),
         ),
       ],
     );

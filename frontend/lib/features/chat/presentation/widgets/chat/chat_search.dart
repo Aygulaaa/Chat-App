@@ -1,105 +1,89 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:my_chat_app/core/theme/app_colors.dart'; // Make sure to import your AppColors file
+import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
-
 import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/chat_tile.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_tile.dart';
 
-class ChatSearchResults extends ConsumerWidget {
+class SearchChats extends ConsumerWidget {
   final String query;
 
-  const ChatSearchResults({
-    super.key,
-    required this.query,
-  });
+  const SearchChats({super.key, required this.query});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(chatProvider);
-
     final currentUserId = ref.watch(authProvider).user?.id;
 
-    final filteredChats = state.chats.where((chat) {
+    final chats = state.chats;
+
+    final filtered = chats.where((chat) {
       final q = query.toLowerCase();
+
+      final isGroup = chat.isGroup;
 
       final users = chat.participants.whereType<UserModel>().toList();
 
       String title = '';
+      String lastMsg = chat.lastMessage?.text ?? '';
 
-      if (chat.isGroup) {
+      if (isGroup) {
         title = (chat.name ?? '').toLowerCase();
       } else {
-        final otherUser = users.isNotEmpty
-            ? users.firstWhere(
-                (u) => u.id != currentUserId,
-                orElse: () => users[0],
-              )
-            : null;
-
-        title = (otherUser?.username ?? '').toLowerCase();
+        final other = users.firstWhere(
+          (u) => u.id != currentUserId,
+          orElse: () => users.first,
+        );
+        title = other.username.toLowerCase();
       }
 
-      final lastMessage = (chat.lastMessage?.text ?? '').toLowerCase();
-
-      return title.contains(q) || lastMessage.contains(q);
+      return title.contains(q) || lastMsg.toLowerCase().contains(q);
     }).toList();
 
-    if (query.trim().isEmpty) {
+    if (state.isLoading) {
       return const Center(
-        child: Text(
-          'Search your conversations',
-          style: TextStyle(
-            color: AppColors.darkTextTertiary, // Updated to AppColors
-          ),
-        ),
+        child: CircularProgressIndicator(color: AppColors.primary),
       );
     }
 
-    if (filteredChats.isEmpty) {
-      return const Center(
+    if (filtered.isEmpty) {
+      return Center(
         child: Text(
           'No chats found',
-          style: TextStyle(
-            color: AppColors.darkTextTertiary, // Updated to AppColors
-          ),
+          style: TextStyle(color: context.textTertiary),
         ),
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 10,
-      ),
-      itemCount: filteredChats.length,
-      itemBuilder: (_, index) {
-        final chat = filteredChats[index];
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      itemCount: filtered.length,
+      itemBuilder: (context, index) {
+        final chat = filtered[index];
 
+        final isGroup = chat.isGroup;
         final users = chat.participants.whereType<UserModel>().toList();
 
-        UserModel? otherUser;
+        UserModel? other;
 
-        if (!chat.isGroup && users.isNotEmpty) {
-          otherUser = users.firstWhere(
+        if (!isGroup) {
+          other = users.firstWhere(
             (u) => u.id != currentUserId,
-            orElse: () => users[0],
+            orElse: () => users.first,
           );
         }
 
-        final title = chat.isGroup
-            ? (chat.name ?? 'Group')
-            : (otherUser?.username ?? 'Unknown');
-
-        final avatar = chat.isGroup ? chat.avatar : otherUser?.avatar;
+        final title = isGroup ? (chat.name ?? 'Group') : other?.username ?? '';
+        final avatar = isGroup ? chat.avatar : other?.avatar;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: ChatTile(
-            userId: otherUser?.id ?? 0,
+            userId: other?.id ?? 0,
             name: title,
             avatarUrl: avatar,
             message: chat.lastMessage?.text ?? 'No messages yet',

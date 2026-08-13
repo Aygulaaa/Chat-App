@@ -15,22 +15,21 @@ class BlockedContactsPage extends ConsumerWidget {
     });
 
     return Scaffold(
-      backgroundColor: AppColors.darkBackground, 
+      backgroundColor: AppColors.darkBg, 
       appBar: AppBar(
         elevation: 0,
-
         backgroundColor: AppColors.darkCard,
         foregroundColor: Colors.white,
         title: const Text(
-          
           'Blocked Users',
           style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
         ),
       ),
       body: Container(
         decoration: const BoxDecoration(
+          
           gradient: LinearGradient(
-            colors: [AppColors.darkBackground, AppColors.darkInputFill],
+            colors: [AppColors.darkBg, AppColors.darkInputFill],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),

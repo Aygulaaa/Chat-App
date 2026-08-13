@@ -50,9 +50,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   Future<void> _save() async {
     final username = _usernameController.text.trim();
     if (username.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Username cannot be empty')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Username cannot be empty')));
       return;
     }
     setState(() => _isSaving = true);
@@ -60,14 +60,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       await ref.read(userProfileProvider.notifier).updateInfo({
         'username': username,
         'bio': _bioController.text.trim(),
-        if (_selectedDate != null) 'birthDate': _selectedDate!.toIso8601String(),
+        if (_selectedDate != null)
+          'birthDate': _selectedDate!.toIso8601String(),
       });
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to save: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -170,7 +171,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   border: Border.all(color: context.glassBorder),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 12,
                       offset: const Offset(0, 3),
                     ),
@@ -178,19 +179,29 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.cake_outlined, color: context.textTertiary, size: 18.sp),
+                    Icon(
+                      Icons.cake_outlined,
+                      color: context.textTertiary,
+                      size: 18.sp,
+                    ),
                     SizedBox(width: 12.w),
                     Text(
                       _selectedDate != null
                           ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
                           : 'Set birthday',
                       style: TextStyle(
-                        color: _selectedDate != null ? context.textPrimary : context.textTertiary,
+                        color: _selectedDate != null
+                            ? context.textPrimary
+                            : context.textTertiary,
                         fontSize: 15.sp,
                       ),
                     ),
                     const Spacer(),
-                    Icon(Icons.edit_outlined, color: context.textTertiary, size: 15.sp),
+                    Icon(
+                      Icons.edit_outlined,
+                      color: context.textTertiary,
+                      size: 15.sp,
+                    ),
                   ],
                 ),
               ),
@@ -247,7 +258,10 @@ class _Field extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14.r),
-              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+              borderSide: const BorderSide(
+                color: AppColors.primary,
+                width: 1.5,
+              ),
             ),
             contentPadding: EdgeInsets.all(16.r),
             counterStyle: TextStyle(color: context.textTertiary),

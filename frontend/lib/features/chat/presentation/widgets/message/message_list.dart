@@ -3,9 +3,9 @@ import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/utils/date_formatter.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/date_divider.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/message_bubble.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/typing_indicator.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/chat/date_divider.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/message_bubble.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/typing_indicator.dart';
 import 'package:my_chat_app/features/profile/presentation/pages/profile_screen.dart';
 import 'package:collection/collection.dart';
 

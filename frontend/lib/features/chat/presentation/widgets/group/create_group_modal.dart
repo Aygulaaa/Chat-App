@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/contacts/domain/entities/contact.dart';
@@ -16,9 +17,7 @@ class CreateGroupModal extends ConsumerStatefulWidget {
 
 class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
   final TextEditingController _searchController = TextEditingController();
-
   final TextEditingController _groupNameController = TextEditingController();
-
   final Set<int> _selectedIds = {};
 
   bool _isCreating = false;
@@ -26,7 +25,6 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
   @override
   void initState() {
     super.initState();
-
     _searchController.addListener(() {
       setState(() {});
     });
@@ -43,9 +41,9 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
     final groupName = _groupNameController.text.trim();
 
     if (groupName.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Enter group name')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter group name')),
+      );
       return;
     }
 
@@ -81,9 +79,9 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to create group: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to create group: $e')),
+      );
     } finally {
       if (mounted) {
         setState(() => _isCreating = false);
@@ -97,9 +95,9 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.88,
-      decoration: const BoxDecoration(
-        color: AppColors.darkModalBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: SafeArea(
         child: Column(
@@ -110,7 +108,7 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
               width: 42,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.darkBorder,
+                color: context.glassBorder,
                 borderRadius: BorderRadius.circular(100),
               ),
             ),
@@ -121,17 +119,16 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'New Group',
                       style: TextStyle(
-                        color: AppColors.darkTextPrimary,
+                        color: context.textPrimary,
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-
                   _isCreating
                       ? const SizedBox(
                           width: 22,
@@ -162,19 +159,28 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: TextField(
                 controller: _groupNameController,
-                style: const TextStyle(color: AppColors.darkTextPrimary),
+                cursorColor: AppColors.primary,
+                style: TextStyle(color: context.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'Group name',
-                  hintStyle: const TextStyle(color: AppColors.darkTextTertiary),
-                  prefixIcon: const Icon(
+                  hintStyle: TextStyle(color: context.textTertiary),
+                  prefixIcon: Icon(
                     Icons.groups_rounded,
-                    color: AppColors.darkTextTertiary,
+                    color: context.textTertiary,
                   ),
                   filled: true,
-                  fillColor: AppColors.darkModalSurface,
+                  fillColor: context.cardBg,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+                    borderSide: BorderSide(color: context.glassBorder, width: 1),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: context.glassBorder, width: 1),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                   ),
                 ),
               ),
@@ -184,8 +190,7 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
 
             ContactsSearchBar(
               controller: _searchController,
-              onChanged: (val) =>
-                  setState(() {}), 
+              onChanged: (val) => setState(() {}),
               onClear: () {
                 _searchController.clear();
                 setState(() {});
@@ -194,7 +199,6 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
 
             if (_selectedIds.isNotEmpty) ...[
               const SizedBox(height: 18),
-
               SizedBox(
                 height: 90,
                 child: contactsAsync.when(
@@ -225,12 +229,12 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
                                       ? Text(
                                           contact.username[0].toUpperCase(),
                                           style: const TextStyle(
-                                            color: AppColors.darkTextPrimary,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         )
                                       : null,
                                 ),
-
                                 Positioned(
                                   right: -4,
                                   top: -4,
@@ -248,16 +252,14 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
                                       child: const Icon(
                                         Icons.close,
                                         size: 16,
-                                        color: AppColors.darkTextPrimary,
+                                        color: Colors.white,
                                       ),
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-
                             const SizedBox(height: 6),
-
                             SizedBox(
                               width: 64,
                               child: Text(
@@ -265,8 +267,8 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: AppColors.darkTextSecondary,
+                                style: TextStyle(
+                                  color: context.textSecondary,
                                   fontSize: 12,
                                 ),
                               ),
@@ -304,11 +306,12 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
 
                     return username.contains(query) || bio.contains(query);
                   }).toList();
+
                   if (filtered.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text(
                         'No users found',
-                        style: TextStyle(color: AppColors.darkTextTertiary),
+                        style: TextStyle(color: context.textTertiary),
                       ),
                     );
                   }
@@ -321,7 +324,6 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
                     itemCount: filtered.length,
                     itemBuilder: (_, index) {
                       final contact = filtered[index];
-
                       final selected = _selectedIds.contains(contact.id);
 
                       return _ContactTile(
@@ -367,11 +369,11 @@ class _ContactTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: selected
-            ? AppColors.primary.withOpacity(0.12)
-            : AppColors.darkCardAlt,
+            ? AppColors.primary.withValues(alpha: 0.12)
+            : context.cardBg,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: selected ? AppColors.primary : AppColors.darkBorder,
+          color: selected ? AppColors.primary : context.glassBorder,
         ),
       ),
       child: ListTile(
@@ -385,14 +387,17 @@ class _ContactTile extends StatelessWidget {
           child: contact.avatar == null
               ? Text(
                   contact.username[0].toUpperCase(),
-                  style: const TextStyle(color: AppColors.darkTextPrimary),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
                 )
               : null,
         ),
         title: Text(
           contact.username,
-          style: const TextStyle(
-            color: AppColors.darkTextPrimary,
+          style: TextStyle(
+            color: context.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -400,7 +405,10 @@ class _ContactTile extends StatelessWidget {
           contact.bio ?? '',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: AppColors.darkTextTertiary, fontSize: 12),
+          style: TextStyle(
+            color: context.textTertiary,
+            fontSize: 12,
+          ),
         ),
         trailing: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -410,12 +418,16 @@ class _ContactTile extends StatelessWidget {
             shape: BoxShape.circle,
             color: selected ? AppColors.primary : Colors.transparent,
             border: Border.all(
-              color: selected ? AppColors.primary : AppColors.darkBorder,
+              color: selected ? AppColors.primary : context.glassBorder,
               width: 2,
             ),
           ),
           child: selected
-              ? const Icon(Icons.check, color: AppColors.darkTextPrimary, size: 14)
+              ? const Icon(
+                  Icons.check,
+                  color: Colors.white,
+                  size: 14,
+                )
               : null,
         ),
       ),

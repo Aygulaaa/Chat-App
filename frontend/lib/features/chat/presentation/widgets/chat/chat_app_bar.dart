@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/typing_status.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/user_avatar.dart';
-import 'package:my_chat_app/features/profile/presentation/pages/profile_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/pages/group_profile_screen.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/typing_status.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/user_avatar.dart';
+import 'package:my_chat_app/features/profile/presentation/pages/profile_screen.dart';
 
 class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int chatId;
@@ -30,19 +30,38 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: AppColors.darkAppBar,
+      backgroundColor: context.appBg,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      iconTheme: IconThemeData(color: context.textPrimary),
       titleSpacing: 0,
       title: InkWell(
         onTap: () {
           if (isGroup) {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => GroupProfileScreen(chatId: chatId)));
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => GroupProfileScreen(chatId: chatId),
+              ),
+            );
           } else {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(user: otherUser)));
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProfileScreen(user: otherUser),
+              ),
+            );
           }
         },
+        highlightColor: Colors.transparent,
+        splashColor: context.textPrimary.withValues(alpha: 0.05),
         child: Row(
           children: [
-            UserAvatar(name: username, isOnline: isOnline, imageUrl: otherUser?.avatar ?? groupAvatar),
+            UserAvatar(
+              name: username,
+              isOnline: isOnline,
+              imageUrl: otherUser?.avatar ?? groupAvatar,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -50,7 +69,8 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                 children: [
                   Text(
                     username,
-                    style: const TextStyle(
+                    style: TextStyle(
+                      color: context.textPrimary,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       overflow: TextOverflow.ellipsis,
@@ -58,7 +78,11 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                     maxLines: 1,
                   ),
                   if (otherUser != null)
-                    TypingStatusText(chatId: chatId, otherUserId: otherUser!.id, isOnline: isOnline),
+                    TypingStatusText(
+                      chatId: chatId,
+                      otherUserId: otherUser!.id,
+                      isOnline: isOnline,
+                    ),
                 ],
               ),
             ),

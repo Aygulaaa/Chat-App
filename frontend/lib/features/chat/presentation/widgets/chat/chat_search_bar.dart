@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 
 class ChatSearchBar extends StatelessWidget {
   final TextEditingController controller;
@@ -19,18 +20,13 @@ class ChatSearchBar extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: 18,
-          sigmaY: 18,
-        ),
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: Container(
           height: 44,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
+            color: context.cardBg,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.08),
-            ),
+            border: Border.all(color: context.glassBorder),
           ),
           child: Row(
             children: [
@@ -38,7 +34,7 @@ class ChatSearchBar extends StatelessWidget {
 
               Icon(
                 Icons.search_rounded,
-                color: Colors.white.withOpacity(0.5),
+                color: context.textTertiary,
               ),
 
               const SizedBox(width: 8),
@@ -48,26 +44,20 @@ class ChatSearchBar extends StatelessWidget {
                   controller: controller,
                   autofocus: true,
                   cursorColor: AppColors.primary,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                  ),
+                  style: TextStyle(color: context.textPrimary, fontSize: 15),
                   onChanged: onChanged,
                   decoration: InputDecoration(
                     border: InputBorder.none,
                     hintText: 'Search chats...',
                     hintStyle: TextStyle(
-                      color: Colors.white.withOpacity(0.35),
+                      color: context.textTertiary,
                     ),
                   ),
                 ),
               ),
 
               IconButton(
-                icon: const Icon(
-                  Icons.close_rounded,
-                  color: Colors.white70,
-                ),
+                icon: Icon(Icons.close_rounded, color: context.textSecondary),
                 onPressed: onClose,
               ),
             ],

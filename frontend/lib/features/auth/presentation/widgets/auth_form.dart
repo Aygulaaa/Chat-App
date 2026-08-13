@@ -73,8 +73,8 @@ class _AuthFormState extends ConsumerState<AuthForm> {
                   center: Alignment.bottomCenter,
                   radius: 0.8,
                   colors: [
-                    AppColors.primary.withOpacity(0.4),
-                    AppColors.accent.withOpacity(0.2),
+                    AppColors.primary.withValues(alpha:0.4),
+                    AppColors.accent.withValues(alpha:0.2),
                     Colors.transparent,
                   ],
                 ),

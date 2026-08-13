@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 
 class ContactsSearchBar extends StatefulWidget {
   final TextEditingController controller;
@@ -42,37 +43,30 @@ class _ContactsSearchBarState extends State<ContactsSearchBar> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: TextField(
         controller: widget.controller,
-
-        cursorColor: AppColors.darkTextPrimary,
-
-        style: const TextStyle(
-          color: AppColors.darkTextPrimary,
+        cursorColor: AppColors.primary,
+        style: TextStyle(
+          color: context.textPrimary,
           fontSize: 15,
         ),
-
         onChanged: widget.onChanged,
-
         decoration: InputDecoration(
           filled: true,
-          fillColor: AppColors.darkInputFill,
-
+          fillColor: context.cardBg,
           hintText: 'Search users...',
           hintStyle: TextStyle(
-            color: AppColors.darkTextTertiary,
+            color: context.textTertiary,
             fontSize: 15,
           ),
-
           prefixIcon: Icon(
             Icons.search_rounded,
-            color: AppColors.darkTextTertiary,
+            color: context.textTertiary,
             size: 20,
           ),
-
           suffixIcon: hasText
               ? IconButton(
                   icon: Icon(
                     Icons.close_rounded,
-                    color: AppColors.darkTextTertiary,
+                    color: context.textTertiary,
                     size: 20,
                   ),
                   onPressed: () {
@@ -82,22 +76,18 @@ class _ContactsSearchBarState extends State<ContactsSearchBar> {
                   },
                 )
               : null,
-
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
+            borderSide: BorderSide(color: context.glassBorder, width: 1),
           ),
-
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
+            borderSide: BorderSide(color: context.glassBorder, width: 1),
           ),
-
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
           ),
-
           contentPadding: const EdgeInsets.symmetric(
             vertical: 14,
             horizontal: 4,

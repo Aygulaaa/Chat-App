@@ -3,8 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/user_avatar.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/user_avatar.dart';
 
 class ChatTile extends ConsumerWidget {
   final int userId;
@@ -49,40 +50,46 @@ class ChatTile extends ConsumerWidget {
                 }
               : null,
           borderRadius: BorderRadius.circular(18.r),
-          splashColor: AppColors.primary.withOpacity(0.10),
+          splashColor: AppColors.primary.withValues(alpha: 0.10),
           highlightColor: Colors.transparent,
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 13.h),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.darkCard, AppColors.darkCardAlt],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: context.cardBg,
               borderRadius: BorderRadius.circular(18.r),
               border: Border.all(
                 color: unread
-                    ? AppColors.primary.withOpacity(0.35)
-                    : Colors.white.withOpacity(0.07),
+                    ? AppColors.primary.withValues(
+                        alpha: context.isLight ? 0.45 : 0.35,
+                      )
+                    : context.glassBorder,
                 width: unread ? 1.5 : 1,
               ),
               boxShadow: [
                 if (unread)
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.12),
+                    color: AppColors.primary.withValues(
+                      alpha: context.isLight ? 0.18 : 0.12,
+                    ),
                     blurRadius: 20,
                     spreadRadius: 0,
                   ),
-                const BoxShadow(
-                  color: Color(0x10000000),
+                BoxShadow(
+                  color: context.isLight
+                      ? Colors.black.withValues(alpha: 0.04)
+                      : const Color(0x10000000),
                   blurRadius: 8,
-                  offset: Offset(0, 3),
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
             child: Row(
               children: [
-                UserAvatar(name: name, imageUrl: avatarUrl, isOnline: isOnline),
+                UserAvatar(
+                  name: name,
+                  imageUrl: avatarUrl,
+                  isOnline: isOnline,
+                ),
                 SizedBox(width: 13.w),
                 Expanded(
                   child: Column(
@@ -93,7 +100,7 @@ class ChatTile extends ConsumerWidget {
                         style: TextStyle(
                           fontSize: 15.sp,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.lightBg,
+                          color: context.textPrimary,
                           letterSpacing: -0.1,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -104,11 +111,9 @@ class ChatTile extends ConsumerWidget {
                         style: TextStyle(
                           fontSize: 13.sp,
                           color: unread
-                              ? const Color(0xFF94A3B8)
-                              : AppColors.lightTextTertiary,
-                          fontWeight: unread
-                              ? FontWeight.w500
-                              : FontWeight.w400,
+                              ? context.textSecondary
+                              : context.textTertiary,
+                          fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -126,8 +131,10 @@ class ChatTile extends ConsumerWidget {
                       style: TextStyle(
                         fontSize: 11.5.sp,
                         color: unread
-                            ? AppColors.accent
-                            : AppColors.lightTextSecondary,
+                            ? (context.isLight
+                                ? AppColors.primary
+                                : AppColors.accent)
+                            : context.textTertiary,
                         fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
                       ),
                     ),
@@ -159,7 +166,7 @@ class _UnreadBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.4),
+            color: AppColors.primary.withValues(alpha: 0.4),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

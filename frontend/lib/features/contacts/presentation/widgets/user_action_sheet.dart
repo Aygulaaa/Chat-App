@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/contacts/domain/entities/contact.dart';
@@ -9,7 +10,7 @@ import 'package:my_chat_app/features/contacts/presentation/providers/contacts_pr
 void showUserActionSheet(BuildContext context, Contact contact) {
   showModalBottomSheet(
     context: context,
-    backgroundColor: AppColors.darkCard,
+    backgroundColor: context.cardBg,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -26,7 +27,7 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.darkBorder,
+                    color: context.glassBorder,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -50,6 +51,7 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                                       contact.username[0].toUpperCase(),
                                       style: const TextStyle(
                                         color: Colors.white,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     )
                                   : const Icon(
@@ -66,8 +68,8 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                           children: [
                             Text(
                               contact.username,
-                              style: const TextStyle(
-                                color: AppColors.darkTextPrimary,
+                              style: TextStyle(
+                                color: context.textPrimary,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 16,
                               ),
@@ -75,8 +77,8 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                             if (contact.bio != null)
                               Text(
                                 contact.bio!,
-                                style: const TextStyle(
-                                  color: AppColors.darkTextTertiary,
+                                style: TextStyle(
+                                  color: context.textTertiary,
                                   fontSize: 13,
                                 ),
                               ),
@@ -88,7 +90,7 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                 ),
 
                 const SizedBox(height: 12),
-                const Divider(color: AppColors.darkBorder),
+                Divider(color: context.glassBorder),
 
                 if (!contact.isBlocked) ...[
                   if (!contact.isContact)
@@ -97,9 +99,9 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                         Icons.person_add_outlined,
                         color: AppColors.online,
                       ),
-                      title: const Text(
+                      title: Text(
                         'Add to contacts',
-                        style: TextStyle(color: AppColors.darkTextPrimary),
+                        style: TextStyle(color: context.textPrimary),
                       ),
                       onTap: () {
                         Navigator.pop(context);
@@ -114,9 +116,9 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                         Icons.person_remove_outlined,
                         color: Colors.orangeAccent,
                       ),
-                      title: const Text(
+                      title: Text(
                         'Remove from contacts',
-                        style: TextStyle(color: AppColors.darkTextPrimary),
+                        style: TextStyle(color: context.textPrimary),
                       ),
                       onTap: () {
                         Navigator.pop(context);
@@ -131,9 +133,9 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                       Icons.chat_bubble_outline,
                       color: AppColors.primary,
                     ),
-                    title: const Text(
+                    title: Text(
                       'Send message',
-                      style: TextStyle(color: AppColors.darkTextPrimary),
+                      style: TextStyle(color: context.textPrimary),
                     ),
                     onTap: () async {
                       try {
@@ -156,7 +158,6 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                           ),
                         );
                       } catch (e) {
-                        print("Error opening chat: $e");
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('Failed to open chat: $e')),

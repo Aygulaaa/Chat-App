@@ -9,10 +9,9 @@ import 'package:my_chat_app/core/utils/format_last_seen.dart';
 import 'package:my_chat_app/features/auth/presentation/pages/auth_page.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
-import 'package:my_chat_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:my_chat_app/features/profile/presentation/pages/edit_profile_screen.dart';
 import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
-import 'package:my_chat_app/features/profile/presentation/widgets/profile_avatar.dart';
+import 'package:my_chat_app/features/settings/presentation/pages/settings_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   final UserEntity? user;
@@ -28,19 +27,28 @@ class ProfileScreen extends ConsumerWidget {
     if (authState.isLoading) {
       return Scaffold(
         backgroundColor: context.appBg,
-        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
       );
     }
     if (authState.user == null) {
       return Scaffold(
         backgroundColor: context.appBg,
-        body: Center(child: Text('Please log in', style: TextStyle(color: context.textSecondary))),
+        body: Center(
+          child: Text(
+            'Please log in',
+            style: TextStyle(color: context.textSecondary),
+          ),
+        ),
       );
     }
     return profileAsync.when(
       loading: () => Scaffold(
         backgroundColor: context.appBg,
-        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
       ),
       error: (e, _) => Scaffold(
         backgroundColor: context.appBg,
@@ -50,11 +58,19 @@ class ProfileScreen extends ConsumerWidget {
             children: [
               Icon(Icons.error_outline, color: AppColors.error, size: 48.sp),
               SizedBox(height: 16.h),
-              Text('$e', style: TextStyle(color: context.textSecondary), textAlign: TextAlign.center),
+              Text(
+                '$e',
+                style: TextStyle(color: context.textSecondary),
+                textAlign: TextAlign.center,
+              ),
               SizedBox(height: 16.h),
               TextButton(
-                onPressed: () => ref.read(userProfileProvider.notifier).fetchProfile(),
-                child: const Text('Retry', style: TextStyle(color: AppColors.primary)),
+                onPressed: () =>
+                    ref.read(userProfileProvider.notifier).fetchProfile(),
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(color: AppColors.primary),
+                ),
               ),
             ],
           ),
@@ -80,15 +96,27 @@ class _MyProfile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
+    final maxHeaderHeight = 320.h;
+    final minHeaderHeight = kToolbarHeight + topPadding;
+
     return Scaffold(
       backgroundColor: context.appBg,
       body: CustomScrollView(
         slivers: [
-          _ProfileAppBar(user: user, isMe: true),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _ProfileHeaderDelegate(
+              user: user,
+              isMe: true,
+              maxExtentHeight: maxHeaderHeight,
+              minExtentHeight: minHeaderHeight,
+            ),
+          ),
           SliverToBoxAdapter(
             child: Column(
               children: [
-                SizedBox(height: 24.h),
+                SizedBox(height: 20.h),
                 _InfoCard(user: user),
                 SizedBox(height: 12.h),
                 _ActionCard(user: user),
@@ -115,15 +143,27 @@ class _OtherProfile extends ConsumerWidget {
       orElse: () => user,
     );
 
+    final topPadding = MediaQuery.of(context).padding.top;
+    final maxHeaderHeight = 320.h;
+    final minHeaderHeight = kToolbarHeight + topPadding;
+
     return Scaffold(
       backgroundColor: context.appBg,
       body: CustomScrollView(
         slivers: [
-          _ProfileAppBar(user: effectiveUser, isMe: false),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _ProfileHeaderDelegate(
+              user: effectiveUser,
+              isMe: false,
+              maxExtentHeight: maxHeaderHeight,
+              minExtentHeight: minHeaderHeight,
+            ),
+          ),
           SliverToBoxAdapter(
             child: Column(
               children: [
-                SizedBox(height: 24.h),
+                SizedBox(height: 20.h),
                 _InfoCard(user: effectiveUser),
                 SizedBox(height: 100.h),
               ],
@@ -135,113 +175,207 @@ class _OtherProfile extends ConsumerWidget {
   }
 }
 
-// ─── AppBar ───────────────────────────────────────────────────────────────────
-class _ProfileAppBar extends ConsumerWidget {
+// ─── Dynamic Squeezing Header Delegate ─────────────────────────────────────────
+class _ProfileHeaderDelegate extends SliverPersistentHeaderDelegate {
   final UserEntity user;
   final bool isMe;
-  const _ProfileAppBar({required this.user, required this.isMe});
+  final double maxExtentHeight;
+  final double minExtentHeight;
+
+  _ProfileHeaderDelegate({
+    required this.user,
+    required this.isMe,
+    required this.maxExtentHeight,
+    required this.minExtentHeight,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isOnline = ref.watch(userStatusProvider).onlineUsers[user.id] ?? false;
-    final socketLastSeen = ref.watch(userStatusProvider).lastSeen[user.id];
+  double get maxExtent => maxExtentHeight;
 
-    if (!isMe) {
-      final userAsync = ref.watch(userByIdProvider(user.id));
-      userAsync.whenData((fetchedUser) {
-        if (fetchedUser?.lastSeen != null &&
-            !ref.read(userStatusProvider).lastSeen.containsKey(user.id)) {
-          Future.microtask(() => ref
-              .read(userStatusProvider.notifier)
-              .setLastSeen(user.id, fetchedUser!.lastSeen));
+  @override
+  double get minExtent => minExtentHeight;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    final topPadding = MediaQuery.of(context).padding.top;
+    // Calculate collapse percentage (0.0 fully expanded, 1.0 fully collapsed)
+    final progress =
+        (shrinkOffset / (maxExtentHeight - minExtentHeight)).clamp(0.0, 1.0);
+
+    return Consumer(
+      builder: (context, ref, child) {
+        final isOnline =
+            ref.watch(userStatusProvider).onlineUsers[user.id] ?? false;
+        final socketLastSeen = ref.watch(userStatusProvider).lastSeen[user.id];
+
+        if (!isMe) {
+          final userAsync = ref.watch(userByIdProvider(user.id));
+          userAsync.whenData((fetchedUser) {
+            if (fetchedUser?.lastSeen != null &&
+                !ref.read(userStatusProvider).lastSeen.containsKey(user.id)) {
+              Future.microtask(
+                () => ref
+                    .read(userStatusProvider.notifier)
+                    .setLastSeen(user.id, fetchedUser!.lastSeen),
+              );
+            }
+          });
         }
-      });
-    }
 
-    final effectiveLastSeen = socketLastSeen ?? user.lastSeen;
-    final isDark = !context.isLight;
+        final effectiveLastSeen = socketLastSeen ?? user.lastSeen;
 
-    return SliverAppBar(
-      expandedHeight: 280.h,
-      pinned: true,
-      backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF1F5F9),
-      iconTheme: IconThemeData(color: context.textPrimary),
-      actions: [
-        if (isMe)
-          IconButton(
-            icon: Icon(Icons.edit_outlined, color: context.textPrimary),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => EditProfileScreen(user: user)),
-            ),
-          ),
-      ],
-      flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Gradient background
-            Container(
-              decoration: BoxDecoration(
-                gradient: isDark
-                    ? const LinearGradient(
-                        colors: [Color(0xFF0B1120), Color(0xFF1E293B)],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      )
-                    : const LinearGradient(
-                        colors: [Color(0xFFE2E8F0), Color(0xFFF8FAFC)],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-              ),
-            ),
-            // Glass shimmer band
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: 80.h,
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                child: Container(
+        // Position transformations as header collapses
+        final titleLeft = Tween<double>(begin: 20.w, end: isMe ? 20.w : 56.w)
+            .transform(progress);
+        final titleBottom =
+            Tween<double>(begin: 20.h, end: 12.h).transform(progress);
+
+        return ClipRRect(
+          child: Container(
+            color: context.appBg,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // 1. Photo Background / Fallback (Scales down smoothly)
+                Opacity(
+                  opacity: (1.0 - (progress * 1.2)).clamp(0.0, 1.0),
+                  child: user.avatar != null && user.avatar!.isNotEmpty
+                      ? Image.network(
+                          user.avatar!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              _FallbackGradient(user: user),
+                        )
+                      : _FallbackGradient(user: user),
+                ),
+
+                // 2. Scrim Overlay for image readability
+                Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        Colors.transparent,
-                        context.appBg.withOpacity(0.6),
-                      ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.5),
+                        Colors.transparent,
+                        Colors.black.withValues(
+                          alpha: 0.8 * (1.0 - progress),
+                        ),
+                      ],
+                      stops: const [0.0, 0.4, 1.0],
                     ),
                   ),
                 ),
-              ),
-            ),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(height: 60.h),
-                ProfileAvatar(
-                  username: user.username,
-                  imageUrl: user.avatar,
-                  isMe: isMe,
-                ),
-                SizedBox(height: 14.h),
-                Text(
-                  user.username,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                    fontSize: 22.sp,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
+
+                // 3. Back Button for other users
+                if (!isMe)
+                  Positioned(
+                    top: topPadding + 4.h,
+                    left: 8.w,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+
+                // 4. Edit Profile Button
+                if (isMe)
+                  Positioned(
+                    top: topPadding + 4.h,
+                    right: 8.w,
+                    child: IconButton(
+                      icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EditProfileScreen(user: user),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // 5. Username & Status (Pins into App Bar position when scrolled)
+                Positioned(
+                  left: titleLeft,
+                  right: 60.w,
+                  bottom: titleBottom,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        user.username,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize:
+                              Tween<double>(begin: 24.sp, end: 18.sp).transform(
+                            progress,
+                          ),
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.3,
+                          shadows: [
+                            Shadow(
+                              offset: const Offset(0, 1),
+                              blurRadius: 6,
+                              color: Colors.black.withValues(alpha: 0.7),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (progress < 0.85) ...[
+                        SizedBox(height: 2.h),
+                        Opacity(
+                          opacity: (1.0 - (progress * 2)).clamp(0.0, 1.0),
+                          child: _StatusLabel(
+                            isOnline: isOnline,
+                            lastSeen: effectiveLastSeen,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                SizedBox(height: 4.h),
-                _StatusLabel(isOnline: isOnline, lastSeen: effectiveLastSeen),
               ],
             ),
-          ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _ProfileHeaderDelegate oldDelegate) {
+    return oldDelegate.user != user ||
+        oldDelegate.isMe != isMe ||
+        oldDelegate.maxExtentHeight != maxExtentHeight ||
+        oldDelegate.minExtentHeight != minExtentHeight;
+  }
+}
+
+class _FallbackGradient extends StatelessWidget {
+  final UserEntity user;
+  const _FallbackGradient({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: AppColors.primaryGradient,
+      ),
+      child: Center(
+        child: Text(
+          user.username.isNotEmpty ? user.username[0].toUpperCase() : 'U',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 72.sp,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
@@ -255,27 +389,48 @@ class _StatusLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final shadow = [
+      Shadow(
+        offset: const Offset(0, 1),
+        blurRadius: 4,
+        color: Colors.black.withValues(alpha: 0.7),
+      ),
+    ];
+
     if (isOnline) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 7.r,
-            height: 7.r,
+            width: 8.r,
+            height: 8.r,
             decoration: const BoxDecoration(
               color: AppColors.online,
               shape: BoxShape.circle,
             ),
           ),
-          SizedBox(width: 5.w),
-          const Text('Online', style: TextStyle(color: AppColors.online, fontSize: 13)),
+          SizedBox(width: 6.w),
+          Text(
+            'Online',
+            style: TextStyle(
+              color: AppColors.online,
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w600,
+              shadows: shadow,
+            ),
+          ),
         ],
       );
     }
     if (lastSeen != null) {
       return Text(
         TimeUtils.formatLastSeen(lastSeen!),
-        style: const TextStyle(color: AppColors.darkTextTertiary, fontSize: 13),
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.85),
+          fontSize: 13.sp,
+          fontWeight: FontWeight.w500,
+          shadows: shadow,
+        ),
       );
     }
     return const SizedBox.shrink();
@@ -297,7 +452,7 @@ class _InfoCard extends StatelessWidget {
         border: Border.all(color: context.glassBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -321,7 +476,8 @@ class _InfoCard extends StatelessWidget {
             _InfoRow(
               icon: Icons.cake_outlined,
               label: 'Birthday',
-              value: '${user.birthDate!.day}/${user.birthDate!.month}/${user.birthDate!.year}',
+              value:
+                  '${user.birthDate!.day}/${user.birthDate!.month}/${user.birthDate!.year}',
             ),
           ],
         ],
@@ -334,7 +490,11 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  const _InfoRow({required this.icon, required this.label, required this.value});
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -346,10 +506,10 @@ class _InfoRow extends StatelessWidget {
             width: 32.r,
             height: 32.r,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.12),
+              color: AppColors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8.r),
             ),
-            child: const Icon(icon, color: AppColors.accent, size: 17),
+            child: Icon(icon, color: AppColors.accent, size: 17),
           ),
           SizedBox(width: 12.w),
           Expanded(
@@ -366,7 +526,10 @@ class _InfoRow extends StatelessWidget {
                 ),
                 Text(
                   label,
-                  style: TextStyle(color: context.textTertiary, fontSize: 11.sp),
+                  style: TextStyle(
+                    color: context.textTertiary,
+                    fontSize: 11.sp,
+                  ),
                 ),
               ],
             ),
@@ -392,7 +555,7 @@ class _ActionCard extends ConsumerWidget {
         border: Border.all(color: context.glassBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -467,7 +630,7 @@ class _ActionRow extends StatelessWidget {
               width: 32.r,
               height: 32.r,
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.12),
+                color: iconColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8.r),
               ),
               child: Icon(icon, color: iconColor, size: 17),
@@ -477,13 +640,19 @@ class _ActionRow extends StatelessWidget {
               child: Text(
                 label,
                 style: TextStyle(
-                  color: labelColor == Colors.white ? context.textPrimary : labelColor,
+                  color: labelColor == Colors.white
+                      ? context.textPrimary
+                      : labelColor,
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: context.textTertiary, size: 18),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: context.textTertiary,
+              size: 18,
+            ),
           ],
         ),
       ),

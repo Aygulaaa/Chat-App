@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/inlineAudioPlayer.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/inlineAudioPlayer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class MessageContent extends StatelessWidget {
@@ -24,19 +24,39 @@ class MessageContent extends StatelessWidget {
         );
 
       case MessageType.image:
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            message.fileUrl!,
-            width: 200,
-            fit: BoxFit.cover,
-            loadingBuilder: (_, child, progress) => progress == null
-                ? child
-                : const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.primary,
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => Scaffold(
+                  backgroundColor: Colors.black,
+                  appBar: AppBar(
+                    backgroundColor: Colors.black,
+                    iconTheme: const IconThemeData(color: Colors.white),
+                  ),
+                  body: Center(
+                    child: InteractiveViewer(
+                      child: Image.network(message.fileUrl!),
                     ),
                   ),
+                ),
+              ),
+            );
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(
+              message.fileUrl!,
+              width: 200,
+              fit: BoxFit.cover,
+              loadingBuilder: (_, child, progress) => progress == null
+                  ? child
+                  : const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
+                    ),
+            ),
           ),
         );
 

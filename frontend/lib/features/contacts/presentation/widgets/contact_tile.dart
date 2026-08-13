@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/user_avatar.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/user_avatar.dart';
 import 'package:my_chat_app/features/contacts/domain/entities/contact.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/user_action_sheet.dart';
 
@@ -25,7 +26,11 @@ class ContactTile extends ConsumerWidget {
           children: [
             Stack(
               children: [
-                UserAvatar(name: contact.username, isOnline: isOnline, imageUrl: contact.avatar),
+                UserAvatar(
+                  name: contact.username,
+                  isOnline: isOnline,
+                  imageUrl: contact.avatar,
+                ),
               ],
             ),
             const SizedBox(width: 14),
@@ -35,8 +40,8 @@ class ContactTile extends ConsumerWidget {
                 children: [
                   Text(
                     contact.username,
-                    style: const TextStyle(
-                      color: AppColors.darkTextPrimary,
+                    style: TextStyle(
+                      color: context.textPrimary,
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
                     ),
@@ -50,10 +55,10 @@ class ContactTile extends ConsumerWidget {
                             : contact.bio ?? 'No bio',
                     style: TextStyle(
                       color: contact.isBlocked
-                          ? AppColors.error.withOpacity(0.7)
+                          ? AppColors.error.withValues(alpha: 0.7)
                           : isOnline
                               ? AppColors.online
-                              : AppColors.darkTextTertiary,
+                              : context.textTertiary,
                       fontSize: 12,
                     ),
                     maxLines: 1,
@@ -62,9 +67,9 @@ class ContactTile extends ConsumerWidget {
                 ],
               ),
             ),
-            const Icon(
+            Icon(
               Icons.chevron_right_rounded,
-              color: AppColors.darkBorder,
+              color: context.glassBorder,
               size: 20,
             ),
           ],

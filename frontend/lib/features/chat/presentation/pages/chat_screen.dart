@@ -8,9 +8,9 @@ import 'package:my_chat_app/features/chat/data/datasources/chat_socket_datasourc
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/message_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/chat_app_bar.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/message_input.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/message_list.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_app_bar.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/message_input.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/message_list.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final int chatId;

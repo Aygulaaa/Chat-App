@@ -4,9 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/domain/entities/chat.dart';
+import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/chat_tile.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_tile.dart';
 
 class ChatList extends ConsumerWidget {
   const ChatList({super.key});
@@ -167,8 +168,17 @@ class ChatList extends ConsumerWidget {
               ? chat.avatar
               : otherUser?.avatar;
 
-          final subtitle = chat.lastMessage?.text ??
-              'No messages yet';
+          final lastMsg = chat.lastMessage;
+          String subtitle = 'No messages yet';
+          if (lastMsg != null) {
+            if (lastMsg.fileType == MessageType.audio) {
+              subtitle = 'audio message';
+            } else if (lastMsg.fileType != MessageType.text) {
+              subtitle = lastMsg.originalName ?? 'file';
+            } else {
+              subtitle = lastMsg.text ?? '';
+            }
+          }
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),

@@ -26,8 +26,9 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
   bool _isUploading = false;
 
   Future<void> _showPickerSheet() async {
-    final currentAvatar = ref.read(userProfileProvider).valueOrNull?.avatar ?? widget.imageUrl;
-    
+    final currentAvatar =
+        ref.read(userProfileProvider).valueOrNull?.avatar ?? widget.imageUrl;
+
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -68,7 +69,8 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
   Widget build(BuildContext context) {
     final String? latestUrl;
     if (widget.isMe) {
-      latestUrl = ref.watch(userProfileProvider).valueOrNull?.avatar ?? widget.imageUrl;
+      latestUrl =
+          ref.watch(userProfileProvider).valueOrNull?.avatar ?? widget.imageUrl;
     } else {
       latestUrl = widget.imageUrl;
     }
@@ -133,7 +135,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
                   filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
+                      color: Colors.black.withValues(alpha: 0.5),
                       shape: BoxShape.circle,
                     ),
                     child: Center(
@@ -168,7 +170,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.5),
+                      color: AppColors.primary.withValues(alpha: 0.5),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -203,7 +205,12 @@ class _AvatarPickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 32.h + MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.fromLTRB(
+        16.w,
+        0,
+        16.w,
+        32.h + MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24.r),
         child: BackdropFilter(
@@ -212,10 +219,7 @@ class _AvatarPickerSheet extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.darkCard,
               borderRadius: BorderRadius.circular(24.r),
-              border: Border.all(
-                color: AppColors.darkBorder,
-                width: 1,
-              ),
+              border: Border.all(color: AppColors.darkBorder, width: 1),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -286,9 +290,7 @@ class _AvatarPickerSheet extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppColors.darkInputFill,
                       borderRadius: BorderRadius.circular(16.r),
-                      border: Border.all(
-                        color: AppColors.darkBorder,
-                      ),
+                      border: Border.all(color: AppColors.darkBorder),
                     ),
                     child: Text(
                       'Cancel',
@@ -337,7 +339,7 @@ class _PickerOption extends StatelessWidget {
           border: Border.all(color: AppColors.darkBorder),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -353,7 +355,7 @@ class _PickerOption extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12.r),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.4),
+                    color: AppColors.primary.withValues(alpha: 0.4),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),

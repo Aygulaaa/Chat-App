@@ -24,7 +24,7 @@ class SettingsNotifier extends AsyncNotifier<UserSettings?> {
   @override
   Future<UserSettings?> build() async {
     final auth = ref.watch(authProvider);
-    if (auth.isLoading || auth.token == null) return null;
+    if (auth.isLoading || auth.user == null) return null;
 
     final repo = ref.read(settingsRepositoryProvider);
     return GetSettings(repo)();

@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 
 class GlassNavBar extends StatelessWidget {
   final int index;
@@ -19,15 +19,19 @@ class GlassNavBar extends StatelessWidget {
           child: Container(
             height: 64,
             decoration: BoxDecoration(
-              color: AppColors.darkCard,
+              color: context.cardBg.withValues(alpha: context.isLight ? 0.85 : 0.75),
               borderRadius: BorderRadius.circular(40),
               border: Border.all(
-                color: AppColors.darkBorder,
+                color: context.isLight 
+                    ? const Color(0xFF6366F1).withValues(alpha: 0.15)
+                    : const Color(0xFF818CF8).withValues(alpha: 0.25),
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
+                  color: context.isLight
+                      ? const Color(0xFF6366F1).withValues(alpha: 0.10)
+                      : const Color(0xFF2D1B4E).withValues(alpha: 0.50),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
@@ -83,6 +87,11 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Purple active tint adapted to light/dark themes
+    final activeColor = context.isLight 
+        ? const Color(0xFF6366F1) // Indigo/Violet
+        : const Color(0xFFA5B4FC); // Soft Lilac Glow
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -95,12 +104,16 @@ class _NavItem extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: isActive
-              ? AppColors.primary.withOpacity(0.25)
+              ? (context.isLight
+                  ? const Color(0xFF6366F1).withValues(alpha: 0.15)
+                  : const Color(0xFF818CF8).withValues(alpha: 0.25))
               : Colors.transparent,
           borderRadius: BorderRadius.circular(30),
           border: isActive
               ? Border.all(
-                  color: AppColors.primary.withOpacity(0.4),
+                  color: context.isLight
+                      ? const Color(0xFF6366F1).withValues(alpha: 0.35)
+                      : const Color(0xFFA5B4FC).withValues(alpha: 0.45),
                   width: 1,
                 )
               : null,
@@ -110,17 +123,15 @@ class _NavItem extends StatelessWidget {
           children: [
             Icon(
               isActive ? activeIcon : icon,
-              color: isActive
-                  ? AppColors.accent
-                  : AppColors.darkTextTertiary,
+              color: isActive ? activeColor : context.textTertiary,
               size: 22,
             ),
             if (isActive) ...[
               const SizedBox(width: 6),
-               Text(
+              Text(
                 label,
                 style: TextStyle(
-                  color: AppColors.accent,
+                  color: activeColor,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),

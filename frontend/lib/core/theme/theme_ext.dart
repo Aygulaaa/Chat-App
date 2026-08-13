@@ -13,8 +13,8 @@ extension ThemeExt on BuildContext {
 
   // Glassmorphic panel background
   Color get glassBg => isLight
-      ? Colors.white.withOpacity(0.7)
-      : Colors.white.withOpacity(0.05);
+      ? Colors.white.withValues(alpha: 0.75)
+      : Colors.white.withValues(alpha: 0.04);
 
   // Glassmorphic panel border color
   Color get glassBorder => isLight ? AppColors.lightBorder : AppColors.darkBorder;
@@ -41,4 +41,3 @@ extension ThemeExt on BuildContext {
   // Dynamic gradient for message bubbles / items
   LinearGradient get primaryGradient => AppColors.primaryGradient;
 }
-

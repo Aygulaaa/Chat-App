@@ -372,4 +372,17 @@ export const chatRepository = {
     RETURNING id, name, avatar, type
   `, values);
   },
+
+  async deleteChat(chatId: number) {
+    try {
+      return await db.query(`
+        DELETE FROM chats
+        WHERE id = $1
+        RETURNING *
+      `, [chatId]);
+    } catch (err) {
+      console.error('DB ERROR deleteChat:', err);
+      throw err;
+    }
+  },
 };

@@ -29,5 +29,6 @@ router.post(
 router.post('/:chatId/members', chatController.addMember);
 router.delete('/:chatId/members/:userId', chatController.removeMember);
 router.patch('/:chatId/group', upload.single('avatar'), chatController.updateGroupInfo);
+router.delete('/:chatId', chatController.deleteChat);
 
 export default router;

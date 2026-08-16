@@ -15,6 +15,8 @@ class MessageModel extends Message {
     super.deliveredAt,
     super.readAt,
     super.status,
+    super.localPath,
+    super.uploadedBytes,
   });
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
@@ -61,6 +63,8 @@ class MessageModel extends Message {
       deliveredAt: deliveredAt?.toLocal(),
       readAt: readAt?.toLocal(),
       status: status,
+      localPath: json['localPath'],
+      uploadedBytes: _parseNullableIntSafe(json['uploadedBytes']),
     );
   }
 

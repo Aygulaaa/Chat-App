@@ -1,6 +1,7 @@
 import './db'; // Imports and initializes DB connection first
 import dotenv from "dotenv";
 dotenv.config();
+import './config/firebase';
 
 import express from "express";
 import http from "http";

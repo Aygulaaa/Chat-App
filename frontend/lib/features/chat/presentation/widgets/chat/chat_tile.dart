@@ -17,6 +17,7 @@ class ChatTile extends ConsumerWidget {
   final int unreadCount;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+  final bool isMuted;
 
   const ChatTile({
     super.key,
@@ -29,6 +30,7 @@ class ChatTile extends ConsumerWidget {
     this.unreadCount = 1,
     required this.onTap,
     this.onLongPress,
+    this.isMuted = false,
   });
 
   @override
@@ -126,17 +128,29 @@ class ChatTile extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      time,
-                      style: TextStyle(
-                        fontSize: 11.5.sp,
-                        color: unread
-                            ? (context.isLight
-                                ? AppColors.primary
-                                : AppColors.accent)
-                            : context.textTertiary,
-                        fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
-                      ),
+                    Row(
+                      children: [
+                        if (isMuted) ...[
+                          Icon(
+                            Icons.volume_off,
+                            size: 14.sp,
+                            color: context.textTertiary,
+                          ),
+                          SizedBox(width: 4.w),
+                        ],
+                        Text(
+                          time,
+                          style: TextStyle(
+                            fontSize: 11.5.sp,
+                            color: unread
+                                ? (context.isLight
+                                    ? AppColors.primary
+                                    : AppColors.accent)
+                                : context.textTertiary,
+                            fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                        ),
+                      ],
                     ),
                     SizedBox(height: 6.h),
                     if (unread) _UnreadBadge(count: unreadCount),

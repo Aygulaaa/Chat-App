@@ -182,4 +182,14 @@ export const chatController = {
             res.status(500).json({ error: 'Failed to update group' });
         }
     },
+
+    async deleteChat(req: AuthRequest, res: Response) {
+        try {
+            const chatId = Number(req.params.chatId);
+            await chatService.deleteChat(chatId);
+            res.json({ success: true });
+        } catch (err) {
+            res.status(500).json({ error: 'Failed to delete chat' });
+        }
+    },
 }

@@ -288,26 +288,86 @@ class MessageNotifier extends StateNotifier<MessageState> {
     }
   }
 
+  MessageType _getMessageTypeFromMime(String mimeType) {
+    if (mimeType.startsWith('image/')) return MessageType.image;
+    if (mimeType.startsWith('video/')) return MessageType.video;
+    if (mimeType.startsWith('audio/')) return MessageType.audio;
+    if (mimeType == 'application/pdf') return MessageType.pdf;
+    if (mimeType.contains('zip') || mimeType.contains('tar') || mimeType.contains('rar')) {
+      return MessageType.archive;
+    }
+    return MessageType.file;
+  }
+
   Future<void> sendFileMessage(
     Uint8List bytes,
     String filename,
-    String mimeType,
-  ) async {
+    String mimeType, {
+    String? localPath,
+  }) async {
     print(
       '📤 sendFileMessage called: $filename | $mimeType | ${bytes.length} bytes',
     );
+
+    final user = ref.read(authProvider).user;
+    final tempId = DateTime.now().microsecondsSinceEpoch;
+
+    // Create an optimistic placeholder message
+    final tempMessage = Message(
+      id: tempId,
+      chatId: chatId,
+      senderId: user?.id ?? 0,
+      text: filename,
+      fileType: _getMessageTypeFromMime(mimeType),
+      originalName: filename,
+      mimeType: mimeType,
+      fileSize: bytes.length,
+      localPath: localPath,
+      createdAt: DateTime.now(),
+      status: MessageStatus.uploading,
+      uploadedBytes: 0,
+    );
+
+    // Insert optimistic message at the top
+    state = state.copyWith(messages: [tempMessage, ...state.messages]);
+
     try {
       final message = await repository.sendFileMessage(
         chatId,
         bytes,
         filename,
         mimeType,
+        onProgress: (sent, total) {
+          if (!mounted) return;
+          final updated = state.messages.map((m) {
+            if (m.id == tempId) {
+              return m.copyWith(uploadedBytes: sent);
+            }
+            return m;
+          }).toList();
+          state = state.copyWith(messages: updated);
+        },
       );
+
       print('✅ File sent: ${message.fileUrl}');
+
+      // Replace temp message with server response
+      final updated = state.messages.map((m) {
+        return m.id == tempId ? message : m;
+      }).toList();
+      state = state.copyWith(messages: updated);
+
       ref.read(chatProvider.notifier).updateChatLastMessage(message);
     } catch (e) {
       print('❌ sendFileMessage error: $e');
-      state = state.copyWith(error: e.toString());
+      // Mark the temp message as error
+      final updated = state.messages.map((m) {
+        if (m.id == tempId) {
+          return m.copyWith(status: MessageStatus.error);
+        }
+        return m;
+      }).toList();
+      state = state.copyWith(messages: updated, error: e.toString());
     }
   }
 

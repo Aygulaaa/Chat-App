@@ -69,16 +69,7 @@ class AuthCard extends StatelessWidget {
                           color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        isLogin
-                            ? "Log in to continue your journey."
-                            : "Join the conversation today.",
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 13,
-                        ),
-                      ),
+                      
                       const SizedBox(height: 28),
 
                       _buildTextField(

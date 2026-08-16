@@ -24,7 +24,9 @@ class TypingStatusText extends ConsumerWidget {
     );
 
     // ✅ Single watch — no duplicate
-    final lastSeen = ref.watch(userStatusProvider).lastSeen[otherUserId];
+    final userStatus = ref.watch(userStatusProvider);
+    final lastSeen = userStatus.lastSeen[otherUserId];
+    final lastSeenFuzzy = userStatus.lastSeenFuzzy[otherUserId];
 
     if (typingStatus != null) {
       return const Text(
@@ -44,15 +46,14 @@ class TypingStatusText extends ConsumerWidget {
       );
     }
 
-    // ✅ Offline — show lastSeen if available, nothing if null (hidden)
-    if (lastSeen != null) {
+    if (lastSeen != null || lastSeenFuzzy != null) {
       return Text(
-        TimeUtils.formatLastSeen(lastSeen),
+        TimeUtils.formatLastSeen(lastSeen, fuzzy: lastSeenFuzzy),
         style: const TextStyle(fontSize: 12, color: AppColors.darkTextTertiary),
       );
     }
 
-    // ✅ null = hideLastSeen is on — show nothing
+    // fallback
     return const SizedBox.shrink();
   }
 }

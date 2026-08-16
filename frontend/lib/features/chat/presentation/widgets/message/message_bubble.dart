@@ -155,11 +155,14 @@ class _BubbleBody extends StatelessWidget {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          time!,
-                          style: TextStyle(
-                            fontSize: 10.sp,
-                            color: AppColors.darkTextTertiary,
+                        Padding(
+                          padding: EdgeInsetsGeometry.symmetric(vertical: 0, horizontal: 1.5),
+                          child: Text(
+                            time!,
+                            style: TextStyle(
+                              fontSize: 10.sp,
+                              color: AppColors.darkTextTertiary,
+                            ),
                           ),
                         ),
                         if (isMe) ...[

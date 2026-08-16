@@ -172,4 +172,9 @@ export const chatService = {
     const result = await chatRepository.updateGroupInfo(chatId, name, avatar);
     return result.rows[0];
   },
+
+  async deleteChat(chatId: number) {
+    const result = await chatRepository.deleteChat(chatId);
+    return result.rows[0];
+  },
 }

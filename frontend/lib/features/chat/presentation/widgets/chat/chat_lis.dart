@@ -13,7 +13,7 @@ class ChatList extends ConsumerWidget {
   const ChatList({super.key});
 
 
-  void _showChatOptions(BuildContext context, Chat chat) {
+  void _showChatOptions(BuildContext context, Chat chat, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.darkCard,
@@ -40,15 +40,18 @@ class ChatList extends ConsumerWidget {
             const SizedBox(height: 12),
 
             ListTile(
-              leading: const Icon(
-                Icons.notifications_off_outlined,
+              leading: Icon(
+                chat.isMuted ? Icons.notifications_active_outlined : Icons.notifications_off_outlined,
                 color: Colors.white70,
               ),
-              title: const Text(
-                'Mute',
-                style: TextStyle(color: Colors.white),
+              title: Text(
+                chat.isMuted ? 'Unmute' : 'Mute',
+                style: const TextStyle(color: Colors.white),
               ),
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                ref.read(chatProvider.notifier).toggleMute(chat.id);
+                Navigator.pop(context);
+              },
             ),
 
             ListTile(
@@ -60,7 +63,10 @@ class ChatList extends ConsumerWidget {
                 'Delete',
                 style: TextStyle(color: Colors.redAccent),
               ),
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                ref.read(chatProvider.notifier).deleteChat(chat.id);
+                Navigator.pop(context);
+              },
             ),
 
             const SizedBox(height: 8),
@@ -200,6 +206,8 @@ class ChatList extends ConsumerWidget {
 
               unreadCount: chat.unreadCount,
 
+              isMuted: chat.isMuted,
+
               onTap: () {
                 Navigator.push(
                   context,
@@ -213,7 +221,7 @@ class ChatList extends ConsumerWidget {
               },
 
               onLongPress: () =>
-                  _showChatOptions(context, chat),
+                  _showChatOptions(context, chat, ref),
             ),
           );
         },

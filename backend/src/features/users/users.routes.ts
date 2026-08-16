@@ -12,6 +12,6 @@ router.get('/user/:userId', userController.getUserById);
 router.get('/me', userController.getMe);
 router.put('/me', userController.updateMe);
 router.post('/avatar', upload.single('avatar'), userController.updateAvatar);
-
+router.post('/fcm-token', userController.pushNotification);
 
 export default router;

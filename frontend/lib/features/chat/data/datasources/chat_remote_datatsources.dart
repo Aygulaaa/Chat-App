@@ -67,14 +67,16 @@ class ChatRemoteDatatsources {
     int chatId,
     Uint8List bytes,
     String filename,
-    String mimeType,
-  ) async {
+    String mimeType, {
+    Function(int sent, int total)? onProgress,
+  }) async {
     final response = await api.postMultipartBytes(
       ApiEndpoints.fileMessage(chatId),
       bytes: bytes,
       filename: filename,
       field: 'file',
       mimeType: mimeType,
+      onProgress: onProgress,
     );
     return MessageModel.fromJson(response);
   }
@@ -124,5 +126,9 @@ class ChatRemoteDatatsources {
       final response = await api.patch(ApiEndpoints.groupInfo(chatId), fields);
       return response as Map<String, dynamic>;
     }
+  }
+
+  Future<void> deleteChat(int chatId) async {
+    await api.delete(ApiEndpoints.deleteChat(chatId));
   }
 }

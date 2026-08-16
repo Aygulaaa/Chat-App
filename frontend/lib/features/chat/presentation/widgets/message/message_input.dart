@@ -4,8 +4,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_sound/flutter_sound.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/core/utils/mime_utils.dart';
@@ -24,7 +25,9 @@ class MessageInput extends ConsumerStatefulWidget {
 
 class _MessageInputState extends ConsumerState<MessageInput> {
   late final TextEditingController _controller;
-  final AudioRecorder _recorder = AudioRecorder();
+  FlutterSoundRecorder? _audioRecorder;
+  bool _isRecorderInitialized = false;
+
   bool _isRecording = false;
   bool _isSendingFile = false;
   String? _recordedPath;
@@ -35,13 +38,25 @@ class _MessageInputState extends ConsumerState<MessageInput> {
   void initState() {
     super.initState();
     _controller = TextEditingController();
+    _initRecorder();
+  }
+
+  Future<void> _initRecorder() async {
+    _audioRecorder = FlutterSoundRecorder();
+    await _audioRecorder!.openRecorder();
+    setState(() {
+      _isRecorderInitialized = true;
+    });
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _recorder.dispose();
     _recordTimer?.cancel();
+    if (_isRecorderInitialized) {
+      _audioRecorder?.closeRecorder();
+      _audioRecorder = null;
+    }
     super.dispose();
   }
 
@@ -64,7 +79,7 @@ class _MessageInputState extends ConsumerState<MessageInput> {
       final mimeType = MimeUtils.getMimeType(file.extension ?? '');
       await ref
           .read(messageProvider(widget.chatId).notifier)
-          .sendFileMessage(bytes, file.name, mimeType);
+          .sendFileMessage(bytes, file.name, mimeType, localPath: file.path);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -77,14 +92,14 @@ class _MessageInputState extends ConsumerState<MessageInput> {
   }
 
   Future<void> _startRecording() async {
-    final hasPermission = await _recorder.hasPermission();
-    if (!hasPermission) {
+    if (!_isRecorderInitialized) return;
+
+    final status = await Permission.microphone.request();
+    if (status != PermissionStatus.granted) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Microphone permission denied — enable it in Settings',
-            ),
+            content: Text('Microphone permission denied — enable it in Settings'),
           ),
         );
       }
@@ -93,17 +108,11 @@ class _MessageInputState extends ConsumerState<MessageInput> {
 
     try {
       final dir = await getTemporaryDirectory();
-      final path =
-          '${dir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final path = '${dir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
-      await _recorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.aacLc,
-          bitRate: 128000,
-          sampleRate: 44100,
-          numChannels: 1,
-        ),
-        path: path,
+      await _audioRecorder!.startRecorder(
+        toFile: path,
+        codec: Codec.aacMP4,
       );
 
       if (mounted) {
@@ -136,9 +145,10 @@ class _MessageInputState extends ConsumerState<MessageInput> {
 
   Future<void> _stopRecording() async {
     _recordTimer?.cancel();
-    if (!_isRecording) return;
+    if (!_isRecording || !_isRecorderInitialized) return;
+
     try {
-      final path = await _recorder.stop();
+      final path = await _audioRecorder!.stopRecorder();
       if (mounted) {
         setState(() {
           _isRecording = false;
@@ -194,7 +204,9 @@ class _MessageInputState extends ConsumerState<MessageInput> {
 
   Future<void> _cancelRecording() async {
     _recordTimer?.cancel();
-    await _recorder.cancel();
+    if (_isRecorderInitialized && _isRecording) {
+      await _audioRecorder!.stopRecorder();
+    }
     setState(() {
       _isRecording = false;
       _recordDuration = 0;
@@ -404,22 +416,22 @@ class _RecordingIndicator extends StatefulWidget {
 
 class _RecordingIndicatorState extends State<_RecordingIndicator>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+  late final AnimationController _animController;
   late final Animation<double> _opacity;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
-    _opacity = Tween<double>(begin: 0.3, end: 1.0).animate(_controller);
+    _opacity = Tween<double>(begin: 0.3, end: 1.0).animate(_animController);
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _animController.dispose();
     super.dispose();
   }
 

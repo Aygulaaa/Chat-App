@@ -320,6 +320,26 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
+  Future<void> deleteChat(int chatId) async {
+    try {
+      await ref.read(chatRepositoryProvider).deleteChat(chatId);
+      removeChatFromList(chatId);
+    } catch (e) {
+      print('❌ deleteChat error: $e');
+      rethrow;
+    }
+  }
+
+  void toggleMute(int chatId) {
+    final updatedChats = state.chats.map((chat) {
+      if (chat.id == chatId) {
+        return chat.copyWith(isMuted: !chat.isMuted);
+      }
+      return chat;
+    }).toList();
+    state = state.copyWith(chats: updatedChats);
+  }
+
   @override
   void dispose() {
     _messageSub?.cancel();

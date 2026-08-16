@@ -8,6 +8,7 @@ class UserEntity extends Equatable {
   final DateTime? birthDate;
   final String? status;
   final DateTime? lastSeen;
+  final String? lastSeenFuzzy;
 
   const UserEntity({
     required this.id,
@@ -16,6 +17,7 @@ class UserEntity extends Equatable {
     this.bio,
     this.birthDate,
     this.lastSeen,
+    this.lastSeenFuzzy,
     this.status,
   });
 
@@ -27,6 +29,7 @@ class UserEntity extends Equatable {
     DateTime? birthDate,
     String? status,
     DateTime? lastSeen,
+    String? lastSeenFuzzy,
   }) {
     return UserEntity(
       id: id ?? this.id,
@@ -36,6 +39,7 @@ class UserEntity extends Equatable {
       birthDate: birthDate ?? this.birthDate,
       status: status ?? this.status,
       lastSeen: lastSeen ?? this.lastSeen,
+      lastSeenFuzzy: lastSeenFuzzy ?? this.lastSeenFuzzy,
     );
   }
 
@@ -48,5 +52,6 @@ class UserEntity extends Equatable {
     birthDate,
     status,
     lastSeen,
+    lastSeenFuzzy,
   ];
 }

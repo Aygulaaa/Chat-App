@@ -10,6 +10,7 @@ class UserModel extends UserEntity {
     super.birthDate,
     super.status,
     super.lastSeen,
+    super.lastSeenFuzzy,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -21,6 +22,7 @@ class UserModel extends UserEntity {
       birthDate: json['birthDate'] != null ? DateTime.parse(json['birthDate']) : null,
       status: json['status'],
       lastSeen: json['lastSeen'] != null ? DateTime.parse(json['lastSeen']) : null,
+      lastSeenFuzzy: json['lastSeenFuzzy'],
     );
   }
 }

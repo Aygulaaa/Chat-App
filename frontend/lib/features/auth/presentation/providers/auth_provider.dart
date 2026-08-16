@@ -8,6 +8,7 @@ import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/usecases/login_user.dart';
 import '../../domain/usecases/register_user.dart';
+import 'package:my_chat_app/features/notification/presentation/providers/notification_provider.dart';
 import 'auth_state.dart';
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
@@ -59,6 +60,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final user = await loginUser(username: username, password: password);
       state = state.copyWith(user: user, isLoading: false);
       await _connectSocketFromStorage();
+      ref.read(syncFcmTokenProvider).call();
       ref.invalidate(userProfileProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
@@ -86,6 +88,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final user = await ref.read(authRepositoryProvider).getCurrentUser();
       final socket = ref.read(chatSocketDataSourceProvider);
       socket.connect(token);
+      ref.read(syncFcmTokenProvider).call();
 
       state = state.copyWith(user: user, isLoading: false);
     } catch (e) {
@@ -100,6 +103,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final user = await registerUser(username: username, password: password);
       state = state.copyWith(user: user, isLoading: false);
       await _connectSocketFromStorage();
+      ref.read(syncFcmTokenProvider).call();
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
     }

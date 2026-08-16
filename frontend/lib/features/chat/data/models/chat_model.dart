@@ -12,6 +12,7 @@ class ChatModel extends Chat {
     required super.unreadCount,
     required super.participants,
     required super.lastMessage,
+    super.isMuted,
   });
 
   factory ChatModel.fromJson(Map<String, dynamic> json) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -120,6 +121,7 @@ class ApiClient {
     required String filename,
     required String field,
     required String mimeType,
+    Function(int sent, int total)? onProgress,
   }) async {
     print('🌐 POST multipart: ${ApiConfig.baseUrl}$path');
     print('📁 file: $filename | mime: $mimeType | size: ${bytes.length}');
@@ -139,13 +141,48 @@ class ApiClient {
       ),
     );
 
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
+    if (onProgress != null) {
+      final totalBytes = request.contentLength;
+      final byteStream = request.finalize();
+      int sentBytes = 0;
 
-    print('📬 status: ${response.statusCode}');
-    print('📬 body: ${response.body}');
+      final progressStream = byteStream.transform(
+        StreamTransformer<List<int>, List<int>>.fromHandlers(
+          handleData: (data, sink) {
+            sentBytes += data.length;
+            onProgress(sentBytes, totalBytes);
+            sink.add(data);
+          },
+        ),
+      );
 
-    return _handleResponse(response);
+      final streamedRequest = http.StreamedRequest('POST', _uri(path));
+      streamedRequest.headers.addAll(request.headers);
+      streamedRequest.contentLength = totalBytes;
+
+      progressStream.listen(
+        streamedRequest.sink.add,
+        onDone: streamedRequest.sink.close,
+        onError: streamedRequest.sink.addError,
+        cancelOnError: true,
+      );
+
+      final streamedResponse = await streamedRequest.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('📬 status: ${response.statusCode}');
+      print('📬 body: ${response.body}');
+
+      return _handleResponse(response);
+    } else {
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('📬 status: ${response.statusCode}');
+      print('📬 body: ${response.body}');
+
+      return _handleResponse(response);
+    }
   }
 
   Future<dynamic> patchMultipartBytes(

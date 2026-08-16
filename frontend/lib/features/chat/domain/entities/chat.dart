@@ -10,6 +10,7 @@ class Chat extends Equatable {
   final List<UserEntity> participants;
   final Message? lastMessage;
   final int unreadCount;
+  final bool isMuted;
 
   const Chat({
     required this.id,
@@ -20,6 +21,7 @@ class Chat extends Equatable {
     required this.participants,
     required this.lastMessage,
     required this.unreadCount,
+    this.isMuted = false,
   });
 
   bool get isGroup => type == 'group';
@@ -35,6 +37,7 @@ class Chat extends Equatable {
     List<UserEntity>? participants,
     Message? lastMessage,
     int? unreadCount,
+    bool? isMuted,
   }) {
     return Chat(
       id: id ?? this.id,
@@ -45,6 +48,7 @@ class Chat extends Equatable {
       participants: participants ?? this.participants,
       lastMessage: lastMessage ?? this.lastMessage,
       unreadCount: unreadCount ?? this.unreadCount,
+      isMuted: isMuted ?? this.isMuted,
     );
   }
 
@@ -58,5 +62,6 @@ class Chat extends Equatable {
         participants,
         lastMessage,
         unreadCount,
+        isMuted,
       ];
 }

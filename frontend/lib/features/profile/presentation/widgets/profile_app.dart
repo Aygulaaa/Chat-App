@@ -18,9 +18,11 @@ class ProfileAppBar extends ConsumerWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final onlineUsers = ref.watch(userStatusProvider).onlineUsers;
+    final userStatus = ref.watch(userStatusProvider);
+    final onlineUsers = userStatus.onlineUsers;
     final bool isOnline = onlineUsers[user.id] ?? false;
-    final userLastSeen = ref.watch(userStatusProvider).lastSeen[user.id];
+    final userLastSeen = userStatus.lastSeen[user.id];
+    final userLastSeenFuzzy = userStatus.lastSeenFuzzy[user.id];
 
     return SliverAppBar(
       actions: [
@@ -62,7 +64,11 @@ class ProfileAppBar extends ConsumerWidget implements PreferredSizeWidget {
               children: [
                 const SizedBox(width: 6),
                 Text(
-                  isOnline ? 'Online' : (userLastSeen != null ? ' ${TimeUtils.formatLastSeen(userLastSeen)}' : 'Offline'),
+                  isOnline 
+                      ? 'Online' 
+                      : (userLastSeen != null || userLastSeenFuzzy != null 
+                          ? ' ${TimeUtils.formatLastSeen(userLastSeen, fuzzy: userLastSeenFuzzy)}' 
+                          : 'Offline'),
                   style: TextStyle(
                     color: isOnline ? AppColors.online : AppColors.darkTextTertiary,
                     fontSize: 14,

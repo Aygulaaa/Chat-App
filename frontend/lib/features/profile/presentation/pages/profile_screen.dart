@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -247,7 +246,7 @@ class _ProfileHeaderDelegate extends SliverPersistentHeaderDelegate {
                       ? Image.network(
                           user.avatar!,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
+                          errorBuilder: (_, _, _) =>
                               _FallbackGradient(user: user),
                         )
                       : _FallbackGradient(user: user),
@@ -335,6 +334,7 @@ class _ProfileHeaderDelegate extends SliverPersistentHeaderDelegate {
                           child: _StatusLabel(
                             isOnline: isOnline,
                             lastSeen: effectiveLastSeen,
+                            lastSeenFuzzy: ref.watch(userStatusProvider).lastSeenFuzzy[user.id] ?? user.lastSeenFuzzy,
                           ),
                         ),
                       ],
@@ -385,7 +385,8 @@ class _FallbackGradient extends StatelessWidget {
 class _StatusLabel extends StatelessWidget {
   final bool isOnline;
   final DateTime? lastSeen;
-  const _StatusLabel({required this.isOnline, this.lastSeen});
+  final String? lastSeenFuzzy;
+  const _StatusLabel({required this.isOnline, this.lastSeen, this.lastSeenFuzzy});
 
   @override
   Widget build(BuildContext context) {
@@ -422,9 +423,9 @@ class _StatusLabel extends StatelessWidget {
         ],
       );
     }
-    if (lastSeen != null) {
+    if (lastSeen != null || lastSeenFuzzy != null) {
       return Text(
-        TimeUtils.formatLastSeen(lastSeen!),
+        TimeUtils.formatLastSeen(lastSeen, fuzzy: lastSeenFuzzy),
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.85),
           fontSize: 13.sp,

@@ -18,8 +18,9 @@ abstract class ChatRepository {
     int chatId,
     Uint8List bytes,
     String filename,
-    String mimeType,
-  );
+    String mimeType, {
+    Function(int sent, int total)? onProgress,
+  });
 
   Future<void> addMember(int chatId, int userId);
   Future<void> removeMember(int chatId, int userId);
@@ -31,5 +32,5 @@ abstract class ChatRepository {
     String? mimeType,
   });
 
-  // Future<void> deleteChat(String chatId);
+  Future<void> deleteChat(int chatId);
 }

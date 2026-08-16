@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/contact_tile.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/empty_contacts.dart';
@@ -28,8 +29,8 @@ class BlockedList extends ConsumerWidget {
           : ListView.separated(
               padding: const EdgeInsets.only(top: 8, bottom: 100),
               itemCount: blocked.length,
-              separatorBuilder: (_, __) => const Divider(
-                color: AppColors.darkBorder,
+              separatorBuilder: (_, __) => Divider(
+                color: context.glassBorder,
                 indent: 70,
                 height: 1,
               ),

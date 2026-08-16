@@ -81,15 +81,50 @@ export const chatSocket = (io: Server) => {
 
           console.log("MESSAGE CREATED:", message);
 
+          // Get sender info for notification title
+          const senderResult = await db.query(
+            `SELECT name, username FROM users WHERE id = $1`,
+            [socket.user.id]
+          );
+          const senderName = senderResult.rows[0]?.name || senderResult.rows[0]?.username || "New Message";
+
+          // Fetch chat members along with their fcm_token
           const membersResult = await db.query(
-            `SELECT user_id FROM chat_members WHERE chat_id = $1`,
+            `SELECT cm.user_id, u.fcm_token 
+             FROM chat_members cm 
+             JOIN users u ON u.id = cm.user_id 
+             WHERE cm.chat_id = $1`,
             [chatId]
           );
+
+          // Get all socket instances currently connected to check active chat status
+          const sockets = await io.in(`user_`).fetchSockets();
 
           for (const member of membersResult.rows) {
             const memberId = member.user_id;
 
+            // Emit via WebSocket to all connected devices of the user
             io.to(`user_${memberId}`).emit("message", message);
+
+            // Skip sending push notification to the sender
+            if (memberId === socket.user.id) continue;
+
+            // Check if the recipient is currently active in THIS specific chat
+            const recipientSockets = await io.in(`user_${memberId}`).fetchSockets();
+            const isInsideActiveChat = recipientSockets.some(
+              (s) => s.data.activeChatId === chatId
+            );
+
+            // Send Push Notification if recipient is not actively viewing the chat & has an FCM token
+            if (!isInsideActiveChat && member.fcm_token) {
+              sendChatPushNotification({
+                fcmToken: member.fcm_token,
+                title: senderName,
+                body: text.trim(),
+                chatId,
+                senderId: socket.user.id,
+              });
+            }
           }
 
         } catch (e) {
@@ -233,6 +268,7 @@ export const chatSocket = (io: Server) => {
                   userId,
                   status: "offline",
                   lastSeen: settings.hideLastSeen ? null : new Date().toISOString(),
+                  lastSeenFuzzy: settings.hideLastSeen ? 'recently' : null,
                 });
               }
               disconnectTimers.delete(userId);
@@ -249,3 +285,7 @@ export const chatSocket = (io: Server) => {
     }
   });
 };
+
+function sendChatPushNotification(arg0: { fcmToken: any; title: any; body: any; chatId: any; senderId: number; }) {
+  throw new Error("Function not implemented.");
+}

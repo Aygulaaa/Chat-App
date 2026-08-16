@@ -61,14 +61,16 @@ class ChatRepositoryImpl implements ChatRepository {
     int chatId,
     Uint8List bytes,
     String filename,
-    String mimeType,
-  ) async {
+    String mimeType, {
+    Function(int sent, int total)? onProgress,
+  }) async {
     try {
       final response = await remote.sendFileMessage(
         chatId,
         bytes,
         filename,
         mimeType,
+        onProgress: onProgress,
       );
       return response;
     } catch (e) {
@@ -101,5 +103,10 @@ class ChatRepositoryImpl implements ChatRepository {
       filename: filename,
       mimeType: mimeType,
     );
+  }
+
+  @override
+  Future<void> deleteChat(int chatId) {
+    return remote.deleteChat(chatId);
   }
 }

@@ -1,25 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_core/firebase_core.dart';
+
 import 'package:my_chat_app/core/auth/auth_gate.dart';
 import 'package:my_chat_app/core/constants/api_config.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/app_shell/presentation/pages/main__screen.dart';
 import 'package:my_chat_app/features/settings/presentation/providers/settings_provider.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:my_chat_app/core/network/fcm_service.dart';
+
+// Global Navigation Key for handling push notification routing
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 1. Load .env FIRST so API endpoints are available to services
   try {
-
     await dotenv.load(fileName: ".env");
     print('✅ .env loaded successfully!');
-
-    ApiConfig.init();
   } catch (e) {
-    print('❌ Error: $e');
-    ApiConfig.init(); 
+    print('⚠️ .env load warning: $e');
+  }
+
+  // Initialize API Configuration synchronously
+  ApiConfig.init();
+
+  // 2. Register FCM background isolates BEFORE initializing Firebase
+  FcmService.registerBackgroundHandler();
+
+  // 3. Initialize Firebase & FCM
+  try {
+    await Firebase.initializeApp();
+    print('✅ Firebase initialized successfully!');
+    
+    final fcmService = FcmService();
+    // Non-blocking initialization
+    fcmService.initialize(
+      onNotificationTap: (data) {
+        print("🔔 Notification tapped with payload: $data");
+        
+        // Deep link example: Navigate directly to chat screen
+        if (data.containsKey('chatId') && navigatorKey.currentState != null) {
+          navigatorKey.currentState!.pushNamed(
+            '/chat', 
+            arguments: data['chatId'],
+          );
+        }
+      },
+    );
+  } catch (e) {
+    print('❌ Firebase/FCM init Error: $e');
   }
 
   runApp(const ProviderScope(child: MyApp()));
@@ -40,6 +73,7 @@ class MyApp extends ConsumerWidget {
       splitScreenMode: true,
       builder: (context, child) {
         return MaterialApp(
+          navigatorKey: navigatorKey, // Attached for deep-linking from notifications
           debugShowCheckedModeBanner: false,
           title: 'Chat App',
           themeMode: themeMode,
@@ -108,7 +142,9 @@ class MyApp extends ConsumerWidget {
             ),
           ),
           home: const AuthGate(),
-          routes: {'/home': (_) => const MainScreen()},
+          routes: {
+            '/home': (_) => const MainScreen(),
+          },
         );
       },
     );

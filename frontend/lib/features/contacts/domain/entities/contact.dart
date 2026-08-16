@@ -6,6 +6,7 @@ class Contact extends Equatable {
   final String? avatar;
   final String? bio;
   final DateTime? lastSeen;
+  final String? lastSeenFuzzy;
   final String status; 
   final bool isContact;
   final bool isBlocked;
@@ -16,6 +17,7 @@ class Contact extends Equatable {
     this.avatar,
     this.bio,
     this.lastSeen,
+    this.lastSeenFuzzy,
     this.status = 'active',
     this.isContact = false,
     this.isBlocked = false,
@@ -27,6 +29,7 @@ class Contact extends Equatable {
     String? avatar,
     String? bio,
     DateTime? lastSeen,
+    String? lastSeenFuzzy,
     String? status,
     bool? isContact,
     bool? isBlocked,
@@ -37,6 +40,7 @@ class Contact extends Equatable {
       avatar: avatar ?? this.avatar,
       bio: bio ?? this.bio,
       lastSeen: lastSeen ?? this.lastSeen,
+      lastSeenFuzzy: lastSeenFuzzy ?? this.lastSeenFuzzy,
       status: status ?? this.status,
       isContact: isContact ?? this.isContact,
       isBlocked: isBlocked ?? this.isBlocked,
@@ -45,5 +49,5 @@ class Contact extends Equatable {
 
   @override
   List<Object?> get props =>
-      [id, username, avatar, bio, lastSeen, status, isContact, isBlocked];
+      [id, username, avatar, bio, lastSeen, lastSeenFuzzy, status, isContact, isBlocked];
 }

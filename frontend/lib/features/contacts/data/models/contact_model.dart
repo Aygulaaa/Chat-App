@@ -7,6 +7,7 @@ class ContactModel extends Contact {
     super.avatar,
     super.bio,
     super.lastSeen,
+    super.lastSeenFuzzy,
     super.status,
     super.isContact,
     super.isBlocked,
@@ -24,6 +25,7 @@ class ContactModel extends Contact {
       lastSeen: json['lastSeen'] != null
           ? DateTime.tryParse(json['lastSeen'].toString())
           : null,
+      lastSeenFuzzy: json['lastSeenFuzzy'],
       status: status,
       isContact: json['isContact'] ?? (status == 'active'),
       isBlocked: json['isBlocked'] ?? (status == 'blocked'),

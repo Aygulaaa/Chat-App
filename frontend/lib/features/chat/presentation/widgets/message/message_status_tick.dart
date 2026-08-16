@@ -10,6 +10,21 @@ class MessageStatusTick extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     switch (status) {
+      case MessageStatus.uploading:
+        return const SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(
+            strokeWidth: 1.5,
+            color: AppColors.darkTextTertiary,
+          ),
+        );
+      case MessageStatus.error:
+        return const Icon(
+          Icons.error_outline_rounded,
+          size: 14,
+          color: AppColors.error,
+        );
       case MessageStatus.sent:
         return const Icon(
           Icons.check_rounded,

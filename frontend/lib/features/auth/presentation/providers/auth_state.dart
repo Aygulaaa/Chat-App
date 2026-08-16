@@ -13,6 +13,8 @@ class AuthState{
     this.token
   });
 
+  bool get isAuthenticated => false;
+
   AuthState copyWith({
     bool? isLoading,
     String? error,

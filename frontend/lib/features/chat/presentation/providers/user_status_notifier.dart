@@ -32,16 +32,19 @@ class UserStatusNotifier extends StateNotifier<UserStatusState> {
         updatedOnline[userId] = isOnline;
 
         final updatedLastSeen = Map<int, DateTime?>.from(state.lastSeen);
+        final updatedLastSeenFuzzy = Map<int, String?>.from(state.lastSeenFuzzy);
 
         if (!isOnline) {
           updatedLastSeen[userId] = data['lastSeen'] != null
               ? DateTime.tryParse(data['lastSeen'].toString())
               : null;
+          updatedLastSeenFuzzy[userId] = data['lastSeenFuzzy']?.toString();
         }
 
         state = state.copyWith(
           onlineUsers: updatedOnline,
           lastSeen: updatedLastSeen,
+          lastSeenFuzzy: updatedLastSeenFuzzy,
         );
       } catch (e) {
         print("❌ Error parsing status change: $e");
@@ -59,10 +62,13 @@ class UserStatusNotifier extends StateNotifier<UserStatusState> {
   }
 
   
-  void setLastSeen(int userId, DateTime? lastSeen) {
-    if (state.lastSeen.containsKey(userId)) return;
-    final updated = Map<int, DateTime?>.from(state.lastSeen);
-    updated[userId] = lastSeen;
-    state = state.copyWith(lastSeen: updated);
+  void setLastSeen(int userId, DateTime? lastSeen, {String? lastSeenFuzzy}) {
+    final updatedLastSeen = Map<int, DateTime?>.from(state.lastSeen);
+    final updatedLastSeenFuzzy = Map<int, String?>.from(state.lastSeenFuzzy);
+
+    updatedLastSeen[userId] = lastSeen;
+    updatedLastSeenFuzzy[userId] = lastSeenFuzzy;
+
+    state = state.copyWith(lastSeen: updatedLastSeen, lastSeenFuzzy: updatedLastSeenFuzzy);
   }
 }

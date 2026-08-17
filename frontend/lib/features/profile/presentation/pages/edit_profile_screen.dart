@@ -37,6 +37,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _pickDate() async {
+    FocusScope.of(context).unfocus(); // Dismiss keyboard before opening date picker
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate ?? DateTime(1995),
@@ -48,6 +49,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _save() async {
+    FocusScope.of(context).unfocus();
     final username = _usernameController.text.trim();
     if (username.isEmpty) {
       ScaffoldMessenger.of(
@@ -77,136 +79,140 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.appBg,
-      appBar: AppBar(
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
         backgroundColor: context.appBg,
-        elevation: 0,
-        iconTheme: IconThemeData(color: context.textPrimary),
-        title: Text(
-          'Edit Profile',
-          style: TextStyle(
-            color: context.textPrimary,
-            fontWeight: FontWeight.w600,
-            fontSize: 17.sp,
+        appBar: AppBar(
+          backgroundColor: context.appBg,
+          elevation: 0,
+          iconTheme: IconThemeData(color: context.textPrimary),
+          title: Text(
+            'Edit Profile',
+            style: TextStyle(
+              color: context.textPrimary,
+              fontWeight: FontWeight.w600,
+              fontSize: 17.sp,
+            ),
           ),
-        ),
-        actions: [
-          _isSaving
-              ? Padding(
-                  padding: EdgeInsets.all(16.r),
-                  child: SizedBox(
-                    width: 20.r,
-                    height: 20.r,
-                    child: const CircularProgressIndicator(
-                      color: AppColors.primary,
-                      strokeWidth: 2,
+          actions: [
+            _isSaving
+                ? Padding(
+                    padding: EdgeInsets.all(16.r),
+                    child: SizedBox(
+                      width: 20.r,
+                      height: 20.r,
+                      child: const CircularProgressIndicator(
+                        color: AppColors.primary,
+                        strokeWidth: 2,
+                      ),
                     ),
-                  ),
-                )
-              : TextButton(
-                  onPressed: _save,
-                  child: Text(
-                    'Save',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15.sp,
-                    ),
-                  ),
-                ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(20.r),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Avatar
-            Center(
-              child: ProfileAvatar(
-                username: widget.user.username,
-                imageUrl: widget.user.avatar,
-                isMe: true,
-              ),
-            ),
-            SizedBox(height: 8.h),
-            Center(
-              child: Text(
-                'Tap avatar to change photo',
-                style: TextStyle(color: context.textTertiary, fontSize: 12.sp),
-              ),
-            ),
-            SizedBox(height: 32.h),
-
-            _Field(
-              label: 'Username',
-              controller: _usernameController,
-              hint: 'Enter your username',
-            ),
-            SizedBox(height: 16.h),
-
-            _Field(
-              label: 'Bio',
-              controller: _bioController,
-              hint: 'Tell something about yourself',
-              maxLines: 4,
-              maxLength: 150,
-            ),
-            SizedBox(height: 16.h),
-
-            // Birthday picker
-            Text(
-              'Birthday',
-              style: TextStyle(color: context.textSecondary, fontSize: 13.sp),
-            ),
-            SizedBox(height: 8.h),
-            GestureDetector(
-              onTap: _pickDate,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 15.h),
-                decoration: BoxDecoration(
-                  color: context.glassBg,
-                  borderRadius: BorderRadius.circular(14.r),
-                  border: Border.all(color: context.glassBorder),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 12,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.cake_outlined,
-                      color: context.textTertiary,
-                      size: 18.sp,
-                    ),
-                    SizedBox(width: 12.w),
-                    Text(
-                      _selectedDate != null
-                          ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
-                          : 'Set birthday',
+                  )
+                : TextButton(
+                    onPressed: _save,
+                    child: Text(
+                      'Save',
                       style: TextStyle(
-                        color: _selectedDate != null
-                            ? context.textPrimary
-                            : context.textTertiary,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
                         fontSize: 15.sp,
                       ),
                     ),
-                    const Spacer(),
-                    Icon(
-                      Icons.edit_outlined,
-                      color: context.textTertiary,
-                      size: 15.sp,
-                    ),
-                  ],
+                  ),
+          ],
+        ),
+        body: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.all(20.r),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Avatar
+              Center(
+                child: ProfileAvatar(
+                  username: widget.user.username,
+                  imageUrl: widget.user.avatar,
+                  isMe: true,
                 ),
               ),
-            ),
-          ],
+              SizedBox(height: 8.h),
+              Center(
+                child: Text(
+                  'Tap avatar to change photo',
+                  style: TextStyle(color: context.textTertiary, fontSize: 12.sp),
+                ),
+              ),
+              SizedBox(height: 32.h),
+
+              _Field(
+                label: 'Username',
+                controller: _usernameController,
+                hint: 'Enter your username',
+              ),
+              SizedBox(height: 16.h),
+
+              _Field(
+                label: 'Bio',
+                controller: _bioController,
+                hint: 'Tell something about yourself',
+                maxLines: 4,
+                maxLength: 150,
+              ),
+              SizedBox(height: 16.h),
+
+              // Birthday picker
+              Text(
+                'Birthday',
+                style: TextStyle(color: context.textSecondary, fontSize: 13.sp),
+              ),
+              SizedBox(height: 8.h),
+              GestureDetector(
+                onTap: _pickDate,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 15.h),
+                  decoration: BoxDecoration(
+                    color: context.glassBg,
+                    borderRadius: BorderRadius.circular(14.r),
+                    border: Border.all(color: context.glassBorder),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 12,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.cake_outlined,
+                        color: context.textTertiary,
+                        size: 18.sp,
+                      ),
+                      SizedBox(width: 12.w),
+                      Text(
+                        _selectedDate != null
+                            ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
+                            : 'Set birthday',
+                        style: TextStyle(
+                          color: _selectedDate != null
+                              ? context.textPrimary
+                              : context.textTertiary,
+                          fontSize: 15.sp,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        Icons.edit_outlined,
+                        color: context.textTertiary,
+                        size: 15.sp,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -48,66 +48,69 @@ class _AuthFormState extends ConsumerState<AuthForm> {
   Widget build(BuildContext context) {
     final state = ref.watch(authProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.darkAuthBg,
-      body: Stack(
-        children: [
-          // Background gradient
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: AppColors.authBgGradient,
-              ),
-            ),
-          ),
-
-          // Bottom glow effect using brand primary
-          Positioned(
-            bottom: -100,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: 400,
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.bottomCenter,
-                  radius: 0.8,
-                  colors: [
-                    AppColors.primary.withValues(alpha:0.4),
-                    AppColors.accent.withValues(alpha:0.2),
-                    Colors.transparent,
-                  ],
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        backgroundColor: AppColors.darkAuthBg,
+        body: Stack(
+          children: [
+            // Background gradient
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: AppColors.authBgGradient,
                 ),
               ),
             ),
-          ),
 
-          // Glassmorphism blur overlay (subtle)
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-              child: Container(color: Colors.transparent),
-            ),
-          ),
-
-          // Main Auth Card
-          Center(
-            child: SingleChildScrollView(
-              child: AuthCard(
-                isLogin: isLogin,
-                state: state,
-                usernameController: usernameController,
-                passwordController: passwordController,
-                confirmPasswordController: confirmPasswordController,
-                onLogin: login,
-                onRegister: register,
-                onToggle: () {
-                  setState(() => isLogin = !isLogin);
-                },
+            // Bottom glow effect using brand primary
+            Positioned(
+              bottom: -100,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 400,
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.bottomCenter,
+                    radius: 0.8,
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.4),
+                      AppColors.accent.withValues(alpha: 0.2),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+
+            // Glassmorphism blur overlay (subtle)
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+
+            // Main Auth Card
+            Center(
+              child: SingleChildScrollView(
+                child: AuthCard(
+                  isLogin: isLogin,
+                  state: state,
+                  usernameController: usernameController,
+                  passwordController: passwordController,
+                  confirmPasswordController: confirmPasswordController,
+                  onLogin: login,
+                  onRegister: register,
+                  onToggle: () {
+                    setState(() => isLogin = !isLogin);
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -110,20 +110,9 @@ class FcmService {
     }
   }
 
-  /// Safe Token Getter with APNs Handling for iOS
+  /// Safe Token Getter
   Future<String?> getToken() async {
     try {
-      if (Platform.isIOS) {
-        String? apnsToken = await _messaging.getAPNSToken();
-        if (apnsToken == null) {
-          await Future.delayed(const Duration(seconds: 2));
-          apnsToken = await _messaging.getAPNSToken();
-        }
-        if (apnsToken == null) {
-          print('⚠️ APNs token not available yet (iOS Simulator or network lag).');
-          return null;
-        }
-      }
       return await _messaging.getToken();
     } catch (e) {
       print('❌ Error fetching FCM Token: $e');

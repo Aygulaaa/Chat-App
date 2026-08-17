@@ -28,13 +28,13 @@ void main() async {
   // Initialize API Configuration synchronously
   ApiConfig.init();
 
-  // 2. Register FCM background isolates BEFORE initializing Firebase
-  FcmService.registerBackgroundHandler();
-
-  // 3. Initialize Firebase & FCM
+  // 2. Initialize Firebase
   try {
     await Firebase.initializeApp();
     print('✅ Firebase initialized successfully!');
+
+    // 3. Register FCM background isolates AFTER initializing Firebase
+    FcmService.registerBackgroundHandler();
     
     final fcmService = FcmService();
     // Non-blocking initialization

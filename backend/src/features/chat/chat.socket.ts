@@ -3,6 +3,7 @@ import { chatService } from "./chat.service";
 import { userService } from "../users/user.service";
 import { settingsService } from "../settings/settings.service";
 import db from "../../db";
+import { messaging } from "../../config/firebase";
 
 interface SendMessagePayload { chatId: number; text: string; }
 interface MessageReceivedPayload { messageId: number; }
@@ -286,6 +287,38 @@ export const chatSocket = (io: Server) => {
   });
 };
 
-function sendChatPushNotification(arg0: { fcmToken: any; title: any; body: any; chatId: any; senderId: number; }) {
-  throw new Error("Function not implemented.");
+async function sendChatPushNotification({ fcmToken, title, body, chatId, senderId }: { fcmToken: string; title: string; body: string; chatId: number; senderId: number; }) {
+  try {
+    await messaging.send({
+      token: fcmToken,
+      notification: {
+        title,
+        body,
+      },
+      data: {
+        chatId: chatId.toString(),
+        senderId: senderId.toString(),
+        type: 'chat_message'
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'chat_messages',
+          priority: 'high',
+          sound: 'default'
+        }
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            contentAvailable: true
+          }
+        }
+      }
+    });
+    console.log(`Push notification sent to ${fcmToken}`);
+  } catch (error) {
+    console.error('Error sending push notification:', error);
+  }
 }

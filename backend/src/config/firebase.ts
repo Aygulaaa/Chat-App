@@ -6,7 +6,16 @@ import path from 'path';
 function getServiceAccount(): ServiceAccount {
   // 1. Production / Render: Check for JSON string in environment variable
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    const rawEnv = process.env.FIREBASE_SERVICE_ACCOUNT.trim();
+    let rawEnv = process.env.FIREBASE_SERVICE_ACCOUNT.trim();
+
+    // Strip surrounding quotes if the environment variable was saved with quotes
+    if (
+      (rawEnv.startsWith('"') && rawEnv.endsWith('"')) ||
+      (rawEnv.startsWith("'") && rawEnv.endsWith("'"))
+    ) {
+      rawEnv = rawEnv.slice(1, -1).trim();
+    }
+
     const jsonString = rawEnv.startsWith('{')
       ? rawEnv
       : Buffer.from(rawEnv, 'base64').toString('utf-8');

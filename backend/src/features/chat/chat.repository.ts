@@ -31,6 +31,12 @@ export const chatRepository = {
           )
           FROM messages m
           WHERE m.chat_id = c.id
+            AND NOT EXISTS (
+              SELECT 1 FROM contacts block_c
+              WHERE ((block_c.user_id = $1 AND block_c.contact_user_id = m.sender_id)
+                 OR (block_c.user_id = m.sender_id AND block_c.contact_user_id = $1))
+                AND block_c.status = 'blocked'
+            )
           ORDER BY m.created_at DESC
           LIMIT 1
         ) AS "lastMessage",
@@ -74,6 +80,12 @@ export const chatRepository = {
         SELECT m.created_at
         FROM messages m
         WHERE m.chat_id = c.id
+          AND NOT EXISTS (
+            SELECT 1 FROM contacts block_c
+            WHERE ((block_c.user_id = $1 AND block_c.contact_user_id = m.sender_id)
+               OR (block_c.user_id = m.sender_id AND block_c.contact_user_id = $1))
+              AND block_c.status = 'blocked'
+          )
         ORDER BY m.created_at DESC
         LIMIT 1
       ) DESC NULLS LAST
@@ -109,6 +121,12 @@ export const chatRepository = {
           )
           FROM messages m
           WHERE m.chat_id = c.id
+            AND NOT EXISTS (
+              SELECT 1 FROM contacts block_c
+              WHERE ((block_c.user_id = $2 AND block_c.contact_user_id = m.sender_id)
+                 OR (block_c.user_id = m.sender_id AND block_c.contact_user_id = $2))
+                AND block_c.status = 'blocked'
+            )
           ORDER BY m.created_at DESC
           LIMIT 1
         ) AS "lastMessage",

@@ -33,7 +33,8 @@ export const chatController = {
     async getMessages(req: AuthRequest, res: Response) {
         try {
             const chatId = Number(req.params.chatId);
-            const messages = await chatService.getMessages(chatId);
+            const userId = req.user!.id;
+            const messages = await chatService.getMessages(chatId, userId);
             res.json(messages);
         } catch (err) {
             res.status(500).json({ error: 'Failed to fetch messages. Error:', err });
@@ -58,6 +59,18 @@ export const chatController = {
                     [chatId]
                 );
                 for (const member of membersResult.rows) {
+                    if (member.user_id !== senderId) {
+                        const blockCheck = await db.query(
+                            `SELECT 1 FROM contacts 
+                             WHERE ((user_id = $1 AND contact_user_id = $2)
+                                OR (user_id = $2 AND contact_user_id = $1))
+                               AND status = 'blocked'`,
+                            [member.user_id, senderId]
+                        );
+                        if (blockCheck.rows.length > 0) {
+                            continue; // Silently skip
+                        }
+                    }
                     io.to(`user_${member.user_id}`).emit('message', message);
                 }
             } else {
@@ -113,6 +126,18 @@ export const chatController = {
                     [chatId]
                 );
                 for (const member of membersResult.rows) {
+                    if (member.user_id !== senderId) {
+                        const blockCheck = await db.query(
+                            `SELECT 1 FROM contacts 
+                             WHERE ((user_id = $1 AND contact_user_id = $2)
+                                OR (user_id = $2 AND contact_user_id = $1))
+                               AND status = 'blocked'`,
+                            [member.user_id, senderId]
+                        );
+                        if (blockCheck.rows.length > 0) {
+                            continue; // Silently skip
+                        }
+                    }
                     io.to(`user_${member.user_id}`).emit('message', message);
                 }
             }
@@ -190,6 +215,31 @@ export const chatController = {
             res.json({ success: true });
         } catch (err) {
             res.status(500).json({ error: 'Failed to delete chat' });
+        }
+    },
+
+    async deleteGroup(req: AuthRequest, res: Response) {
+        try {
+            const chatId = Number(req.params.chatId);
+            const requesterId = req.user!.id;
+
+            const { memberIds } = await chatService.deleteGroup(chatId, requesterId);
+
+            // Notify all former members via socket in real-time
+            const io = req.app.get('io');
+            if (io) {
+                for (const memberId of memberIds) {
+                    io.to(`user_${memberId}`).emit('group_deleted', { chatId });
+                }
+            }
+
+            res.json({ success: true, chatId });
+        } catch (err: any) {
+            const status =
+                err.message === 'Group not found' ? 404 :
+                err.message === 'Only the group creator can delete the group' ? 403 :
+                err.message === 'This is not a group chat' ? 400 : 500;
+            res.status(status).json({ error: err.message ?? 'Failed to delete group' });
         }
     },
 }

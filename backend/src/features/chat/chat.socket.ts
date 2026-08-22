@@ -4,6 +4,7 @@ import { userService } from "../users/user.service";
 import { settingsService } from "../settings/settings.service";
 import db from "../../db";
 import { messaging } from "../../config/firebase";
+import { sendChatPushNotification } from "../../services/notificationService";
 
 interface SendMessagePayload { chatId: number; text: string; }
 interface MessageReceivedPayload { messageId: number; }
@@ -60,7 +61,8 @@ export const chatSocket = (io: Server) => {
       socket.on("read_messages", async ({ chatId }: ReadMessagesPayload) => {
         if (!socket.user) return;
         await handleMarkAsRead(chatId, socket.user.id);
-        socket.emit("chat_read", { chatId, });
+        // chat_read is already emitted inside handleMarkAsRead to the whole room;
+        // no extra emit needed here.
       });
 
       socket.on("send_message", async (data) => {
@@ -103,6 +105,20 @@ export const chatSocket = (io: Server) => {
 
           for (const member of membersResult.rows) {
             const memberId = member.user_id;
+
+            // Check if memberId has blocked the sender
+            if (memberId !== socket.user.id) {
+               const blockCheck = await db.query(
+                 `SELECT 1 FROM contacts 
+                  WHERE ((user_id = $1 AND contact_user_id = $2)
+                     OR (user_id = $2 AND contact_user_id = $1))
+                    AND status = 'blocked'`,
+                 [memberId, socket.user.id]
+               );
+               if (blockCheck.rows.length > 0) {
+                 continue; // Silently skip delivery for this member
+               }
+            }
 
             // Emit via WebSocket to all connected devices of the user
             io.to(`user_${memberId}`).emit("message", message);
@@ -150,30 +166,33 @@ export const chatSocket = (io: Server) => {
 
       socket.on("message_received", async ({ messageId }: MessageReceivedPayload) => {
         try {
-          if (!messageId) return;
-          console.log(`message_received for messageId ${messageId} from user ${socket.user?.id}`);
+          // Parse to number in case client sends a string
+          const msgId = Number(messageId);
+          if (!msgId) return;
+          console.log(`message_received for messageId ${msgId} from user ${socket.user?.id}`);
           
           const msgResult = await db.query(
-            `SELECT sender_id FROM messages WHERE id = $1`, [messageId]
+            `SELECT sender_id FROM messages WHERE id = $1`, [msgId]
           );
           if (msgResult.rowCount === 0) return;
           const msg = msgResult.rows[0];
           
+          // Don't mark your own message as delivered
           if (msg.sender_id === socket.user?.id) {
              return;
           }
 
           const result = await db.query(
             `UPDATE messages SET delivered_at = COALESCE(delivered_at, NOW()) WHERE id = $1 RETURNING *`,
-            [messageId]
+            [msgId]
           );
           const message = result.rows[0];
           if (!message) return;
-          console.log(`Message ${messageId} marked as delivered in DB`);
+          console.log(`Message ${msgId} marked as delivered in DB`);
 
           io.to(`user_${message.sender_id}`).emit("messages_delivered", {
             chatId: message.chat_id,
-            messageIds: [messageId],
+            messageIds: [msgId],
           });
         } catch (error) {
           console.error("message_received error:", error);
@@ -286,39 +305,3 @@ export const chatSocket = (io: Server) => {
     }
   });
 };
-
-async function sendChatPushNotification({ fcmToken, title, body, chatId, senderId }: { fcmToken: string; title: string; body: string; chatId: number; senderId: number; }) {
-  try {
-    await messaging.send({
-      token: fcmToken,
-      notification: {
-        title,
-        body,
-      },
-      data: {
-        chatId: chatId.toString(),
-        senderId: senderId.toString(),
-        type: 'chat_message'
-      },
-      android: {
-        priority: 'high',
-        notification: {
-          channelId: 'chat_messages',
-          priority: 'high',
-          sound: 'default'
-        }
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: 'default',
-            contentAvailable: true
-          }
-        }
-      }
-    });
-    console.log(`Push notification sent to ${fcmToken}`);
-  } catch (error) {
-    console.error('Error sending push notification:', error);
-  }
-}

@@ -43,9 +43,9 @@ export const chatService = {
     }
   },
 
-  async getMessages(chatId: number) {
+  async getMessages(chatId: number, userId: number) {
     try {
-      const result = await chatRepository.getMessages(chatId);
+      const result = await chatRepository.getMessages(chatId, userId);
       return result.rows;
     } catch (err) {
       throw err;
@@ -176,5 +176,9 @@ export const chatService = {
   async deleteChat(chatId: number) {
     const result = await chatRepository.deleteChat(chatId);
     return result.rows[0];
+  },
+
+  async deleteGroup(chatId: number, requesterId: number) {
+    return await chatRepository.deleteGroup(chatId, requesterId);
   },
 }

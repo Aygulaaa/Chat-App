@@ -41,6 +41,12 @@ export const chatRepository = {
           WHERE m.chat_id = c.id
             AND m.sender_id != $1
             AND m.read_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM contacts block_c
+              WHERE ((block_c.user_id = $1 AND block_c.contact_user_id = m.sender_id)
+                 OR (block_c.user_id = m.sender_id AND block_c.contact_user_id = $1))
+                AND block_c.status = 'blocked'
+            )
         ) AS "unreadCount"
 
       FROM chats c
@@ -113,6 +119,12 @@ export const chatRepository = {
           WHERE m.chat_id = c.id
             AND m.sender_id != $2
             AND m.read_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM contacts block_c
+              WHERE ((block_c.user_id = $2 AND block_c.contact_user_id = m.sender_id)
+                 OR (block_c.user_id = m.sender_id AND block_c.contact_user_id = $2))
+                AND block_c.status = 'blocked'
+            )
         ) AS "unreadCount"
 
       FROM chats c
@@ -134,7 +146,7 @@ export const chatRepository = {
     `, [chatId, userId]);
   },
 
-  async getMessages(chatId: number) {
+  async getMessages(chatId: number, userId: number) {
     try {
       return await db.query(`
       SELECT 
@@ -148,9 +160,15 @@ export const chatRepository = {
         m.delivered_at AS "deliveredAt",
         m.read_at AS "readAt"
       FROM messages m
-      WHERE m.chat_id = $1
+      WHERE m.chat_id = $1 
+        AND NOT EXISTS (
+          SELECT 1 FROM contacts c 
+          WHERE ((c.user_id = $2 AND c.contact_user_id = m.sender_id)
+             OR (c.user_id = m.sender_id AND c.contact_user_id = $2))
+            AND c.status = 'blocked'
+        )
       ORDER BY m.created_at DESC
-    `, [chatId]);
+    `, [chatId, userId]);
     } catch (err) {
       console.error("DB ERROR:", err);
       throw err;
@@ -282,6 +300,7 @@ export const chatRepository = {
       FROM chats c
       JOIN chat_members m1 ON m1.chat_id = c.id AND m1.user_id = $1
       JOIN chat_members m2 ON m2.chat_id = c.id AND m2.user_id = $2
+      WHERE c.type = 'private'
       LIMIT 1
     `, [userId, contactId]);
 
@@ -382,6 +401,49 @@ export const chatRepository = {
       `, [chatId]);
     } catch (err) {
       console.error('DB ERROR deleteChat:', err);
+      throw err;
+    }
+  },
+
+  async deleteGroup(chatId: number, requesterId: number) {
+    try {
+      // 1. Verify chat exists and requester is the creator
+      const chatResult = await db.query(`
+        SELECT id, created_by, type FROM chats WHERE id = $1
+      `, [chatId]);
+
+      if (chatResult.rowCount === 0) {
+        throw new Error('Group not found');
+      }
+
+      const chat = chatResult.rows[0];
+
+      if (chat.type !== 'group') {
+        throw new Error('This is not a group chat');
+      }
+
+      if (chat.created_by !== requesterId) {
+        throw new Error('Only the group creator can delete the group');
+      }
+
+      // 2. Collect all member IDs before deletion (to notify via socket)
+      const membersResult = await db.query(`
+        SELECT user_id FROM chat_members WHERE chat_id = $1
+      `, [chatId]);
+      const memberIds: number[] = membersResult.rows.map((r: any) => r.user_id);
+
+      // 3. Delete all messages in the group
+      await db.query(`DELETE FROM messages WHERE chat_id = $1`, [chatId]);
+
+      // 4. Remove all members from the group
+      await db.query(`DELETE FROM chat_members WHERE chat_id = $1`, [chatId]);
+
+      // 5. Delete the chat itself
+      await db.query(`DELETE FROM chats WHERE id = $1`, [chatId]);
+
+      return { chatId, memberIds };
+    } catch (err) {
+      console.error('DB ERROR deleteGroup:', err);
       throw err;
     }
   },

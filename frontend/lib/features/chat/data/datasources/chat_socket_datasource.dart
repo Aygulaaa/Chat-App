@@ -9,6 +9,7 @@ abstract class ChatSocketDatasource {
   Future<void> sendTypingEvent(int chatId, bool isTyping, int userId);
   Future<void> markChatAsRead(int chatId);
   Future<void> leaveChat(int chatId);
+  void emitMessageReceived(int messageId);
 
   Stream<Map<String, dynamic>> onMessage();
   Stream<Map<String, dynamic>> onUserTyping();
@@ -17,4 +18,5 @@ abstract class ChatSocketDatasource {
   Stream<Map<String, dynamic>> onChatRead();
   Stream<Map<String, dynamic>> onMessagesDelivered();
   Stream<List<int>> onInitialOnlineUsers();
+  Stream<int> onGroupDeleted();
 }

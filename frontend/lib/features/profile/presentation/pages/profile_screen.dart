@@ -4,13 +4,14 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
-import 'package:my_chat_app/core/utils/format_last_seen.dart';
-import 'package:my_chat_app/features/auth/presentation/pages/auth_page.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
-import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
-import 'package:my_chat_app/features/profile/presentation/pages/edit_profile_screen.dart';
+import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
+import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
+import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
-import 'package:my_chat_app/features/settings/presentation/pages/settings_screen.dart';
+import 'package:my_chat_app/features/profile/presentation/widgets/info_card.dart';
+import 'package:my_chat_app/features/profile/presentation/widgets/my_profile.dart';
+import 'package:my_chat_app/features/profile/presentation/widgets/profile_delegate.dart';
 
 class ProfileScreen extends ConsumerWidget {
   final UserEntity? user;
@@ -82,54 +83,12 @@ class ProfileScreen extends ConsumerWidget {
             body: const Center(child: CircularProgressIndicator()),
           );
         }
-        return _MyProfile(user: me);
+        return MyProfile(user: me);
       },
     );
   }
 }
 
-// ─── My Profile ───────────────────────────────────────────────────────────────
-class _MyProfile extends StatelessWidget {
-  final UserEntity user;
-  const _MyProfile({required this.user});
-
-  @override
-  Widget build(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top;
-    final maxHeaderHeight = 320.h;
-    final minHeaderHeight = kToolbarHeight + topPadding;
-
-    return Scaffold(
-      backgroundColor: context.appBg,
-      body: CustomScrollView(
-        slivers: [
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _ProfileHeaderDelegate(
-              user: user,
-              isMe: true,
-              maxExtentHeight: maxHeaderHeight,
-              minExtentHeight: minHeaderHeight,
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Column(
-              children: [
-                SizedBox(height: 20.h),
-                _InfoCard(user: user),
-                SizedBox(height: 12.h),
-                _ActionCard(user: user),
-                SizedBox(height: 100.h),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Other Profile ────────────────────────────────────────────────────────────
 class _OtherProfile extends ConsumerWidget {
   final UserEntity user;
   const _OtherProfile({required this.user});
@@ -142,6 +101,20 @@ class _OtherProfile extends ConsumerWidget {
       orElse: () => user,
     );
 
+    // Watch contacts list to know state (isContact, isBlocked)
+    final contactsAsync = ref.watch(contactsProvider);
+    final blockedContactsAsync = ref.watch(blockedContactsProvider);
+
+    final isContact = contactsAsync.maybeWhen(
+      data: (contacts) => contacts.any((c) => c.id == effectiveUser.id),
+      orElse: () => false,
+    );
+
+    final isBlocked = blockedContactsAsync.maybeWhen(
+      data: (blocked) => blocked.any((c) => c.id == effectiveUser.id),
+      orElse: () => false,
+    );
+
     final topPadding = MediaQuery.of(context).padding.top;
     final maxHeaderHeight = 320.h;
     final minHeaderHeight = kToolbarHeight + topPadding;
@@ -152,7 +125,7 @@ class _OtherProfile extends ConsumerWidget {
         slivers: [
           SliverPersistentHeader(
             pinned: true,
-            delegate: _ProfileHeaderDelegate(
+            delegate: ProfileHeaderDelegate(
               user: effectiveUser,
               isMe: false,
               maxExtentHeight: maxHeaderHeight,
@@ -163,7 +136,120 @@ class _OtherProfile extends ConsumerWidget {
             child: Column(
               children: [
                 SizedBox(height: 20.h),
-                _InfoCard(user: effectiveUser),
+                InfoCard(user: effectiveUser),
+                SizedBox(height: 16.h),
+
+                // Action Card matching InfoCard style
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 16.w),
+                  decoration: BoxDecoration(
+                    color: context.cardBg,
+                    borderRadius: BorderRadius.circular(18.r),
+                    border: Border.all(color: context.glassBorder),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 20,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Send Message Row
+                      if (!isBlocked) ...[
+                        _ActionCardRow(
+                          icon: Icons.chat_bubble_outline_rounded,
+                          iconColor: AppColors.accent,
+                          iconBgColor: AppColors.primary.withValues(alpha: 0.12),
+                          title: 'Send message',
+                          onTap: () async {
+                            try {
+                              final chatRepo = ref.read(chatRepositoryProvider);
+                              final chatId = await chatRepo.createChat(effectiveUser.id);
+
+                              await ref.read(chatProvider.notifier).loadChats();
+
+                              if (!context.mounted) return;
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChatScreen(
+                                    chatId: chatId,
+                                    username: effectiveUser.username,
+                                  ),
+                                ),
+                              );
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Failed to open chat: $e')),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                        Divider(color: context.glassBorder, height: 1, indent: 52.w),
+                      ],
+
+                      // Add / Remove from Contacts Row
+                      if (!isBlocked) ...[
+                        if (!isContact)
+                          _ActionCardRow(
+                            icon: Icons.person_add_outlined,
+                            iconColor: AppColors.online,
+                            iconBgColor: AppColors.online.withValues(alpha: 0.12),
+                            title: 'Add to contacts',
+                            onTap: () {
+                              ref
+                                  .read(contactsProvider.notifier)
+                                  .addContact(effectiveUser.id);
+                            },
+                          )
+                        else
+                          _ActionCardRow(
+                            icon: Icons.person_remove_outlined,
+                            iconColor: Colors.orangeAccent,
+                            iconBgColor: Colors.orangeAccent.withValues(alpha: 0.12),
+                            title: 'Remove from contacts',
+                            onTap: () {
+                              ref
+                                  .read(contactsProvider.notifier)
+                                  .removeContact(effectiveUser.id);
+                            },
+                          ),
+                        Divider(color: context.glassBorder, height: 1, indent: 52.w),
+                      ],
+
+                      // Block / Unblock User Row
+                      if (!isBlocked)
+                        _ActionCardRow(
+                          icon: Icons.block_rounded,
+                          iconColor: AppColors.error,
+                          iconBgColor: AppColors.error.withValues(alpha: 0.12),
+                          title: 'Block user',
+                          titleColor: AppColors.error,
+                          onTap: () {
+                            ref.read(contactsProvider.notifier).blockUser(effectiveUser.id);
+                          },
+                        )
+                      else
+                        _ActionCardRow(
+                          icon: Icons.lock_open_rounded,
+                          iconColor: AppColors.online,
+                          iconBgColor: AppColors.online.withValues(alpha: 0.12),
+                          title: 'Unblock user',
+                          titleColor: AppColors.online,
+                          onTap: () {
+                            ref
+                                .read(blockedContactsProvider.notifier)
+                                .unblock(effectiveUser.id);
+                          },
+                        ),
+                    ],
+                  ),
+                ),
                 SizedBox(height: 100.h),
               ],
             ),
@@ -174,447 +260,20 @@ class _OtherProfile extends ConsumerWidget {
   }
 }
 
-// ─── Dynamic Squeezing Header Delegate ─────────────────────────────────────────
-class _ProfileHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final UserEntity user;
-  final bool isMe;
-  final double maxExtentHeight;
-  final double minExtentHeight;
-
-  _ProfileHeaderDelegate({
-    required this.user,
-    required this.isMe,
-    required this.maxExtentHeight,
-    required this.minExtentHeight,
-  });
-
-  @override
-  double get maxExtent => maxExtentHeight;
-
-  @override
-  double get minExtent => minExtentHeight;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    final topPadding = MediaQuery.of(context).padding.top;
-    // Calculate collapse percentage (0.0 fully expanded, 1.0 fully collapsed)
-    final progress =
-        (shrinkOffset / (maxExtentHeight - minExtentHeight)).clamp(0.0, 1.0);
-
-    return Consumer(
-      builder: (context, ref, child) {
-        final isOnline =
-            ref.watch(userStatusProvider).onlineUsers[user.id] ?? false;
-        final socketLastSeen = ref.watch(userStatusProvider).lastSeen[user.id];
-
-        if (!isMe) {
-          final userAsync = ref.watch(userByIdProvider(user.id));
-          userAsync.whenData((fetchedUser) {
-            if (fetchedUser?.lastSeen != null &&
-                !ref.read(userStatusProvider).lastSeen.containsKey(user.id)) {
-              Future.microtask(
-                () => ref
-                    .read(userStatusProvider.notifier)
-                    .setLastSeen(user.id, fetchedUser!.lastSeen),
-              );
-            }
-          });
-        }
-
-        final effectiveLastSeen = socketLastSeen ?? user.lastSeen;
-
-        // Position transformations as header collapses
-        final titleLeft = Tween<double>(begin: 20.w, end: isMe ? 20.w : 56.w)
-            .transform(progress);
-        final titleBottom =
-            Tween<double>(begin: 20.h, end: 12.h).transform(progress);
-
-        return ClipRRect(
-          child: Container(
-            color: context.appBg,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // 1. Photo Background / Fallback (Scales down smoothly)
-                Opacity(
-                  opacity: (1.0 - (progress * 1.2)).clamp(0.0, 1.0),
-                  child: user.avatar != null && user.avatar!.isNotEmpty
-                      ? Image.network(
-                          user.avatar!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) =>
-                              _FallbackGradient(user: user),
-                        )
-                      : _FallbackGradient(user: user),
-                ),
-
-                // 2. Scrim Overlay for image readability
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.5),
-                        Colors.transparent,
-                        Colors.black.withValues(
-                          alpha: 0.8 * (1.0 - progress),
-                        ),
-                      ],
-                      stops: const [0.0, 0.4, 1.0],
-                    ),
-                  ),
-                ),
-
-                // 3. Back Button for other users
-                if (!isMe)
-                  Positioned(
-                    top: topPadding + 4.h,
-                    left: 8.w,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-
-                // 4. Edit Profile Button
-                if (isMe)
-                  Positioned(
-                    top: topPadding + 4.h,
-                    right: 8.w,
-                    child: IconButton(
-                      icon: const Icon(Icons.edit_outlined, color: Colors.white),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EditProfileScreen(user: user),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                // 5. Username & Status (Pins into App Bar position when scrolled)
-                Positioned(
-                  left: titleLeft,
-                  right: 60.w,
-                  bottom: titleBottom,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        user.username,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize:
-                              Tween<double>(begin: 24.sp, end: 18.sp).transform(
-                            progress,
-                          ),
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.3,
-                          shadows: [
-                            Shadow(
-                              offset: const Offset(0, 1),
-                              blurRadius: 6,
-                              color: Colors.black.withValues(alpha: 0.7),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (progress < 0.85) ...[
-                        SizedBox(height: 2.h),
-                        Opacity(
-                          opacity: (1.0 - (progress * 2)).clamp(0.0, 1.0),
-                          child: _StatusLabel(
-                            isOnline: isOnline,
-                            lastSeen: effectiveLastSeen,
-                            lastSeenFuzzy: ref.watch(userStatusProvider).lastSeenFuzzy[user.id] ?? user.lastSeenFuzzy,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _ProfileHeaderDelegate oldDelegate) {
-    return oldDelegate.user != user ||
-        oldDelegate.isMe != isMe ||
-        oldDelegate.maxExtentHeight != maxExtentHeight ||
-        oldDelegate.minExtentHeight != minExtentHeight;
-  }
-}
-
-class _FallbackGradient extends StatelessWidget {
-  final UserEntity user;
-  const _FallbackGradient({required this.user});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: AppColors.primaryGradient,
-      ),
-      child: Center(
-        child: Text(
-          user.username.isNotEmpty ? user.username[0].toUpperCase() : 'U',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 72.sp,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusLabel extends StatelessWidget {
-  final bool isOnline;
-  final DateTime? lastSeen;
-  final String? lastSeenFuzzy;
-  const _StatusLabel({required this.isOnline, this.lastSeen, this.lastSeenFuzzy});
-
-  @override
-  Widget build(BuildContext context) {
-    final shadow = [
-      Shadow(
-        offset: const Offset(0, 1),
-        blurRadius: 4,
-        color: Colors.black.withValues(alpha: 0.7),
-      ),
-    ];
-
-    if (isOnline) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8.r,
-            height: 8.r,
-            decoration: const BoxDecoration(
-              color: AppColors.online,
-              shape: BoxShape.circle,
-            ),
-          ),
-          SizedBox(width: 6.w),
-          Text(
-            'Online',
-            style: TextStyle(
-              color: AppColors.online,
-              fontSize: 13.sp,
-              fontWeight: FontWeight.w600,
-              shadows: shadow,
-            ),
-          ),
-        ],
-      );
-    }
-    if (lastSeen != null || lastSeenFuzzy != null) {
-      return Text(
-        TimeUtils.formatLastSeen(lastSeen, fuzzy: lastSeenFuzzy),
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.85),
-          fontSize: 13.sp,
-          fontWeight: FontWeight.w500,
-          shadows: shadow,
-        ),
-      );
-    }
-    return const SizedBox.shrink();
-  }
-}
-
-// ─── Info Card ────────────────────────────────────────────────────────────────
-class _InfoCard extends StatelessWidget {
-  final UserEntity user;
-  const _InfoCard({required this.user});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16.w),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(18.r),
-        border: Border.all(color: context.glassBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _InfoRow(
-            icon: Icons.info_outline_rounded,
-            label: 'Bio',
-            value: user.bio?.isNotEmpty == true ? user.bio! : 'No bio set',
-          ),
-          Divider(color: context.glassBorder, height: 1, indent: 52.w),
-          _InfoRow(
-            icon: Icons.alternate_email_rounded,
-            label: 'Username',
-            value: '@${user.username}',
-          ),
-          if (user.birthDate != null) ...[
-            Divider(color: context.glassBorder, height: 1, indent: 52.w),
-            _InfoRow(
-              icon: Icons.cake_outlined,
-              label: 'Birthday',
-              value:
-                  '${user.birthDate!.day}/${user.birthDate!.month}/${user.birthDate!.year}',
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  const _InfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-      child: Row(
-        children: [
-          Container(
-            width: 32.r,
-            height: 32.r,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            child: Icon(icon, color: AppColors.accent, size: 17),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    color: context.textPrimary,
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: context.textTertiary,
-                    fontSize: 11.sp,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Action Card ─────────────────────────────────────────────────────────────
-class _ActionCard extends ConsumerWidget {
-  final UserEntity user;
-  const _ActionCard({required this.user});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16.w),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(18.r),
-        border: Border.all(color: context.glassBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _ActionRow(
-            icon: Icons.settings_outlined,
-            iconColor: AppColors.primary,
-            label: 'Settings',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
-          ),
-          Divider(color: context.glassBorder, height: 1, indent: 52.w),
-          _ActionRow(
-            icon: Icons.edit_outlined,
-            iconColor: Colors.blueAccent,
-            label: 'Edit Profile',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => EditProfileScreen(user: user)),
-            ),
-          ),
-          Divider(color: context.glassBorder, height: 1, indent: 52.w),
-          _ActionRow(
-            icon: Icons.logout_rounded,
-            iconColor: AppColors.error,
-            label: 'Log Out',
-            labelColor: AppColors.error,
-            onTap: () {
-              ref.read(authProvider.notifier).logout();
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const AuthPage()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionRow extends StatelessWidget {
+class _ActionCardRow extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
-  final String label;
-  final Color labelColor;
+  final Color iconBgColor;
+  final String title;
+  final Color? titleColor;
   final VoidCallback onTap;
-  const _ActionRow({
+
+  const _ActionCardRow({
     required this.icon,
     required this.iconColor,
-    required this.label,
-    this.labelColor = Colors.white,
+    required this.iconBgColor,
+    required this.title,
+    this.titleColor,
     required this.onTap,
   });
 
@@ -631,28 +290,31 @@ class _ActionRow extends StatelessWidget {
               width: 32.r,
               height: 32.r,
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.12),
+                color: iconBgColor,
                 borderRadius: BorderRadius.circular(8.r),
               ),
               child: Icon(icon, color: iconColor, size: 17),
             ),
             SizedBox(width: 12.w),
             Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: labelColor == Colors.white
-                      ? context.textPrimary
-                      : labelColor,
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w500,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: titleColor ?? context.textPrimary,
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  )
+                ],
               ),
             ),
             Icon(
               Icons.chevron_right_rounded,
               color: context.textTertiary,
-              size: 18,
+              size: 20,
             ),
           ],
         ),

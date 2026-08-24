@@ -10,7 +10,7 @@ import 'package:my_chat_app/features/contacts/presentation/providers/contacts_pr
 void showUserActionSheet(BuildContext context, Contact contact) {
   showModalBottomSheet(
     context: context,
-    backgroundColor: context.cardBg,
+    backgroundColor: context.appBg,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),

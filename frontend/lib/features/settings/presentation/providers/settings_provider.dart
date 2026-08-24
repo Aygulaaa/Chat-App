@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/settings/data/datasources/settings_remote_datasource.dart';
 import 'package:my_chat_app/features/settings/data/repositories/settings_repository_impl.dart';
@@ -27,7 +28,10 @@ class SettingsNotifier extends AsyncNotifier<UserSettings?> {
     if (auth.isLoading || auth.user == null) return null;
 
     final repo = ref.read(settingsRepositoryProvider);
-    return GetSettings(repo)();
+    final settings = await GetSettings(repo)();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notificationsEnabled', settings.notificationsEnabled);
+    return settings;
   }
 
   Future<void> updateSettings(Map<String, dynamic> updates) async {
@@ -47,6 +51,8 @@ class SettingsNotifier extends AsyncNotifier<UserSettings?> {
 
     try {
       final updated = await UpdateSettings(repo)(updates);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notificationsEnabled', updated.notificationsEnabled);
       state = AsyncData(updated);
     } catch (e) {
       if (current != null) state = AsyncData(current);

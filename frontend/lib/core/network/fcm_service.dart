@@ -1,13 +1,20 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 // Top-Level background handler (MUST remain outside the class)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
+  final prefs = await SharedPreferences.getInstance();
+  final notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
+  if (!notificationsEnabled) {
+    print('Background push received but notifications are disabled locally: ${message.messageId}');
+    return;
+  }
   print('Background push received: ${message.messageId}');
 }
 
@@ -36,22 +43,29 @@ class FcmService {
   Future<void> initialize({
     required Function(Map<String, dynamic> data) onNotificationTap,
   }) async {
-    // 1. Request Permission
+    // 1. Local Notifications Setup & Permission Request for Android 13+
+    final androidImplementation = _localNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await androidImplementation?.requestNotificationsPermission();
+    await androidImplementation?.createNotificationChannel(_channel);
+
+    // Explicitly request notification permission using permission_handler (vital for physical Android devices)
+    var status = await Permission.notification.status;
+    if (status.isDenied) {
+      await Permission.notification.request();
+    }
+
+    // 2. Request FCM Permission
     NotificationSettings settings = await _messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
 
-    if (settings.authorizationStatus != AuthorizationStatus.authorized) {
-      print('⚠️ User declined push permissions');
-      return;
+    if (settings.authorizationStatus != AuthorizationStatus.authorized && 
+        settings.authorizationStatus != AuthorizationStatus.provisional) {
+      print('⚠️ User has not granted push permissions');
+      // Do not return early, as local notifications might still be authorized
     }
-
-    // 2. Local Notifications Setup
-    await _localNotifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(_channel);
 
     const initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initializationSettingsIOS = DarwinInitializationSettings();
@@ -70,7 +84,12 @@ class FcmService {
     );
 
     // 3. Foreground Banner Execution (Fixed for both Android & iOS)
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      final prefs = await SharedPreferences.getInstance();
+      final notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
+      
+      if (!notificationsEnabled) return;
+
       RemoteNotification? notification = message.notification;
 
       if (notification != null) {

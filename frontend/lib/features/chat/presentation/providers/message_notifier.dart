@@ -10,6 +10,7 @@ import 'package:my_chat_app/features/chat/domain/usecases/get_messages.dart';
 import 'package:my_chat_app/features/chat/domain/usecases/send_message.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/message_state.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
+import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 
 final messageProvider =
     StateNotifierProvider.family<MessageNotifier, MessageState, int>((
@@ -43,6 +44,9 @@ class MessageNotifier extends StateNotifier<MessageState> {
   Timer? _typingTimer;
   Timer? _typingDebounce;
 
+  /// Eagerly cached blocked user IDs to avoid race condition with async provider.
+  final Set<int> _blockedUserIds = {};
+
   MessageNotifier({
     required this.getMessages,
     required this.sendMessage,
@@ -52,7 +56,24 @@ class MessageNotifier extends StateNotifier<MessageState> {
     required this.chatId,
   }) : _datasource = datasource,
        super(const MessageState()) {
-    loadMessages();
+    _initBlocked();
+  }
+
+  /// Fetch blocked IDs first, THEN set up listeners and load messages.
+  Future<void> _initBlocked() async {
+    try {
+      final blocked = await ref.read(blockedContactsProvider.future);
+      _blockedUserIds.addAll(blocked.map((c) => c.id));
+    } catch (_) {}
+
+    ref.listen<AsyncValue<List<dynamic>>>(blockedContactsProvider, (_, next) {
+      next.whenData((blocked) {
+        _blockedUserIds
+          ..clear()
+          ..addAll(blocked.map((c) => c.id));
+      });
+    });
+
     _init();
   }
   Future<void> _init() async {
@@ -81,25 +102,38 @@ class MessageNotifier extends StateNotifier<MessageState> {
         final myId = ref.read(authProvider).user?.id;
         final isMyMessage = newMessage.senderId == myId;
 
-        // 2. If it's MY message, check if we have a temporary optimistic message to swap out
+        // ── Block filter (uses pre-loaded cached set — no race condition) ──
+        if (!isMyMessage && _blockedUserIds.contains(newMessage.senderId)) {
+          print('🚫 MessageNotifier: dropped msg from blocked ${newMessage.senderId}');
+          return;
+        }
+        // ──────────────────────────────────────────────────────────
+
         if (isMyMessage) {
+          // Check if it's already in state (by real server ID)
+          final existsById = state.messages.any((m) => m.id == newMessage.id);
+          if (existsById) return; // Already confirmed, ignore duplicate
+
+          // Try to swap a matching optimistic/temp message (long tempId or same text)
           final tempIndex = state.messages.indexWhere(
             (m) =>
-                m.text == newMessage.text &&
-                m.id.toString().length >
-                    10, // matches temporary local ID length
+                m.id.toString().length > 10 && // temp ID
+                (m.text == newMessage.text ||
+                 (m.fileType != MessageType.text && m.originalName == newMessage.originalName && m.fileSize == newMessage.fileSize)),
           );
 
           if (tempIndex != -1) {
             final updated = List<Message>.from(state.messages);
             updated[tempIndex] = newMessage;
             state = state.copyWith(messages: updated);
+          } else {
+            // No temp found — insert server message to avoid missing it
+            state = state.copyWith(messages: [newMessage, ...state.messages]);
           }
-          // If no temp message found and it's already in the list, do nothing to avoid duplicates
           return;
         }
 
-        // 3. If it's FROM SOMEONE ELSE: handle normal insertion
+        // Message from someone else: handle normal insertion
         final exists = state.messages.any((m) => m.id == newMessage.id);
         if (!exists) {
           state = state.copyWith(messages: [newMessage, ...state.messages]);
@@ -116,20 +150,22 @@ class MessageNotifier extends StateNotifier<MessageState> {
     _deliveredSub = _datasource.onMessagesDelivered().listen((data) {
       print('📦 messages_delivered: $data');
 
-      final List<dynamic> messageIds = data['messageIds'] ?? [];
+      final rawIds = data['messageIds'];
+      if (rawIds == null) return;
+      final Set<int> messageIds = (rawIds as List)
+          .map((id) => int.tryParse(id.toString()))
+          .whereType<int>()
+          .toSet();
+
+      if (messageIds.isEmpty) return;
 
       final updated = state.messages.map((m) {
-        final inList = messageIds.any(
-          (id) => int.tryParse(id.toString()) == m.id,
-        );
-
-        if (inList && m.status != MessageStatus.read) {
+        if (messageIds.contains(m.id) && m.status != MessageStatus.read) {
           return m.copyWith(
             status: MessageStatus.delivered,
             deliveredAt: DateTime.now(),
           );
         }
-
         return m;
       }).toList();
 
@@ -156,9 +192,9 @@ class MessageNotifier extends StateNotifier<MessageState> {
     _readSub = _datasource.onMessagesRead().listen((data) {
       print('📩 messages_read received: $data');
 
-      final incomingChatId = int.tryParse(data['chatId'].toString());
+      final incomingChatId = int.tryParse(data['chatId']?.toString() ?? '');
 
-      if (incomingChatId != chatId) return;
+      if (incomingChatId == null || incomingChatId != chatId) return;
 
       final List<dynamic> rawIds = data['messageIds'] ?? [];
 
@@ -166,6 +202,8 @@ class MessageNotifier extends StateNotifier<MessageState> {
           .map((e) => int.tryParse(e.toString()))
           .whereType<int>()
           .toSet();
+
+      if (ids.isEmpty) return;
 
       final updated = state.messages.map((m) {
         if (ids.contains(m.id)) {
@@ -201,6 +239,12 @@ class MessageNotifier extends StateNotifier<MessageState> {
       print('🔍 typingUserId=$typingUserId myId=$myId isTyping=$isTyping');
 
       if (typingUserId == null || typingUserId == myId) return;
+      
+      // ── Block filter ──────────────────────────────────────────
+      if (_blockedUserIds.contains(typingUserId)) {
+        return;
+      }
+      // ──────────────────────────────────────────────────────────
 
       _typingTimer?.cancel();
       if (isTyping) {
@@ -241,6 +285,7 @@ class MessageNotifier extends StateNotifier<MessageState> {
 
     try {
       print('📡 Loading messages for chatId: $chatId');
+      final myId = ref.read(authProvider).user?.id;
       final history = await getMessages(chatId: chatId);
       print('📦 Got ${history.length} messages from API');
       if (history.isNotEmpty) {
@@ -249,7 +294,15 @@ class MessageNotifier extends StateNotifier<MessageState> {
         );
       }
 
-      final allMessages = [...state.messages, ...history];
+      // Filter out any messages from blocked senders (double safety
+      // in case the backend query missed them).
+      final filtered = _blockedUserIds.isEmpty
+          ? history
+          : history.where((m) =>
+              m.senderId == myId || !_blockedUserIds.contains(m.senderId),
+            ).toList();
+
+      final allMessages = [...state.messages, ...filtered];
       final seenIds = <int>{};
       final unique = allMessages.where((m) => seenIds.add(m.id)).toList();
       unique.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -275,11 +328,17 @@ class MessageNotifier extends StateNotifier<MessageState> {
     try {
       final serverMessage = await repository.sendMessage(message);
 
+      // Replace the optimistic temp message with the confirmed server message
       final updated = state.messages.map((m) {
         return m.id == message.id ? serverMessage : m;
       }).toList();
 
       state = state.copyWith(messages: updated);
+
+      // Emit message_received for the HTTP-sent message so the server
+      // marks it as delivered for the recipient when they are online.
+      // This covers the case where the message is sent via REST (not socket).
+      _datasource.emitMessageReceived(serverMessage.id);
     } catch (e) {
       state = state.copyWith(
         messages: state.messages.where((m) => m.id != message.id).toList(),

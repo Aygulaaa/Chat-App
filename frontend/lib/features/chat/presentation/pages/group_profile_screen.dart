@@ -76,6 +76,62 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
     );
   }
 
+  void _confirmDeleteGroup(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.appBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: context.glassBorder),
+        ),
+        title: Text(
+          'Delete Group?',
+          style: TextStyle(
+            color: context.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(
+          'This will permanently delete the group and all its messages for everyone. This cannot be undone.',
+          style: TextStyle(
+            color: context.textSecondary,
+            fontSize: 14,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: context.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx); // close dialog
+              await ref
+                  .read(chatProvider.notifier)
+                  .deleteGroup(widget.chatId);
+              if (mounted) {
+                // pop group profile + chat screen back to home
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
+            },
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatProvider);
@@ -184,6 +240,44 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
                               .removeMember(widget.chatId, memberId);
                         },
                       ),
+
+                      // Delete Group — only for the creator
+                      if (myId != null && chat.createdBy == myId) ...[  
+                        SizedBox(height: 8.h),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16.w),
+                          child: Divider(
+                            color: context.glassBorder,
+                            height: 1,
+                          ),
+                        ),
+                        SizedBox(height: 4.h),
+                        ListTile(
+                          leading: Container(
+                            width: 36.r,
+                            height: 36.r,
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10.r),
+                            ),
+                            child: const Icon(
+                              Icons.delete_rounded,
+                              color: AppColors.error,
+                              size: 20,
+                            ),
+                          ),
+                          title: Text(
+                            'Delete Group',
+                            style: TextStyle(
+                              color: AppColors.error,
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          onTap: () => _confirmDeleteGroup(context),
+                        ),
+                        SizedBox(height: 8.h),
+                      ],
                     ],
                   ),
                 );

@@ -13,11 +13,17 @@ import 'package:my_chat_app/core/utils/mime_utils.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/message_notifier.dart';
+import 'package:image_picker/image_picker.dart';
 
 class MessageInput extends ConsumerStatefulWidget {
   final int chatId;
+  final bool isBlocked;
 
-  const MessageInput({super.key, required this.chatId});
+  const MessageInput({
+    super.key,
+    required this.chatId,
+    this.isBlocked = false,
+  });
 
   @override
   ConsumerState<MessageInput> createState() => _MessageInputState();
@@ -60,6 +66,48 @@ class _MessageInputState extends ConsumerState<MessageInput> {
     super.dispose();
   }
 
+  String _getCleanErrorMessage(dynamic e) {
+    final msg = e.toString();
+    if (msg.contains('SocketException') || msg.contains('Network')) {
+      return 'Please check your internet connection and try again.';
+    } else if (msg.contains('Timeout')) {
+      return 'The request took too long. Please try again.';
+    } else if (msg.contains('Permission')) {
+      return 'Permission denied. Please check your settings.';
+    } else if (msg.contains('DioException') || msg.contains('Http')) {
+      return 'Server error occurred. Please try again later.';
+    }
+    return 'Something went wrong. Please try again.';
+  }
+
+  Future<void> _takePhotoAndSend() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? photo = await picker.pickImage(source: ImageSource.camera);
+
+      if (photo == null) return;
+
+      final bytes = await photo.readAsBytes();
+      if (bytes.isEmpty) return;
+
+      setState(() => _isSendingFile = true);
+
+      final mimeType = MimeUtils.getMimeType(photo.name.split('.').last) ?? 'image/jpeg';
+
+      await ref
+          .read(messageProvider(widget.chatId).notifier)
+          .sendFileMessage(bytes, photo.name, mimeType, localPath: photo.path);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_getCleanErrorMessage(e))));
+      }
+    } finally {
+      if (mounted) setState(() => _isSendingFile = false);
+    }
+  }
+
   Future<void> _pickAndSendFile() async {
     final result = await FilePicker.platform.pickFiles(
       withData: true,
@@ -84,7 +132,7 @@ class _MessageInputState extends ConsumerState<MessageInput> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to send file: $e')));
+        ).showSnackBar(SnackBar(content: Text(_getCleanErrorMessage(e))));
       }
     } finally {
       if (mounted) setState(() => _isSendingFile = false);
@@ -126,7 +174,7 @@ class _MessageInputState extends ConsumerState<MessageInput> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not start recording: $e')),
+          SnackBar(content: Text(_getCleanErrorMessage(e))),
         );
       }
     }
@@ -197,7 +245,7 @@ class _MessageInputState extends ConsumerState<MessageInput> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to send audio: $e')));
+        ).showSnackBar(SnackBar(content: Text(_getCleanErrorMessage(e))));
       }
     }
   }
@@ -281,13 +329,31 @@ class _MessageInputState extends ConsumerState<MessageInput> {
                         ),
                       ),
                     )
-                  : IconButton(
-                      icon: Icon(
-                        Icons.attach_file,
-                        color: context.textTertiary,
-                        size: 22.sp,
-                      ),
-                      onPressed: _pickAndSendFile,
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.camera_alt,
+                            color: context.textTertiary,
+                            size: 22.sp,
+                          ),
+                          onPressed: _takePhotoAndSend,
+                          padding: EdgeInsets.symmetric(horizontal: 4.w),
+                          constraints: const BoxConstraints(),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.attach_file,
+                            color: context.textTertiary,
+                            size: 22.sp,
+                          ),
+                          onPressed: _pickAndSendFile,
+                          padding: EdgeInsets.symmetric(horizontal: 4.w),
+                          constraints: const BoxConstraints(),
+                        ),
+                        SizedBox(width: 8.w),
+                      ],
                     ),
 
             Expanded(

@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_state.dart';
 
@@ -12,6 +13,14 @@ class AuthCard extends StatelessWidget {
   final VoidCallback onLogin;
   final VoidCallback onRegister;
   final VoidCallback onToggle;
+  
+  // New parameters for password visibility and form control
+  final bool obscurePassword;
+  final bool obscureConfirmPassword;
+  final VoidCallback onTogglePasswordVisibility;
+  final VoidCallback onToggleConfirmPasswordVisibility;
+  final bool isFormValid;
+  final bool isFormDisabled;
 
   const AuthCard({
     super.key,
@@ -23,6 +32,12 @@ class AuthCard extends StatelessWidget {
     required this.onLogin,
     required this.onRegister,
     required this.onToggle,
+    required this.obscurePassword,
+    required this.obscureConfirmPassword,
+    required this.onTogglePasswordVisibility,
+    required this.onToggleConfirmPasswordVisibility,
+    required this.isFormValid,
+    required this.isFormDisabled,
   });
 
   @override
@@ -33,17 +48,17 @@ class AuthCard extends StatelessWidget {
         // Main Auth Card Container (Glassmorphism)
         Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(vertical: 24),
+            padding: EdgeInsets.symmetric(vertical: 24.h),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(32),
+              borderRadius: BorderRadius.circular(32.r),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
                 child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 24),
-                  padding: const EdgeInsets.all(32),
+                  margin: EdgeInsets.symmetric(horizontal: 24.w),
+                  padding: EdgeInsets.all(32.r),
                   decoration: BoxDecoration(
                     color: const Color(0xFF121214).withValues(alpha: 0.82),
-                    borderRadius: BorderRadius.circular(32),
+                    borderRadius: BorderRadius.circular(32.r),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.12),
                       width: 1.5,
@@ -62,99 +77,108 @@ class AuthCard extends StatelessWidget {
                     children: [
                       Text(
                         isLogin ? "Welcome Back!" : "Create Account",
-                        style: const TextStyle(
-                          fontSize: 26,
+                        style: TextStyle(
+                          fontSize: 26.sp,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.5,
                           color: Colors.white,
                         ),
                       ),
                       
-                      const SizedBox(height: 28),
+                      SizedBox(height: 28.h),
 
                       _buildTextField(
                         controller: usernameController,
                         label: "Username",
                         hint: "Enter your username",
                         icon: Icons.alternate_email_rounded,
+                        enabled: !isFormDisabled,
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16.h),
                       _buildTextField(
                         controller: passwordController,
                         label: "Password",
                         hint: "Enter your password",
                         icon: Icons.lock_outline_rounded,
                         isPassword: true,
+                        obscureText: obscurePassword,
+                        onToggleVisibility: onTogglePasswordVisibility,
+                        enabled: !isFormDisabled,
                       ),
 
                       if (!isLogin) ...[
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16.h),
                         _buildTextField(
                           controller: confirmPasswordController,
                           label: "Confirm Password",
                           hint: "Re-enter your password",
                           icon: Icons.shield_outlined,
                           isPassword: true,
+                          obscureText: obscureConfirmPassword,
+                          onToggleVisibility: onToggleConfirmPasswordVisibility,
+                          enabled: !isFormDisabled,
                         ),
                       ],
 
                       if (state.error != null)
                         Padding(
-                          padding: const EdgeInsets.only(top: 16),
+                          padding: EdgeInsets.only(top: 16.h),
                           child: Text(
                             state.error!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.error,
-                              fontSize: 12,
+                              fontSize: 12.sp,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
 
-                      const SizedBox(height: 28),
+                      SizedBox(height: 28.h),
 
                       // Gradient Button (primary → accent)
                       state.isLoading
-                          ? const Center(
+                          ? Center(
                               child: CircularProgressIndicator(
                                 color: AppColors.primary,
                               ),
                             )
                           : Container(
                               width: double.infinity,
-                              height: 52,
+                              height: 52.h,
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                gradient: AppColors.primaryGradient,
-                                boxShadow: [
+                                borderRadius: BorderRadius.circular(16.r),
+                                gradient: isFormValid ? AppColors.primaryGradient : null,
+                                color: isFormValid ? null : Colors.grey.withValues(alpha: 0.2),
+                                boxShadow: isFormValid ? [
                                   BoxShadow(
                                     color: AppColors.primary.withValues(alpha: 0.4),
                                     blurRadius: 16,
                                     offset: const Offset(0, 4),
                                   ),
-                                ],
+                                ] : [],
                               ),
                               child: ElevatedButton(
-                                onPressed: isLogin ? onLogin : onRegister,
+                                onPressed: isFormValid ? (isLogin ? onLogin : onRegister) : null,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.transparent,
                                   shadowColor: Colors.transparent,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(16.r),
                                   ),
+                                  disabledBackgroundColor: Colors.transparent,
                                 ),
                                 child: Text(
                                   isLogin ? "Login" : "Get Started",
-                                  style: const TextStyle(
-                                    fontSize: 15,
+                                  style: TextStyle(
+                                    fontSize: 15.sp,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: isFormValid ? Colors.white : Colors.grey[600],
                                   ),
                                 ),
                               ),
                             ),
 
-                      const SizedBox(height: 20),
+                      SizedBox(height: 20.h),
 
                       // Toggle Button
                       Center(
@@ -170,14 +194,15 @@ class AuthCard extends StatelessWidget {
                                   : "Already have an account? ",
                               style: TextStyle(
                                 color: Colors.grey[400],
-                                fontSize: 13,
+                                fontSize: 13.sp,
                               ),
                               children: [
                                 TextSpan(
                                   text: isLogin ? "Sign Up" : "Log in",
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: AppColors.primary,
                                     fontWeight: FontWeight.bold,
+                                    fontSize: 13.sp,
                                   ),
                                 ),
                               ],
@@ -202,6 +227,9 @@ class AuthCard extends StatelessWidget {
     required String hint,
     required IconData icon,
     bool isPassword = false,
+    bool obscureText = false,
+    VoidCallback? onToggleVisibility,
+    bool enabled = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,46 +238,64 @@ class AuthCard extends StatelessWidget {
           label,
           style: TextStyle(
             color: Colors.grey[300],
-            fontSize: 12,
+            fontSize: 12.sp,
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: 6.h),
         TextField(
           controller: controller,
-          obscureText: isPassword,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 15,
+          obscureText: isPassword ? obscureText : false,
+          enabled: enabled,
+          style: TextStyle(
+            color: enabled ? Colors.white : Colors.grey[400],
+            fontSize: 15.sp,
             fontWeight: FontWeight.w500,
           ),
           cursorColor: AppColors.primary,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
-            prefixIcon: Icon(icon, size: 20, color: AppColors.primary),
+            hintStyle: TextStyle(color: Colors.grey[600], fontSize: 14.sp),
+            prefixIcon: Icon(icon, size: 20.sp, color: AppColors.primary),
+            suffixIcon: isPassword
+                ? IconButton(
+                    icon: Icon(
+                      obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      color: Colors.grey[400],
+                      size: 20.sp,
+                    ),
+                    onPressed: onToggleVisibility,
+                  )
+                : null,
             filled: true,
             fillColor: AppColors.darkInputFill,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 16.w,
+              vertical: 16.h,
             ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(14.r),
               borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(14.r),
               borderSide: BorderSide(
                 color: Colors.white.withValues(alpha: 0.05),
                 width: 1,
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(14.r),
               borderSide: const BorderSide(
                 color: AppColors.primary,
                 width: 1.5,
+              ),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14.r),
+              borderSide: BorderSide(
+                color: Colors.white.withValues(alpha: 0.02),
+                width: 1,
               ),
             ),
           ),

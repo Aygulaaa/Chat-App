@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
@@ -8,6 +10,7 @@ import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_tile.dart';
+import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 
 class ChatList extends ConsumerWidget {
   const ChatList({super.key});
@@ -29,11 +32,11 @@ class ChatList extends ConsumerWidget {
             const SizedBox(height: 8),
 
             Container(
-              width: 36,
-              height: 4,
+              width: 36.w,
+              height: 4.h,
               decoration: BoxDecoration(
                 color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(2.r),
               ),
             ),
 
@@ -69,9 +72,145 @@ class ChatList extends ConsumerWidget {
               },
             ),
 
+            if (!chat.isGroup) ...[
+              Builder(builder: (ctx) {
+                final users = chat.participants.whereType<UserModel>().toList();
+                final currentUserId = ref.read(authProvider).user?.id;
+                UserModel? otherUser;
+                if (users.isNotEmpty) {
+                  otherUser = users.firstWhere(
+                    (u) => u.id != currentUserId,
+                    orElse: () => users.first,
+                  );
+                }
+                
+                if (otherUser != null) {
+                  return ListTile(
+                    leading: const Icon(
+                      Icons.block,
+                      color: Colors.redAccent,
+                    ),
+                    title: const Text(
+                      'Block user',
+                      style: TextStyle(color: Colors.redAccent),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context); // Close bottom sheet
+                      _showBlockConfirmation(context, otherUser!.id, otherUser.username, chat.id, ref);
+                    },
+                  );
+                }
+                return const SizedBox.shrink();
+              }),
+            ],
+
             const SizedBox(height: 8),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showBlockConfirmation(BuildContext context, int otherUserId, String username, int chatId, WidgetRef ref) {
+    bool deleteChat = false;
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: context.cardBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: context.glassBorder),
+            ),
+            title: Text(
+              'Block $username?',
+              style: TextStyle(
+                color: context.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Are you sure you want to block this user? They will not be able to message you.',
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 14.sp,
+                  ),
+                ),
+                SizedBox(height: 16.h),
+                InkWell(
+                  onTap: () {
+                    setDialogState(() {
+                      deleteChat = !deleteChat;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: Checkbox(
+                            value: deleteChat,
+                            activeColor: AppColors.error,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            onChanged: (val) {
+                              setDialogState(() {
+                                deleteChat = val ?? false;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Delete chat history',
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 14.sp,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel', style: TextStyle(color: context.textSecondary)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: () async {
+                  final nav = Navigator.of(context);
+                  nav.pop();
+                  await ref.read(contactsProvider.notifier).blockUser(otherUserId);
+                  if (deleteChat) {
+                    await ref.read(chatProvider.notifier).deleteChat(chatId);
+                  }
+                },
+                child: const Text('Block', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -117,12 +256,12 @@ class ChatList extends ConsumerWidget {
     }
 
     if (state.chats.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No conversations yet',
           style: TextStyle(
             color: Colors.white38,
-            fontSize: 15,
+            fontSize: 15.sp,
           ),
         ),
       );
@@ -141,9 +280,9 @@ class ChatList extends ConsumerWidget {
           parent: AlwaysScrollableScrollPhysics(),
         ),
 
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 8,
+        padding: EdgeInsets.symmetric(
+          horizontal: 12.w,
+          vertical: 8.h,
         ),
 
         itemCount: state.chats.length,
@@ -187,7 +326,7 @@ class ChatList extends ConsumerWidget {
           }
 
           return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: EdgeInsets.only(bottom: 8.h),
 
             child: ChatTile(
               userId: otherUser?.id ?? 0,

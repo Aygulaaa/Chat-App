@@ -16,6 +16,7 @@ class MessageContent extends StatelessWidget {
   const MessageContent({super.key, required this.message, required this.isMe});
 
   bool get _isUploading => message.status == MessageStatus.uploading;
+  bool get _isError => message.status == MessageStatus.error;
 
   String _formatBytes(int bytes) {
     if (bytes < 1024) return '${bytes}B';
@@ -53,6 +54,15 @@ class MessageContent extends StatelessWidget {
             label: message.originalName ?? 'Audio',
             fileSize: message.fileSize,
             uploadedBytes: message.uploadedBytes,
+            color: const Color(0xFF4CC9F0),
+          );
+        }
+        if (_isError) {
+          return _FileTile(
+            icon: Icons.audiotrack_rounded,
+            label: message.originalName ?? 'Audio',
+            fileSize: message.fileSize,
+            url: null,
             color: const Color(0xFF4CC9F0),
           );
         }
@@ -120,13 +130,13 @@ class MessageContent extends StatelessWidget {
   Widget _buildImageContent(BuildContext context) {
     Widget imageWidget;
 
-    if (_isUploading && message.localPath != null) {
+    if ((_isUploading || _isError) && message.localPath != null) {
       imageWidget = Image.file(
         File(message.localPath!),
         width: 200,
         fit: BoxFit.cover,
       );
-    } else if (_isUploading) {
+    } else if (_isUploading || _isError) {
       imageWidget = Container(
         width: 200,
         height: 150,
@@ -149,7 +159,7 @@ class MessageContent extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: _isUploading
+      onTap: (_isUploading || _isError)
           ? null
           : () {
               Navigator.of(context).push(

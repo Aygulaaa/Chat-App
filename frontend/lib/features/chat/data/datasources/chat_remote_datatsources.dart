@@ -131,4 +131,8 @@ class ChatRemoteDatatsources {
   Future<void> deleteChat(int chatId) async {
     await api.delete(ApiEndpoints.deleteChat(chatId));
   }
+
+  Future<void> deleteGroup(int chatId) async {
+    await api.delete(ApiEndpoints.deleteGroup(chatId));
+  }
 }

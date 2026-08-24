@@ -4,7 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_lis.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_list.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_search_bar.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_search_result.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/group/create_group_modal.dart';

@@ -14,6 +14,8 @@ import 'package:my_chat_app/core/network/fcm_service.dart';
 // Global Navigation Key for handling push notification routing
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -37,12 +39,12 @@ void main() async {
     FcmService.registerBackgroundHandler();
     
     final fcmService = FcmService();
+    
     // Non-blocking initialization
     fcmService.initialize(
       onNotificationTap: (data) {
         print("🔔 Notification tapped with payload: $data");
         
-        // Deep link example: Navigate directly to chat screen
         if (data.containsKey('chatId') && navigatorKey.currentState != null) {
           navigatorKey.currentState!.pushNamed(
             '/chat', 
@@ -51,6 +53,10 @@ void main() async {
         }
       },
     );
+
+    final token = await fcmService.getToken();
+    print('🔥 MY_FCM_TOKEN: $token');
+
   } catch (e) {
     print('❌ Firebase/FCM init Error: $e');
   }

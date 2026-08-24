@@ -109,4 +109,14 @@ class ChatRepositoryImpl implements ChatRepository {
   Future<void> deleteChat(int chatId) {
     return remote.deleteChat(chatId);
   }
+
+  @override
+  Future<void> deleteGroup(int chatId) {
+    return remote.deleteGroup(chatId);
+  }
+
+  @override
+  Stream<int> onGroupDeleted() {
+    return socket.onGroupDeleted();
+  }
 }

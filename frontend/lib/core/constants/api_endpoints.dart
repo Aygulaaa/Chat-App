@@ -18,12 +18,14 @@ class ApiEndpoints {
       '$chats/$chatId/members/$userId';
   static String groupInfo(int chatId) => '$chats/$chatId/group';
   static String deleteChat(int chatId) => '$chats/$chatId';
+  static String deleteGroup(int chatId) => '$chats/$chatId/group';
 
   static const users = '/api/users';
 
   static const me = '$users/me';
   static const uploadAvatar = '$users/avatar';
   static String userById(int userId) => '$users/user/$userId';
+  static String sendFcmToken() => '$users/fcm-token';
 
   static const contacts = '/api/contacts';
 

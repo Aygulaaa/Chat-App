@@ -22,7 +22,7 @@ dependencies:
   socket_io_client: ^3.1.4
   intl: ^0.20.2
   gal: ^2.3.0
-  image_picker: ^1.2.1
+  image_picker: ^1.2.3
   file_picker: ^8.1.2
   just_audio: ^0.10.5
   flutter_sound: ^9.14.0

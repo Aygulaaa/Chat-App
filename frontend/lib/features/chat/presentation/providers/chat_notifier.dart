@@ -21,6 +21,7 @@ import 'package:my_chat_app/features/chat/domain/usecases/send_message.dart';
 
 import 'package:my_chat_app/features/chat/presentation/providers/chat_state.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/message_notifier.dart';
+import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 
 /// ───────────────── REMOTE DATASOURCE ─────────────────
 
@@ -96,14 +97,53 @@ class ChatNotifier extends StateNotifier<ChatState> {
   StreamSubscription? _messageSub;
   StreamSubscription? _readSub;
   StreamSubscription? _deliveredSub;
+  StreamSubscription? _groupDeletedSub;
+
+  /// Cached set of user IDs blocked by the current user.
+  /// Populated eagerly before socket listeners start.
+  final Set<int> _blockedUserIds = {};
 
   ChatNotifier({
     required this.getChats,
     required this.datasource,
     required this.ref,
   }) : super(const ChatState()) {
+    _initBlocked();
+  }
+
+  /// Load blocked IDs FIRST, then start socket + load chats.
+  Future<void> _initBlocked() async {
+    try {
+      final blocked = await ref.read(blockedContactsProvider.future);
+      _blockedUserIds.addAll(blocked.map((c) => c.id));
+      print('🚫 Loaded ${_blockedUserIds.length} blocked user IDs');
+    } catch (_) {
+      // If it fails, proceed with an empty set — backend is the safety net.
+    }
+
+    // Auto-refresh the cached set whenever the provider is invalidated
+    // (e.g. after block/unblock actions).
+    ref.listen<AsyncValue<List<dynamic>>>(blockedContactsProvider, (_, next) {
+      next.whenData((blocked) {
+        _blockedUserIds
+          ..clear()
+          ..addAll(blocked.map((c) => c.id));
+        print('🔄 Auto-refreshed blocked IDs: $_blockedUserIds');
+      });
+    });
+
     _listenSocketEvents();
     loadChats();
+  }
+
+  /// Public method — can also be called manually if needed.
+  void refreshBlockedIds() {
+    ref.read(blockedContactsProvider.future).then((blocked) {
+      _blockedUserIds
+        ..clear()
+        ..addAll(blocked.map((c) => c.id));
+      print('🔄 Refreshed blocked IDs: $_blockedUserIds');
+    }).catchError((_) {});
   }
 
   /// ───────────────── SOCKET EVENTS ─────────────────
@@ -116,8 +156,18 @@ class ChatNotifier extends StateNotifier<ChatState> {
         final message = MessageModel.fromJson(data);
         final myId = ref.read(authProvider).user?.id;
 
+        // ── Block filter ──────────────────────────────────────────
+        // Reject messages from anyone in the blocked set (bidirectional
+        // — backend also enforces this, frontend is an extra guard).
+        if (message.senderId != myId &&
+            _blockedUserIds.contains(message.senderId)) {
+          print('🚫 ChatNotifier: dropped msg from blocked ${message.senderId}');
+          return;
+        }
+        // ──────────────────────────────────────────────────────────
+
         updateChatLastMessage(message);
-        
+
         if (message.senderId != myId) {
           incrementUnreadCount(message.chatId);
         }
@@ -131,9 +181,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
     /// ✅ READ EVENTS
     _readSub = datasource.onMessagesRead().listen((data) {
       try {
-        final int chatId = int.tryParse(data['chatId'].toString()) ?? 0;
+        final int chatId = int.tryParse(data['chatId']?.toString() ?? '') ?? 0;
+        if (chatId == 0) return;
 
-        final List<int> messageIds = List<int>.from(data['messageIds'] ?? []);
+        final List<int> messageIds = (data['messageIds'] as List? ?? [])
+            .map((e) => int.tryParse(e.toString()))
+            .whereType<int>()
+            .toList();
 
         final updatedChats = state.chats.map((chat) {
           if (chat.id != chatId) {
@@ -162,7 +216,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
     /// ✅ DELIVERED EVENTS
     _deliveredSub = datasource.onMessagesDelivered().listen((data) {
       try {
-        final List<int> messageIds = List<int>.from(data['messageIds'] ?? []);
+        final List<int> messageIds = (data['messageIds'] as List? ?? [])
+            .map((e) => int.tryParse(e.toString()))
+            .whereType<int>()
+            .toList();
 
         final updatedChats = state.chats.map((chat) {
           final last = chat.lastMessage;
@@ -182,6 +239,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
       } catch (e) {
         print('❌ Delivery event error: $e');
       }
+    });
+
+    /// ✅ GROUP DELETED (for non-creator members)
+    _groupDeletedSub?.cancel();
+    _groupDeletedSub = datasource.onGroupDeleted().listen((deletedChatId) {
+      print('🗑️ ChatNotifier: group_deleted for chatId=$deletedChatId');
+      removeChatFromList(deletedChatId);
     });
   }
 
@@ -330,6 +394,18 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
+  Future<void> deleteGroup(int chatId) async {
+    try {
+      await ref.read(chatRepositoryProvider).deleteGroup(chatId);
+      // Remove locally for the creator immediately;
+      // other members are removed via the group_deleted socket event
+      removeChatFromList(chatId);
+    } catch (e) {
+      print('❌ deleteGroup error: $e');
+      rethrow;
+    }
+  }
+
   void toggleMute(int chatId) {
     final updatedChats = state.chats.map((chat) {
       if (chat.id == chatId) {
@@ -345,6 +421,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     _messageSub?.cancel();
     _readSub?.cancel();
     _deliveredSub?.cancel();
+    _groupDeletedSub?.cancel();
 
     super.dispose();
   }

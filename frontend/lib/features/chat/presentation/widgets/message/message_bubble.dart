@@ -32,7 +32,7 @@ class MessageBubble extends StatelessWidget {
     final showAvatar = isGroup && !isMe;
 
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 12.w),
+      padding: EdgeInsets.symmetric(vertical: 5.h, horizontal: 12.w),
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Row(
@@ -110,7 +110,7 @@ class _BubbleBody extends StatelessWidget {
       // 2. Conditionally set zero padding for image messages
       padding: isImage
           ? EdgeInsets.zero
-          : EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
+          : EdgeInsets.symmetric(vertical: 10.h, horizontal: 15.w),
       decoration: BoxDecoration(
         gradient: isMe ? AppColors.primaryGradient : null,
         color: isMe ? null : AppColors.darkCard,
@@ -128,7 +128,6 @@ class _BubbleBody extends StatelessWidget {
       ),
       // 3. Clip the image child to respect the bubble's rounded corners
       child: ClipRRect(
-        borderRadius: borderRadius,
         child: isImage
             ? Stack(
                 children: [
@@ -156,7 +155,7 @@ class _BubbleBody extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Padding(
-                          padding: EdgeInsetsGeometry.symmetric(vertical: 0, horizontal: 1.5),
+                          padding: EdgeInsetsGeometry.symmetric(vertical:0, horizontal: 0),
                           child: Text(
                             time!,
                             style: TextStyle(

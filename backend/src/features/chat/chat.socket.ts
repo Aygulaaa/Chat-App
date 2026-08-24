@@ -16,6 +16,19 @@ export interface AuthSocket extends Socket {
 
 const onlineUsers = new Map<number, Set<string>>();
 
+async function getBlockedSet(userId: number | string): Promise<Set<number>> {
+  const uid = Number(userId);
+  const result = await db.query(
+    `SELECT user_id, contact_user_id FROM contacts WHERE status = 'blocked' AND (user_id = $1 OR contact_user_id = $1)`,
+    [uid]
+  );
+  const blocked = new Set<number>();
+  result.rows.forEach((r: any) => {
+    blocked.add(Number(r.user_id) === uid ? Number(r.contact_user_id) : Number(r.user_id));
+  });
+  return blocked;
+}
+
 export const chatSocket = (io: Server) => {
   io.on("connection", async (socket: AuthSocket) => {
     try {
@@ -35,9 +48,17 @@ export const chatSocket = (io: Server) => {
 
       await socket.join(`user_${userId}`);
 
-      io.emit("user_status", { userId, status: "online" });
+      const blockedSet = await getBlockedSet(userId);
 
-      socket.emit("initial_online_users", Array.from(onlineUsers.keys()));
+      const allSockets = await io.fetchSockets();
+      allSockets.forEach(s => {
+        if (s.data.user?.id && s.data.user.id !== userId && !blockedSet.has(Number(s.data.user.id))) {
+          s.emit("user_status", { userId, status: "online" });
+        }
+      });
+
+      const filteredOnline = Array.from(onlineUsers.keys()).filter(id => !blockedSet.has(Number(id)));
+      socket.emit("initial_online_users", filteredOnline);
 
       socket.on("join_chat", async ({ chatId }: { chatId: number }) => {
         try {
@@ -149,18 +170,33 @@ export const chatSocket = (io: Server) => {
         }
       });
 
-      socket.on("request_online_users", () => {
-        socket.emit("initial_online_users", Array.from(onlineUsers.keys()));
+      socket.on("request_online_users", async () => {
+        if (!socket.user) return;
+        const blockedSet = await getBlockedSet(socket.user.id);
+        const filteredOnline = Array.from(onlineUsers.keys()).filter(id => !blockedSet.has(Number(id)));
+        socket.emit("initial_online_users", filteredOnline);
       });
 
-      socket.on("typing", ({ chatId, userId }: { chatId: number, userId: number }) => {
+      socket.on("typing", async ({ chatId, userId }: { chatId: number, userId: number }) => {
         if (!socket.user || !chatId) return;
-        socket.to(`chat_${chatId}`).emit("user_typing", { chatId, userId, isTyping: true });
+        const blockedSet = await getBlockedSet(socket.user.id);
+        const roomSockets = await io.in(`chat_${chatId}`).fetchSockets();
+        roomSockets.forEach(s => {
+          if (s.data.user?.id && s.data.user.id !== socket.user!.id && !blockedSet.has(Number(s.data.user.id))) {
+            s.emit("user_typing", { chatId, userId, isTyping: true });
+          }
+        });
       });
 
-      socket.on("stop_typing", ({ chatId, userId }: { chatId: number, userId: number }) => {
+      socket.on("stop_typing", async ({ chatId, userId }: { chatId: number, userId: number }) => {
         if (!socket.user || !chatId) return;
-        socket.to(`chat_${chatId}`).emit("user_typing", { chatId, userId, isTyping: false });
+        const blockedSet = await getBlockedSet(socket.user.id);
+        const roomSockets = await io.in(`chat_${chatId}`).fetchSockets();
+        roomSockets.forEach(s => {
+          if (s.data.user?.id && s.data.user.id !== socket.user!.id && !blockedSet.has(Number(s.data.user.id))) {
+            s.emit("user_typing", { chatId, userId, isTyping: false });
+          }
+        });
       });
 
 
@@ -190,10 +226,14 @@ export const chatSocket = (io: Server) => {
           if (!message) return;
           console.log(`Message ${msgId} marked as delivered in DB`);
 
-          io.to(`user_${message.sender_id}`).emit("messages_delivered", {
-            chatId: message.chat_id,
-            messageIds: [msgId],
-          });
+          // Only emit messages_delivered if sender is not blocked
+          const blockedSet = await getBlockedSet(socket.user!.id);
+          if (!blockedSet.has(Number(message.sender_id))) {
+            io.to(`user_${message.sender_id}`).emit("messages_delivered", {
+              chatId: message.chat_id,
+              messageIds: [msgId],
+            });
+          }
         } catch (error) {
           console.error("message_received error:", error);
         }
@@ -222,10 +262,17 @@ export const chatSocket = (io: Server) => {
         if (currentUserSettings.hideReadReceipts) {
           return;
         }
-        io.to(`chat_${chatId}`).emit("chat_read", {
-          chatId,
-          readBy: currentUserId,
-          messageIds: readMessages.map((m: any) => m.id)
+
+        const blockedSet = await getBlockedSet(currentUserId);
+        const roomSockets = await io.in(`chat_${chatId}`).fetchSockets();
+        roomSockets.forEach(s => {
+          if (s.data.user?.id && !blockedSet.has(Number(s.data.user.id))) {
+            s.emit("chat_read", {
+              chatId,
+              readBy: currentUserId,
+              messageIds: readMessages.map((m: any) => m.id)
+            });
+          }
         });
         
         const senderIds = [
@@ -283,12 +330,18 @@ export const chatSocket = (io: Server) => {
                 onlineUsers.delete(userId);
                 await userService.updateLastSeen(userId);
                 const settings = await settingsService.getSettings(userId);
-
-                io.emit("user_status", {
-                  userId,
-                  status: "offline",
-                  lastSeen: settings.hideLastSeen ? null : new Date().toISOString(),
-                  lastSeenFuzzy: settings.hideLastSeen ? 'recently' : null,
+                
+                const blockedSet = await getBlockedSet(userId);
+                const allSockets = await io.fetchSockets();
+                allSockets.forEach(s => {
+                  if (s.data.user?.id && s.data.user.id !== userId && !blockedSet.has(Number(s.data.user.id))) {
+                    s.emit("user_status", {
+                      userId,
+                      status: "offline",
+                      lastSeen: settings.hideLastSeen ? null : new Date().toISOString(),
+                      lastSeenFuzzy: settings.hideLastSeen ? 'recently' : null,
+                    });
+                  }
                 });
               }
               disconnectTimers.delete(userId);

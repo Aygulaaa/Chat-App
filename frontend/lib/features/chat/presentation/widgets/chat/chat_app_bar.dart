@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/chat/presentation/pages/group_profile_screen.dart';
@@ -13,6 +14,12 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final UserModel? otherUser;
   final String? groupAvatar;
   final bool isGroup;
+  final bool isContact;
+  final bool isBlocked;
+  final VoidCallback? onBlock;
+  final VoidCallback? onUnblock;
+  final VoidCallback? onAddContact;
+  final VoidCallback? onRemoveContact;
 
   const ChatAppBar({
     super.key,
@@ -22,6 +29,12 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.otherUser,
     this.groupAvatar,
     this.isGroup = false,
+    this.isContact = false,
+    this.isBlocked = false,
+    this.onBlock,
+    this.onUnblock,
+    this.onAddContact,
+    this.onRemoveContact,
   });
 
   @override
@@ -71,7 +84,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                     username,
                     style: TextStyle(
                       color: context.textPrimary,
-                      fontSize: 16,
+                      fontSize: 16.sp,
                       fontWeight: FontWeight.w600,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -89,6 +102,52 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
           ],
         ),
       ),
+      actions: [
+        if (!isGroup && otherUser != null)
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, color: context.textPrimary),
+            color: context.appBg,
+            onSelected: (value) {
+              switch (value) {
+                case 'add_contact':
+                  onAddContact?.call();
+                  break;
+                case 'remove_contact':
+                  onRemoveContact?.call();
+                  break;
+                case 'block':
+                  onBlock?.call();
+                  break;
+                case 'unblock':
+                  onUnblock?.call();
+                  break;
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              if (!isBlocked) ...[
+                if (!isContact)
+                  PopupMenuItem<String>(
+                    value: 'add_contact',
+                    child: Text('Add to contacts', style: TextStyle(color: context.textPrimary)),
+                  )
+                else
+                  PopupMenuItem<String>(
+                    value: 'remove_contact',
+                    child: Text('Remove from contacts', style: TextStyle(color: context.textPrimary)),
+                  ),
+                const PopupMenuDivider(),
+                const PopupMenuItem<String>(
+                  value: 'block',
+                  child: Text('Block user', style: TextStyle(color: Colors.redAccent)),
+                ),
+              ] else
+                const PopupMenuItem<String>(
+                  value: 'unblock',
+                  child: Text('Unblock user', style: TextStyle(color: Colors.green)),
+                ),
+            ],
+          ),
+      ],
     );
   }
 }

@@ -4,7 +4,7 @@ import { userService } from "../users/user.service";
 import { settingsService } from "../settings/settings.service";
 import db from "../../db";
 import { messaging } from "../../config/firebase";
-import { sendChatPushNotification, fileNotificationBody } from "../../services/notificationService";
+import { sendChatPushNotification } from "../../services/notificationService";
 
 interface SendMessagePayload { chatId: number; text: string; }
 interface MessageReceivedPayload { messageId: number; }
@@ -144,18 +144,12 @@ export const chatSocket = (io: Server) => {
             );
 
             if (!isInsideActiveChat && member.fcm_token) {
-              // Determine the notification body: file message or text
-              const notifBody = message.fileType
-                ? fileNotificationBody(message.fileType)
-                : text.trim();
-
               sendChatPushNotification({
                 fcmToken: member.fcm_token,
                 title: senderName,
-                body: notifBody,
+                body: text.trim(),
                 chatId,
                 senderId: socket.user.id,
-                recipientId: memberId,
               });
             }
           }

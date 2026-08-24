@@ -3,7 +3,6 @@ import { Response } from 'express';
 import { chatService } from '../chat/chat.service';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import db from '../../db';
-import { sendChatPushNotification, fileNotificationBody } from '../../services/notificationService';
 
 export const chatController = {
     async getChats(req: AuthRequest, res: Response) {
@@ -54,65 +53,29 @@ export const chatController = {
 
             const message = await chatService.sendMessage(chatId, senderId, text);
             const io = req.app.get('io');
-
-            // Fetch sender name and all members (with FCM tokens) in one query
-            const [senderResult, membersResult] = await Promise.all([
-                db.query(`SELECT name, username FROM users WHERE id = $1`, [senderId]),
-                db.query(
-                    `SELECT cm.user_id, u.fcm_token
-                     FROM chat_members cm
-                     JOIN users u ON u.id = cm.user_id
-                     WHERE cm.chat_id = $1`,
+            if (io) {
+                const membersResult = await db.query(
+                    `SELECT user_id FROM chat_members WHERE chat_id = $1`,
                     [chatId]
-                ),
-            ]);
-            const senderName =
-                senderResult.rows[0]?.name ||
-                senderResult.rows[0]?.username ||
-                'New Message';
-
-            for (const member of membersResult.rows) {
-                const memberId = Number(member.user_id);
-
-                if (memberId !== senderId) {
-                    const blockCheck = await db.query(
-                        `SELECT 1 FROM contacts 
-                         WHERE ((user_id = $1 AND contact_user_id = $2)
-                            OR (user_id = $2 AND contact_user_id = $1))
-                           AND status = 'blocked'`,
-                        [memberId, senderId]
-                    );
-                    if (blockCheck.rows.length > 0) continue;
-                }
-
-                if (io) {
-                    io.to(`user_${memberId}`).emit('message', message);
-                }
-
-                // Send FCM push to recipients who are not the sender and
-                // have no active socket connection (app killed / backgrounded)
-                if (memberId === senderId || !member.fcm_token) continue;
-
-                const recipientSockets = io
-                    ? await io.in(`user_${memberId}`).fetchSockets()
-                    : [];
-                const isConnected = recipientSockets.length > 0;
-                const isInsideActiveChat = recipientSockets.some(
-                    (s: any) => s.data.activeChatId === chatId
                 );
-
-                if (!isConnected || !isInsideActiveChat) {
-                    sendChatPushNotification({
-                        fcmToken: member.fcm_token,
-                        title: senderName,
-                        body: text?.trim() ?? '',
-                        chatId,
-                        senderId,
-                        recipientId: memberId,
-                    });
+                for (const member of membersResult.rows) {
+                    if (member.user_id !== senderId) {
+                        const blockCheck = await db.query(
+                            `SELECT 1 FROM contacts 
+                             WHERE ((user_id = $1 AND contact_user_id = $2)
+                                OR (user_id = $2 AND contact_user_id = $1))
+                               AND status = 'blocked'`,
+                            [member.user_id, senderId]
+                        );
+                        if (blockCheck.rows.length > 0) {
+                            continue; // Silently skip
+                        }
+                    }
+                    io.to(`user_${member.user_id}`).emit('message', message);
                 }
+            } else {
+                console.error("Socket.io instance not found on app settings");
             }
-
             res.json(message);
         } catch (err) {
             res.status(500).json({ error: 'Failed to send message. Error:', err });
@@ -157,61 +120,25 @@ export const chatController = {
             );
 
             const io = req.app.get('io');
-
-            // Fetch sender name and all members (with FCM tokens) in one query
-            const [senderResult, membersResult] = await Promise.all([
-                db.query(`SELECT name, username FROM users WHERE id = $1`, [senderId]),
-                db.query(
-                    `SELECT cm.user_id, u.fcm_token
-                     FROM chat_members cm
-                     JOIN users u ON u.id = cm.user_id
-                     WHERE cm.chat_id = $1`,
+            if (io) {
+                const membersResult = await db.query(
+                    `SELECT user_id FROM chat_members WHERE chat_id = $1`,
                     [chatId]
-                ),
-            ]);
-            const senderName =
-                senderResult.rows[0]?.name ||
-                senderResult.rows[0]?.username ||
-                'New Message';
-
-            for (const member of membersResult.rows) {
-                const memberId = Number(member.user_id);
-
-                if (memberId !== senderId) {
-                    const blockCheck = await db.query(
-                        `SELECT 1 FROM contacts 
-                         WHERE ((user_id = $1 AND contact_user_id = $2)
-                            OR (user_id = $2 AND contact_user_id = $1))
-                           AND status = 'blocked'`,
-                        [memberId, senderId]
-                    );
-                    if (blockCheck.rows.length > 0) continue;
-                }
-
-                if (io) {
-                    io.to(`user_${memberId}`).emit('message', message);
-                }
-
-                // Send FCM push to recipients who are not the sender and
-                // have no active socket connection (app killed / backgrounded)
-                if (memberId === senderId || !member.fcm_token) continue;
-
-                const recipientSockets = io
-                    ? await io.in(`user_${memberId}`).fetchSockets()
-                    : [];
-                const isInsideActiveChat = recipientSockets.some(
-                    (s: any) => s.data.activeChatId === chatId
                 );
-
-                if (!isInsideActiveChat) {
-                    sendChatPushNotification({
-                        fcmToken: member.fcm_token,
-                        title: senderName,
-                        body: fileNotificationBody(message.fileType),
-                        chatId,
-                        senderId,
-                        recipientId: memberId,
-                    });
+                for (const member of membersResult.rows) {
+                    if (member.user_id !== senderId) {
+                        const blockCheck = await db.query(
+                            `SELECT 1 FROM contacts 
+                             WHERE ((user_id = $1 AND contact_user_id = $2)
+                                OR (user_id = $2 AND contact_user_id = $1))
+                               AND status = 'blocked'`,
+                            [member.user_id, senderId]
+                        );
+                        if (blockCheck.rows.length > 0) {
+                            continue; // Silently skip
+                        }
+                    }
+                    io.to(`user_${member.user_id}`).emit('message', message);
                 }
             }
 

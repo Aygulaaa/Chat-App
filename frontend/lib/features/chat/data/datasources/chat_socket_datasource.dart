@@ -5,6 +5,7 @@ abstract class ChatSocketDatasource {
 
   Future<void> joinChat(int chatId);
   void setActiveChat(int? chatId);
+  int? get activeChatId;
   Future<void> sendMessage(dynamic message);
   Future<void> sendTypingEvent(int chatId, bool isTyping, int userId);
   Future<void> markChatAsRead(int chatId);

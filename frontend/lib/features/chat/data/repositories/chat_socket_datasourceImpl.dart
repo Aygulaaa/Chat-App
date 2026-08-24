@@ -255,6 +255,9 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
   }
 
   @override
+  int? get activeChatId => _activeChatId;
+
+  @override
   Future<void> joinChat(int chatId) async {
     await _waitUntilConnected();
     if (_joinedChats.contains(chatId)) return;

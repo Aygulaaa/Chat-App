@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:overlay_support/overlay_support.dart';
 
 import 'package:my_chat_app/core/auth/auth_gate.dart';
 import 'package:my_chat_app/core/constants/api_config.dart';
@@ -13,8 +14,6 @@ import 'package:my_chat_app/core/network/fcm_service.dart';
 
 // Global Navigation Key for handling push notification routing
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,17 +36,17 @@ void main() async {
 
     // 3. Register FCM background isolates AFTER initializing Firebase
     FcmService.registerBackgroundHandler();
-    
+
     final fcmService = FcmService();
-    
+
     // Non-blocking initialization
     fcmService.initialize(
       onNotificationTap: (data) {
         print("🔔 Notification tapped with payload: $data");
-        
+
         if (data.containsKey('chatId') && navigatorKey.currentState != null) {
           navigatorKey.currentState!.pushNamed(
-            '/chat', 
+            '/chat',
             arguments: data['chatId'],
           );
         }
@@ -56,7 +55,6 @@ void main() async {
 
     final token = await fcmService.getToken();
     print('🔥 MY_FCM_TOKEN: $token');
-
   } catch (e) {
     print('❌ Firebase/FCM init Error: $e');
   }
@@ -78,79 +76,92 @@ class MyApp extends ConsumerWidget {
       minTextAdapt: true,
       splitScreenMode: true,
       builder: (context, child) {
-        return MaterialApp(
-          navigatorKey: navigatorKey, // Attached for deep-linking from notifications
-          debugShowCheckedModeBanner: false,
-          title: 'Chat App',
-          themeMode: themeMode,
-          theme: ThemeData(
-            useMaterial3: true,
-            brightness: Brightness.light,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: AppColors.primary,
+        return OverlaySupport.global(
+          child: MaterialApp(
+            navigatorKey:
+                navigatorKey, // Attached for deep-linking from notifications
+            debugShowCheckedModeBanner: false,
+            title: 'Chat App',
+            themeMode: themeMode,
+            theme: ThemeData(
+              useMaterial3: true,
               brightness: Brightness.light,
-            ),
-            scaffoldBackgroundColor: AppColors.lightBg,
-            appBarTheme: const AppBarTheme(
-              centerTitle: true,
-              elevation: 0,
-              backgroundColor: AppColors.lightBg,
-              foregroundColor: AppColors.lightTextPrimary,
-            ),
-            textTheme: const TextTheme(
-              titleMedium: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.lightTextPrimary,
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: AppColors.primary,
+                brightness: Brightness.light,
               ),
-              bodyMedium: TextStyle(fontSize: 13, color: AppColors.lightTextPrimary),
-              bodySmall: TextStyle(fontSize: 11, color: AppColors.lightTextSecondary),
-            ),
-            elevatedButtonTheme: ElevatedButtonThemeData(
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+              scaffoldBackgroundColor: AppColors.lightBg,
+              appBarTheme: const AppBarTheme(
+                centerTitle: true,
+                elevation: 0,
+                backgroundColor: AppColors.lightBg,
+                foregroundColor: AppColors.lightTextPrimary,
+              ),
+              textTheme: const TextTheme(
+                titleMedium: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.lightTextPrimary,
+                ),
+                bodyMedium: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.lightTextPrimary,
+                ),
+                bodySmall: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.lightTextSecondary,
+                ),
+              ),
+              elevatedButtonTheme: ElevatedButtonThemeData(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
-          ),
-          darkTheme: ThemeData(
-            useMaterial3: true,
-            brightness: Brightness.dark,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: AppColors.primary,
+            darkTheme: ThemeData(
+              useMaterial3: true,
               brightness: Brightness.dark,
-            ),
-            scaffoldBackgroundColor: AppColors.darkBg,
-            appBarTheme: const AppBarTheme(
-              centerTitle: true,
-              elevation: 0,
-              backgroundColor: AppColors.darkBg,
-              foregroundColor: AppColors.darkTextPrimary,
-            ),
-            textTheme: const TextTheme(
-              titleMedium: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.darkTextPrimary,
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: AppColors.primary,
+                brightness: Brightness.dark,
               ),
-              bodyMedium: TextStyle(fontSize: 13, color: AppColors.darkTextPrimary),
-              bodySmall: TextStyle(fontSize: 11, color: AppColors.darkTextSecondary),
-            ),
-            elevatedButtonTheme: ElevatedButtonThemeData(
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+              scaffoldBackgroundColor: AppColors.darkBg,
+              appBarTheme: const AppBarTheme(
+                centerTitle: true,
+                elevation: 0,
+                backgroundColor: AppColors.darkBg,
+                foregroundColor: AppColors.darkTextPrimary,
+              ),
+              textTheme: const TextTheme(
+                titleMedium: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.darkTextPrimary,
+                ),
+                bodyMedium: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.darkTextPrimary,
+                ),
+                bodySmall: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.darkTextSecondary,
+                ),
+              ),
+              elevatedButtonTheme: ElevatedButtonThemeData(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
+            home: const AuthGate(),
+            routes: {'/home': (_) => const MainScreen()},
           ),
-          home: const AuthGate(),
-          routes: {
-            '/home': (_) => const MainScreen(),
-          },
         );
       },
     );

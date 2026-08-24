@@ -37,6 +37,7 @@ dependencies:
   video_player: ^2.14.0
   flutter_local_notifications: ^17.0.0
   shared_preferences: ^2.5.5
+  overlay_support: ^2.1.0
 
 dev_dependencies:
   flutter_test:

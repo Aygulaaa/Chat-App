@@ -1,7 +1,13 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:ui';
 
+import 'package:flutter/material.dart';
+import 'package:overlay_support/overlay_support.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/network/fcm_service.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 
 import 'package:my_chat_app/features/chat/data/datasources/chat_remote_datatsources.dart';
@@ -23,7 +29,6 @@ import 'package:my_chat_app/features/chat/presentation/providers/chat_state.dart
 import 'package:my_chat_app/features/chat/presentation/providers/message_notifier.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 
-/// ───────────────── REMOTE DATASOURCE ─────────────────
 
 final chatRemoteDataSourceProvider = Provider(
   (ref) => ChatRemoteDatatsources(ref.read(apiClientProvider)),
@@ -138,18 +143,22 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   /// Public method — can also be called manually if needed.
   void refreshBlockedIds() {
-    ref.read(blockedContactsProvider.future).then((blocked) {
-      _blockedUserIds
-        ..clear()
-        ..addAll(blocked.map((c) => c.id));
-      print('🔄 Refreshed blocked IDs: $_blockedUserIds');
-    }).catchError((_) {});
+    ref
+        .read(blockedContactsProvider.future)
+        .then((blocked) {
+          _blockedUserIds
+            ..clear()
+            ..addAll(blocked.map((c) => c.id));
+          print('🔄 Refreshed blocked IDs: $_blockedUserIds');
+        })
+        .catchError((_) {});
   }
 
   /// ───────────────── SOCKET EVENTS ─────────────────
 
   void _listenSocketEvents() {
     _messageSub?.cancel();
+
     /// ✅ NEW MESSAGE
     _messageSub = datasource.onMessage().listen((data) {
       try {
@@ -161,7 +170,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
         // — backend also enforces this, frontend is an extra guard).
         if (message.senderId != myId &&
             _blockedUserIds.contains(message.senderId)) {
-          print('🚫 ChatNotifier: dropped msg from blocked ${message.senderId}');
+          print(
+            '🚫 ChatNotifier: dropped msg from blocked ${message.senderId}',
+          );
           return;
         }
         // ──────────────────────────────────────────────────────────
@@ -170,6 +181,161 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
         if (message.senderId != myId) {
           incrementUnreadCount(message.chatId);
+
+          if (datasource.activeChatId != message.chatId) {
+            bool isMuted = false;
+            String title = 'New Message';
+
+            for (var c in state.chats) {
+              if (c.id == message.chatId) {
+                isMuted = c.isMuted;
+                title = c.isGroup
+                    ? (c.name ?? 'Group Message')
+                    : (c.name ?? 'New Message');
+                break;
+              }
+            }
+
+            if (!isMuted) {
+              final msgText = message.text?.isNotEmpty == true
+                  ? message.text!
+                  : '📎 Attachment';
+
+              // ── In-app glassmorphic popup (only visible while app is open) ──
+              showOverlay(
+                (context, progress) => Positioned(
+                  top: MediaQuery.of(context).padding.top + 10,
+                  left: 16,
+                  right: 16,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: GestureDetector(
+                      onTap: () => OverlaySupportEntry.of(context)?.dismiss(),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                          child: AnimatedOpacity(
+                            opacity: progress,
+                            duration: const Duration(milliseconds: 250),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(18),
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xCC1C1733),
+                                    Color(0xBB171326),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                border: Border.all(
+                                  color: AppColors.accent.withOpacity(0.25),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primary.withOpacity(0.28),
+                                    blurRadius: 24,
+                                    spreadRadius: -4,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Glowing avatar circle
+                                  Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          AppColors.primary,
+                                          AppColors.accent,
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.primary
+                                              .withOpacity(0.5),
+                                          blurRadius: 12,
+                                          spreadRadius: -2,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.message_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  // Sender name + message body
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          title,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 14,
+                                            letterSpacing: 0.1,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          msgText,
+                                          style: TextStyle(
+                                            color: AppColors.darkTextSecondary
+                                                .withOpacity(0.9),
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w400,
+                                            height: 1.3,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Dismiss chevron
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Icon(
+                                      Icons.keyboard_arrow_up_rounded,
+                                      color: AppColors.accent.withOpacity(0.6),
+                                      size: 20,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                duration: const Duration(seconds: 4),
+              );
+            }
+          }
         }
 
         print('📨 ChatNotifier received message ${message.id}');
@@ -295,13 +461,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   void updateChatLastMessage(Message message) {
     bool chatFound = false;
-    
-   final updatedChats = state.chats.map((chat) {
+
+    final updatedChats = state.chats.map((chat) {
       if (chat.id == message.chatId) {
         chatFound = true;
-        return chat.copyWith(
-          lastMessage: message,
-        );
+        return chat.copyWith(lastMessage: message);
       }
       return chat;
     }).toList();
@@ -317,7 +481,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
       return bDate.compareTo(aDate);
     });
 
-
     state = state.copyWith(chats: updatedChats);
   }
 
@@ -325,7 +488,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     final updatedChats = state.chats.map((chat) {
       if (chat.id == chatId) {
         print("chatId: ${chat.id}, unreadCount: ${chat.unreadCount}");
-        return chat.copyWith(unreadCount: chat.unreadCount +1);
+        return chat.copyWith(unreadCount: chat.unreadCount + 1);
       }
       return chat;
     }).toList();
@@ -338,16 +501,24 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
   }
 
-  Future<void> updateGroupInfo(int chatId, {String? name, Uint8List? avatarBytes, String? filename, String? mimeType}) async {
+  Future<void> updateGroupInfo(
+    int chatId, {
+    String? name,
+    Uint8List? avatarBytes,
+    String? filename,
+    String? mimeType,
+  }) async {
     try {
-      final updatedData = await ref.read(chatRepositoryProvider).updateGroupInfo(
-        chatId, 
-        name: name, 
-        avatarBytes: avatarBytes, 
-        filename: filename, 
-        mimeType: mimeType
-      );
-      
+      final updatedData = await ref
+          .read(chatRepositoryProvider)
+          .updateGroupInfo(
+            chatId,
+            name: name,
+            avatarBytes: avatarBytes,
+            filename: filename,
+            mimeType: mimeType,
+          );
+
       final updatedChats = state.chats.map((chat) {
         if (chat.id == chatId) {
           return chat.copyWith(
@@ -367,7 +538,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   Future<void> addMember(int chatId, int userId) async {
     try {
       await ref.read(chatRepositoryProvider).addMember(chatId, userId);
-      await loadChats(); 
+      await loadChats();
     } catch (e) {
       print('❌ addMember error: $e');
       rethrow;

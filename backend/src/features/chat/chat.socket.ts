@@ -180,23 +180,25 @@ export const chatSocket = (io: Server) => {
       socket.on("typing", async ({ chatId, userId }: { chatId: number, userId: number }) => {
         if (!socket.user || !chatId) return;
         const blockedSet = await getBlockedSet(socket.user.id);
-        const roomSockets = await io.in(`chat_${chatId}`).fetchSockets();
-        roomSockets.forEach(s => {
-          if (s.data.user?.id && s.data.user.id !== socket.user!.id && !blockedSet.has(Number(s.data.user.id))) {
-            s.emit("user_typing", { chatId, userId, isTyping: true });
+        const membersResult = await db.query(`SELECT user_id FROM chat_members WHERE chat_id = $1`, [chatId]);
+        for (const member of membersResult.rows) {
+          const memberId = Number(member.user_id);
+          if (memberId !== socket.user.id && !blockedSet.has(memberId)) {
+            io.to(`user_${memberId}`).emit("user_typing", { chatId, userId, isTyping: true });
           }
-        });
+        }
       });
 
       socket.on("stop_typing", async ({ chatId, userId }: { chatId: number, userId: number }) => {
         if (!socket.user || !chatId) return;
         const blockedSet = await getBlockedSet(socket.user.id);
-        const roomSockets = await io.in(`chat_${chatId}`).fetchSockets();
-        roomSockets.forEach(s => {
-          if (s.data.user?.id && s.data.user.id !== socket.user!.id && !blockedSet.has(Number(s.data.user.id))) {
-            s.emit("user_typing", { chatId, userId, isTyping: false });
+        const membersResult = await db.query(`SELECT user_id FROM chat_members WHERE chat_id = $1`, [chatId]);
+        for (const member of membersResult.rows) {
+          const memberId = Number(member.user_id);
+          if (memberId !== socket.user.id && !blockedSet.has(memberId)) {
+            io.to(`user_${memberId}`).emit("user_typing", { chatId, userId, isTyping: false });
           }
-        });
+        }
       });
 
 
@@ -264,16 +266,17 @@ export const chatSocket = (io: Server) => {
         }
 
         const blockedSet = await getBlockedSet(currentUserId);
-        const roomSockets = await io.in(`chat_${chatId}`).fetchSockets();
-        roomSockets.forEach(s => {
-          if (s.data.user?.id && !blockedSet.has(Number(s.data.user.id))) {
-            s.emit("chat_read", {
+        const membersResult = await db.query(`SELECT user_id FROM chat_members WHERE chat_id = $1`, [chatId]);
+        for (const member of membersResult.rows) {
+          const memberId = Number(member.user_id);
+          if (!blockedSet.has(memberId)) {
+            io.to(`user_${memberId}`).emit("chat_read", {
               chatId,
               readBy: currentUserId,
               messageIds: readMessages.map((m: any) => m.id)
             });
           }
-        });
+        }
         
         const senderIds = [
           ...new Set(
@@ -287,6 +290,7 @@ export const chatSocket = (io: Server) => {
         for (const senderId of senderIds) {
           if (senderId === currentUserId)
             continue;
+          if (blockedSet.has(Number(senderId))) continue;
 
 
           const senderSettings =

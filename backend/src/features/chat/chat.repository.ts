@@ -227,6 +227,12 @@ export const chatRepository = {
         WHERE chat_id = $1
           AND sender_id != $2
           AND delivered_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM contacts block_c
+              WHERE ((block_c.user_id = $2 AND block_c.contact_user_id = messages.sender_id)
+                 OR (block_c.user_id = messages.sender_id AND block_c.contact_user_id = $2))
+                AND block_c.status = 'blocked'
+          )
         RETURNING
           id,
           chat_id       AS "chatId",
@@ -255,6 +261,12 @@ export const chatRepository = {
         WHERE chat_id = $1
           AND sender_id != $2
           AND read_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM contacts block_c
+              WHERE ((block_c.user_id = $2 AND block_c.contact_user_id = messages.sender_id)
+                 OR (block_c.user_id = messages.sender_id AND block_c.contact_user_id = $2))
+                AND block_c.status = 'blocked'
+          )
         RETURNING
           id,
           chat_id       AS "chatId",

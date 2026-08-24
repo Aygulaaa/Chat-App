@@ -55,6 +55,13 @@ export const contactsController = {
     try {
       const contactId = Number(req.params.contactId);
       const result = await contactsService.blockUser(req.user!.id, contactId);
+      
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`user_${contactId}`).emit('user_status', { userId: req.user!.id, status: 'offline', lastSeen: null, lastSeenFuzzy: null });
+        io.to(`user_${req.user!.id}`).emit('user_status', { userId: contactId, status: 'offline', lastSeen: null, lastSeenFuzzy: null });
+      }
+
       res.json(result);
     } catch (err: any) {
       res.status(400).json({ error: err.message ?? 'Failed to block user' });

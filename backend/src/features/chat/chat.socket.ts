@@ -4,7 +4,7 @@ import { userService } from "../users/user.service";
 import { settingsService } from "../settings/settings.service";
 import db from "../../db";
 import { messaging } from "../../config/firebase";
-import { sendChatPushNotification } from "../../services/notificationService";
+import { sendPushToMembers } from "../../services/notificationService";
 
 interface SendMessagePayload { chatId: number; text: string; }
 interface MessageReceivedPayload { messageId: number; }
@@ -110,16 +110,20 @@ export const chatSocket = (io: Server) => {
 
           console.log("MESSAGE CREATED:", message);
 
+          // 1. Resolve sender display name
           const senderResult = await db.query(
             `SELECT name, username FROM users WHERE id = $1`,
             [socket.user.id]
           );
-          const senderName = senderResult.rows[0]?.name || senderResult.rows[0]?.username || "New Message";
+          const senderName =
+            senderResult.rows[0]?.name ||
+            senderResult.rows[0]?.username ||
+            'New Message';
 
+          // 2. Fetch members for socket emit (block check included)
           const membersResult = await db.query(
-            `SELECT cm.user_id, u.fcm_token 
-             FROM chat_members cm 
-             JOIN users u ON u.id = cm.user_id 
+            `SELECT cm.user_id
+             FROM chat_members cm
              WHERE cm.chat_id = $1`,
             [chatId]
           );
@@ -128,31 +132,15 @@ export const chatSocket = (io: Server) => {
             const memberId = Number(member.user_id);
 
             if (memberId !== socket.user.id) {
-               const blocked = await isBlocked(memberId, socket.user.id);
-               if (blocked) {
-                 continue; 
-               }
+              const blocked = await isBlocked(memberId, socket.user.id);
+              if (blocked) continue;
             }
 
-            io.to(`user_${memberId}`).emit("message", message);
-
-            if (memberId === socket.user.id) continue;
-
-            const recipientSockets = await io.in(`user_${memberId}`).fetchSockets();
-            const isInsideActiveChat = recipientSockets.some(
-              (s) => s.data.activeChatId === chatId
-            );
-
-            if (!isInsideActiveChat && member.fcm_token) {
-              sendChatPushNotification({
-                fcmToken: member.fcm_token,
-                title: senderName,
-                body: text.trim(),
-                chatId,
-                senderId: socket.user.id,
-              });
-            }
+            io.to(`user_${memberId}`).emit('message', message);
           }
+
+          // 3. FCM push — handled by shared helper (checks blocks, active chat, token)
+          await sendPushToMembers(io, chatId, socket.user.id, senderName, text.trim());
 
         } catch (e) {
           console.error("send_message FAILED:", e);

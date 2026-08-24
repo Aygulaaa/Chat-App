@@ -3,9 +3,7 @@ import { Response } from 'express';
 import { chatService } from '../chat/chat.service';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import db from '../../db';
-
-// Correct modular import for Firebase Admin v12+
-import { getMessaging } from 'firebase-admin/messaging';
+import { sendPushToMembers } from '../../services/notificationService';
 
 export const chatController = {
     async getChats(req: AuthRequest, res: Response) {
@@ -51,25 +49,17 @@ export const chatController = {
             }
             const chatId = Number(req.params.chatId);
             const senderId = req.user!.id;
-
             const { text } = req.body;
 
             const message = await chatService.sendMessage(chatId, senderId, text);
-            const io = req.app.get('io');
-            
-            // 1. Fetch sender name once to use as the push notification title
-            const senderRes = await db.query(
-                `SELECT name, username FROM users WHERE id = $1`, 
-                [senderId]
-            );
-            const senderName = senderRes.rows[0]?.name || senderRes.rows[0]?.username || 'New Message';
 
+            // Socket emit to all online members
+            const io = req.app.get('io');
             if (io) {
                 const membersResult = await db.query(
                     `SELECT user_id FROM chat_members WHERE chat_id = $1`,
                     [chatId]
                 );
-                
                 for (const member of membersResult.rows) {
                     if (member.user_id !== senderId) {
                         const blockCheck = await db.query(
@@ -79,50 +69,25 @@ export const chatController = {
                                AND status = 'blocked'`,
                             [member.user_id, senderId]
                         );
-                        if (blockCheck.rows.length > 0) {
-                            continue; // Silently skip
-                        }
-                        
-                        // Emit Socket for foreground users
-                        io.to(`user_${member.user_id}`).emit('message', message);
-                        
-                        // 2. Trigger Push Notification for background/killed state
-                        try {
-                            const userRes = await db.query(
-                                `SELECT fcm_token FROM users WHERE id = $1`, 
-                                [member.user_id]
-                            );
-                            const fcmToken = userRes.rows[0]?.fcm_token;
-
-                            if (fcmToken) {
-                                // FIXED: Use getMessaging().send() instead of admin.messaging().send()
-                                await getMessaging().send({
-                                    token: fcmToken,
-                                    notification: {
-                                        title: senderName,
-                                        body: text,
-                                    },
-                                    data: {
-                                        chatId: String(chatId),
-                                        type: 'chat_message'
-                                    },
-                                    android: {
-                                        priority: 'high',
-                                        notification: { channelId: 'chat_messages' }
-                                    },
-                                    apns: {
-                                        payload: { aps: { sound: 'default', contentAvailable: true } }
-                                    }
-                                });
-                            }
-                        } catch (fcmErr) {
-                            console.error(`FCM Error for user ${member.user_id}:`, fcmErr);
-                        }
+                        if (blockCheck.rows.length > 0) continue;
                     }
+                    io.to(`user_${member.user_id}`).emit('message', message);
                 }
             } else {
-                console.error("Socket.io instance not found on app settings");
+                console.error('Socket.io instance not found on app settings');
             }
+
+            // FCM push — send to offline/backgrounded members not viewing this chat
+            const senderResult = await db.query(
+                `SELECT name, username FROM users WHERE id = $1`,
+                [senderId]
+            );
+            const senderName =
+                senderResult.rows[0]?.name ||
+                senderResult.rows[0]?.username ||
+                'New Message';
+            await sendPushToMembers(io ?? null, chatId, senderId, senderName, text);
+
             res.json(message);
         } catch (err) {
             res.status(500).json({ error: 'Failed to send message. Error:', err });
@@ -150,7 +115,6 @@ export const chatController = {
             res.status(500).json({ error: "Failed to mark messages as read. Error:", err });
         }
     },
-
     async sendFileMessage(req: AuthRequest, res: Response) {
         try {
             if (!req.file) return res.status(400).json({ error: 'No file provided' });
@@ -167,21 +131,13 @@ export const chatController = {
                 req.file.size,
             );
 
+            // Socket emit to all online members
             const io = req.app.get('io');
-            
-            // 1. Fetch sender name once for push notification
-            const senderRes = await db.query(
-                `SELECT name, username FROM users WHERE id = $1`, 
-                [senderId]
-            );
-            const senderName = senderRes.rows[0]?.name || senderRes.rows[0]?.username || 'New Attachment';
-
             if (io) {
                 const membersResult = await db.query(
                     `SELECT user_id FROM chat_members WHERE chat_id = $1`,
                     [chatId]
                 );
-                
                 for (const member of membersResult.rows) {
                     if (member.user_id !== senderId) {
                         const blockCheck = await db.query(
@@ -191,48 +147,24 @@ export const chatController = {
                                AND status = 'blocked'`,
                             [member.user_id, senderId]
                         );
-                        if (blockCheck.rows.length > 0) {
-                            continue; // Silently skip
-                        }
-                        
-                        // Emit Socket for foreground users
-                        io.to(`user_${member.user_id}`).emit('message', message);
-                        
-                        // 2. Trigger Push Notification for background/killed state
-                        try {
-                            const userRes = await db.query(
-                                `SELECT fcm_token FROM users WHERE id = $1`, 
-                                [member.user_id]
-                            );
-                            const fcmToken = userRes.rows[0]?.fcm_token;
-
-                            if (fcmToken) {
-                                // FIXED: Use getMessaging().send() instead of admin.messaging().send()
-                                await getMessaging().send({
-                                    token: fcmToken,
-                                    notification: {
-                                        title: senderName,
-                                        body: `📎 ${req.file.originalname}`,
-                                    },
-                                    data: {
-                                        chatId: String(chatId),
-                                        type: 'chat_message'
-                                    },
-                                    android: {
-                                        priority: 'high',
-                                        notification: { channelId: 'chat_messages' }
-                                    },
-                                    apns: {
-                                        payload: { aps: { sound: 'default', contentAvailable: true } }
-                                    }
-                                });
-                            }
-                        } catch (fcmErr) {
-                            console.error(`FCM Error for user ${member.user_id}:`, fcmErr);
-                        }
+                        if (blockCheck.rows.length > 0) continue;
                     }
+                    io.to(`user_${member.user_id}`).emit('message', message);
                 }
             }
+
+            // FCM push — send to offline/backgrounded members not viewing this chat
+            const senderResult = await db.query(
+                `SELECT name, username FROM users WHERE id = $1`,
+                [senderId]
+            );
+            const senderName =
+                senderResult.rows[0]?.name ||
+                senderResult.rows[0]?.username ||
+                'New Message';
+            // Use original filename as notification body for file messages
+            const notifBody = req.file.originalname;
+            await sendPushToMembers(io ?? null, chatId, senderId, senderName, notifBody);
 
             res.json(message);
         } catch (err) {
@@ -334,4 +266,4 @@ export const chatController = {
             res.status(status).json({ error: err.message ?? 'Failed to delete group' });
         }
     },
-}
+} 

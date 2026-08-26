@@ -7,7 +7,6 @@ import 'package:overlay_support/overlay_support.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:my_chat_app/core/theme/app_colors.dart';
-import 'package:my_chat_app/core/network/fcm_service.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 
 import 'package:my_chat_app/features/chat/data/datasources/chat_remote_datatsources.dart';
@@ -34,7 +33,6 @@ final chatRemoteDataSourceProvider = Provider(
   (ref) => ChatRemoteDatatsources(ref.read(apiClientProvider)),
 );
 
-/// ───────────────── SOCKET DATASOURCE ─────────────────
 
 final chatSocketDataSourceProvider =
     StateNotifierProvider<SocketNotifier, ChatSocketDatasource>(
@@ -50,8 +48,6 @@ class SocketNotifier extends StateNotifier<ChatSocketDatasource> {
     super.dispose();
   }
 }
-
-/// ───────────────── REPOSITORY ─────────────────
 
 final chatRepositoryProvider = Provider(
   (ref) => ChatRepositoryImpl(

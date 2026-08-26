@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_sound/flutter_sound.dart';
@@ -92,7 +93,7 @@ class _MessageInputState extends ConsumerState<MessageInput> {
 
       setState(() => _isSendingFile = true);
 
-      final mimeType = MimeUtils.getMimeType(photo.name.split('.').last) ?? 'image/jpeg';
+      final mimeType = MimeUtils.getMimeType(photo.name.split('.').last);
 
       await ref
           .read(messageProvider(widget.chatId).notifier)
@@ -108,36 +109,43 @@ class _MessageInputState extends ConsumerState<MessageInput> {
     }
   }
 
-  Future<void> _pickAndSendFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      withData: true,
-      allowMultiple: false,
-      type: FileType.any,
-    );
+Future<void> _pickAndSendFile() async {
+  // 1. Pick a single file using the updated 12.x API
+  final PlatformFile? file = await FilePicker.pickFile(
+    type: FileType.any,
+  );
 
-    if (result == null || result.files.isEmpty) return;
+  // 2. Return early if the user canceled the picker
+  if (file == null) return;
 
-    final file = result.files.first;
-    final bytes = file.bytes;
-    if (bytes == null) return;
+  // 3. Read the file bytes asynchronously (works across Mobile & Web)
+  final Uint8List bytes = await file.readAsBytes();
 
-    setState(() => _isSendingFile = true);
+  setState(() => _isSendingFile = true);
 
-    try {
-      final mimeType = MimeUtils.getMimeType(file.extension ?? '');
-      await ref
-          .read(messageProvider(widget.chatId).notifier)
-          .sendFileMessage(bytes, file.name, mimeType, localPath: file.path);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(_getCleanErrorMessage(e))));
-      }
-    } finally {
-      if (mounted) setState(() => _isSendingFile = false);
+  try {
+    // 4. Resolve MIME type and notify your Riverpod state provider
+    final mimeType = MimeUtils.getMimeType(file.extension ?? '');
+    await ref
+        .read(messageProvider(widget.chatId).notifier)
+        .sendFileMessage(
+          bytes,
+          file.name,
+          mimeType,
+          localPath: file.path,
+        );
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_getCleanErrorMessage(e))),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() => _isSendingFile = false);
     }
   }
+}
 
   Future<void> _startRecording() async {
     if (!_isRecorderInitialized) return;

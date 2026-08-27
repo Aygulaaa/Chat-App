@@ -83,12 +83,6 @@ export const chatController = {
                         if (blockCheck.rows.length > 0) continue;
                     }
                     io.to(`user_${member.user_id}`).emit('message', message);
-                    io.to(`user_${member.user_id}`).emit('notification', {
-                        title: senderName,
-                        body: text,
-                        chatId,
-                        senderId,
-                    });
                 }
             } else {
                 console.error('Socket.io instance not found on app settings');
@@ -171,12 +165,6 @@ export const chatController = {
                         if (blockCheck.rows.length > 0) continue;
                     }
                     io.to(`user_${member.user_id}`).emit('message', message);
-                    io.to(`user_${member.user_id}`).emit('notification', {
-                        title: senderName,
-                        body: notifBody,
-                        chatId,
-                        senderId,
-                    });
                 }
             }
 

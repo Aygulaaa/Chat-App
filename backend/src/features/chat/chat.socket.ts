@@ -137,12 +137,6 @@ export const chatSocket = (io: Server) => {
             }
 
             io.to(`user_${memberId}`).emit('message', message);
-            io.to(`user_${memberId}`).emit('notification', {
-              title: senderName,
-              body: text.trim(),
-              chatId,
-              senderId: socket.user.id,
-            });
           }
 
           // 3. FCM push — handled by shared helper (checks blocks, active chat, token)

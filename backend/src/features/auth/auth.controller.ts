@@ -60,3 +60,22 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
     res.status(400).json({ error: error.message });
   }
 };
+
+export const verifyPassword = async (req: AuthRequest, res: Response) => {
+  try {
+    const { currentPassword } = req.body;
+    if (!currentPassword) {
+      return res.status(400).json({ error: "Current password is required" });
+    }
+
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const result = await authService.verifyPassword(userId, currentPassword);
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+};

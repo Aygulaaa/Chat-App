@@ -65,3 +65,13 @@ export const changePassword = async (userId: number, currentPassword: string, ne
 
   return { success: true };
 };
+
+export const verifyPassword = async (userId: number, passwordToCheck: string) => {
+  const user = await authRepository.findById(userId);
+  if (!user) throw new Error("User not found");
+
+  const isMatch = await bcrypt.compare(passwordToCheck, user.password);
+  if (!isMatch) throw new Error("Incorrect current password");
+
+  return { success: true };
+};

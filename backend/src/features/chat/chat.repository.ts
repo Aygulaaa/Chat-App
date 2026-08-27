@@ -422,6 +422,21 @@ export const chatRepository = {
   `, values);
   },
 
+  async deleteMessage(messageId: number, senderId: number) {
+    try {
+      const result = await db.query(
+        `DELETE FROM messages
+         WHERE id = $1 AND sender_id = $2
+         RETURNING id, chat_id AS "chatId"`,
+        [messageId, senderId]
+      );
+      return result.rows[0] ?? null;
+    } catch (err) {
+      console.error('DB ERROR deleteMessage:', err);
+      throw err;
+    }
+  },
+
   async deleteChat(chatId: number) {
     try {
       return await db.query(`

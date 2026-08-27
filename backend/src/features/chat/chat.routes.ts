@@ -29,6 +29,7 @@ router.post(
 router.post('/:chatId/members', chatController.addMember);
 router.delete('/:chatId/members/:userId', chatController.removeMember);
 router.patch('/:chatId/group', upload.single('avatar'), chatController.updateGroupInfo);
+router.delete('/:chatId/messages/:messageId', chatController.deleteMessage);
 router.delete('/:chatId/group', chatController.deleteGroup);
 router.delete('/:chatId', chatController.deleteChat);
 

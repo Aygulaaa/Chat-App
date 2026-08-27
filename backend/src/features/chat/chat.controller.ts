@@ -232,6 +232,35 @@ export const chatController = {
         }
     },
 
+    async deleteMessage(req: AuthRequest, res: Response) {
+        try {
+            const chatId = Number(req.params.chatId);
+            const messageId = Number(req.params.messageId);
+            const senderId = req.user!.id;
+
+            const deleted = await chatService.deleteMessage(messageId, senderId);
+            if (!deleted) {
+                return res.status(404).json({ error: 'Message not found or not authorised' });
+            }
+
+            // Broadcast deletion to all online chat members
+            const io = req.app.get('io');
+            if (io) {
+                const membersResult = await db.query(
+                    `SELECT user_id FROM chat_members WHERE chat_id = $1`,
+                    [chatId]
+                );
+                for (const member of membersResult.rows) {
+                    io.to(`user_${member.user_id}`).emit('message_deleted', { messageId, chatId });
+                }
+            }
+
+            res.json({ success: true, messageId, chatId });
+        } catch (err) {
+            res.status(500).json({ error: 'Failed to delete message' });
+        }
+    },
+
     async deleteChat(req: AuthRequest, res: Response) {
         try {
             const chatId = Number(req.params.chatId);

@@ -20,4 +20,5 @@ abstract class ChatSocketDatasource {
   Stream<Map<String, dynamic>> onMessagesDelivered();
   Stream<List<int>> onInitialOnlineUsers();
   Stream<int> onGroupDeleted();
+  Stream<Map<String, dynamic>> onMessageDeleted();
 }

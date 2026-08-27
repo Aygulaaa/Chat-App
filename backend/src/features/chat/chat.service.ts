@@ -173,6 +173,11 @@ export const chatService = {
     return result.rows[0];
   },
 
+  async deleteMessage(messageId: number, senderId: number) {
+    const result = await chatRepository.deleteMessage(messageId, senderId);
+    return result;
+  },
+
   async deleteChat(chatId: number) {
     const result = await chatRepository.deleteChat(chatId);
     return result.rows[0];

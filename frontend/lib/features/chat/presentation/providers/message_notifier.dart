@@ -41,6 +41,7 @@ class MessageNotifier extends StateNotifier<MessageState> {
   StreamSubscription? _readSub;
   StreamSubscription? _chatReadSub;
   StreamSubscription? _deliveredSub;
+  StreamSubscription? _deletedSub;
   Timer? _typingTimer;
   Timer? _typingDebounce;
 
@@ -85,6 +86,7 @@ class MessageNotifier extends StateNotifier<MessageState> {
     _listenToReadReceipts();
     _listenToChatRead();
     _listenToDelivered();
+    _listenToMessageDeleted();
 
     await joinChat(chatId);
 
@@ -223,6 +225,24 @@ class MessageNotifier extends StateNotifier<MessageState> {
     });
   }
 
+  void _listenToMessageDeleted() {
+    _deletedSub?.cancel();
+    _deletedSub = _datasource.onMessageDeleted().listen((data) {
+      try {
+        final incomingChatId = int.tryParse(data['chatId']?.toString() ?? '');
+        if (incomingChatId == null || incomingChatId != chatId) return;
+        final messageId = int.tryParse(data['messageId']?.toString() ?? '');
+        if (messageId == null) return;
+        state = state.copyWith(
+          messages: state.messages.where((m) => m.id != messageId).toList(),
+        );
+        print('🗑️ Removed message $messageId from state');
+      } catch (e) {
+        print('❌ message_deleted parse error: $e');
+      }
+    });
+  }
+
   void _listenToTyping() {
     _typingSub?.cancel();
     _typingSub = null;
@@ -312,6 +332,20 @@ class MessageNotifier extends StateNotifier<MessageState> {
     } catch (e) {
       print('❌ loadMessages error: $e');
       state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<void> deleteMessage(int chatId, int messageId) async {
+    // Optimistically remove from local state immediately
+    state = state.copyWith(
+      messages: state.messages.where((m) => m.id != messageId).toList(),
+    );
+    try {
+      await repository.deleteMessage(chatId, messageId);
+    } catch (e) {
+      print('❌ deleteMessage error: $e');
+      // Re-load messages on failure to restore state
+      await loadMessages();
     }
   }
 
@@ -439,6 +473,7 @@ class MessageNotifier extends StateNotifier<MessageState> {
     _readSub?.cancel();
     _chatReadSub?.cancel();
     _deliveredSub?.cancel();
+    _deletedSub?.cancel();
     super.dispose();
   }
 }

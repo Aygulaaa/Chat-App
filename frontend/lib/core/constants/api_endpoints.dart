@@ -19,6 +19,7 @@ class ApiEndpoints {
   static String groupInfo(int chatId) => '$chats/$chatId/group';
   static String deleteChat(int chatId) => '$chats/$chatId';
   static String deleteGroup(int chatId) => '$chats/$chatId/group';
+  static String deleteMessage(int chatId, int messageId) => '$chats/$chatId/messages/$messageId';
 
   static const users = '/api/users';
 

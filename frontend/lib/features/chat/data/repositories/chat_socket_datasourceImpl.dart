@@ -31,6 +31,9 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
   final StreamController<int> _groupDeletedController =
       StreamController<int>.broadcast();
 
+  final StreamController<Map<String, dynamic>> _messageDeletedController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
   Completer<void>? _connectionCompleter;
 
   final Set<int> _joinedChats = {};
@@ -226,6 +229,17 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
         print('group_deleted error: $e');
       }
     });
+
+    _socket?.on('message_deleted', (data) {
+      try {
+        if (data is Map) {
+          _messageDeletedController.add(Map<String, dynamic>.from(data));
+          print('🗑️ message_deleted event: $data');
+        }
+      } catch (e) {
+        print('message_deleted error: $e');
+      }
+    });
   }
 
 
@@ -344,6 +358,9 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
   @override
   Stream<int> onGroupDeleted() => _groupDeletedController.stream;
 
+  @override
+  Stream<Map<String, dynamic>> onMessageDeleted() => _messageDeletedController.stream;
+
   // ───────────────── DISCONNECT ─────────────────
 
   @override
@@ -374,5 +391,6 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
     _chatReadController.close();
     _deliveredController.close();
     _groupDeletedController.close();
+    _messageDeletedController.close();
   }
 }

@@ -35,4 +35,5 @@ abstract class ChatRepository {
   Future<void> deleteChat(int chatId);
   Future<void> deleteGroup(int chatId);
   Stream<int> onGroupDeleted();
+  Future<void> deleteMessage(int chatId, int messageId);
 }

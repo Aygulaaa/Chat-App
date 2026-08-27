@@ -128,6 +128,10 @@ class ChatRemoteDatatsources {
     }
   }
 
+  Future<void> deleteMessage(int chatId, int messageId) async {
+    await api.delete(ApiEndpoints.deleteMessage(chatId, messageId));
+  }
+
   Future<void> deleteChat(int chatId) async {
     await api.delete(ApiEndpoints.deleteChat(chatId));
   }

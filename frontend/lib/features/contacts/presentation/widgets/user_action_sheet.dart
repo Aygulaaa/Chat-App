@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/contacts/domain/entities/contact.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
+import 'package:my_chat_app/features/profile/presentation/pages/profile_screen.dart';
 
 void showUserActionSheet(BuildContext context, Contact contact) {
   showModalBottomSheet(
@@ -37,55 +39,75 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                 // User header
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundImage: contact.avatar != null
-                            ? NetworkImage(contact.avatar!)
-                            : null,
-                        backgroundColor: AppColors.primary,
-                        child: contact.avatar == null
-                            ? (contact.username.isNotEmpty
-                                  ? Text(
-                                      contact.username[0].toUpperCase(),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.person,
-                                      color: Colors.white,
-                                    ))
-                            : null,
-                      ),
-                      const SizedBox(width: 12),
-
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              contact.username,
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                              ),
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfileScreen(
+                            user: UserEntity(
+                              id: contact.id,
+                              username: contact.username,
+                              bio: contact.bio,
+                              avatar: contact.avatar,
+                              status: contact.status,
+                              lastSeen: contact.lastSeen,
+                              lastSeenFuzzy: contact.lastSeenFuzzy
                             ),
-                            if (contact.bio != null)
+                          ),
+                        ),
+                      );
+                    },
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundImage: contact.avatar != null
+                              ? NetworkImage(contact.avatar!)
+                              : null,
+                          backgroundColor: AppColors.primary,
+                          child: contact.avatar == null
+                              ? (contact.username.isNotEmpty
+                                    ? Text(
+                                        contact.username[0].toUpperCase(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.person,
+                                        color: Colors.white,
+                                      ))
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                contact.bio!,
+                                contact.username,
                                 style: TextStyle(
-                                  color: context.textTertiary,
-                                  fontSize: 13,
+                                  color: context.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
                                 ),
                               ),
-                          ],
+                              if (contact.bio != null)
+                                Text(
+                                  contact.bio!,
+                                  style: TextStyle(
+                                    color: context.textTertiary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
 

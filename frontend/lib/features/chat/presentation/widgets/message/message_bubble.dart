@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message/message_content.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/message_context_menu.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message/message_status_tick.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message/reaction_row.dart';
 
@@ -15,6 +17,8 @@ class MessageBubble extends StatelessWidget {
   final bool isGroup;
   final String? senderAvatar;
   final VoidCallback? onAvatarTap;
+  final VoidCallback? onDelete;
+  final void Function(String emoji)? onStickerSend;
 
   const MessageBubble({
     super.key,
@@ -25,7 +29,30 @@ class MessageBubble extends StatelessWidget {
     this.isGroup = false,
     this.senderAvatar,
     this.onAvatarTap,
+    this.onDelete,
+    this.onStickerSend,
   });
+
+  void _openContextMenu(BuildContext context) {
+    showMessageContextMenu(
+      context: context,
+      message: message,
+      isMe: isMe,
+      onCopy: () {
+        if (message.text != null && message.text!.isNotEmpty) {
+          Clipboard.setData(ClipboardData(text: message.text!));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Message copied to clipboard'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+      onDelete: onDelete ?? () {},
+      onStickerSend: onStickerSend ?? (_) {},
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +93,21 @@ class MessageBubble extends StatelessWidget {
                     ? CrossAxisAlignment.end
                     : CrossAxisAlignment.start,
                 children: [
-                  _BubbleBody(message: message, isMe: isMe, time: time),
+                  SelectionArea(
+                    contextMenuBuilder: (context, selectableRegionState) {
+                      // Triggers your custom Telegram-style context menu on long press/right click
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        selectableRegionState.hideToolbar();
+                        _openContextMenu(context);
+                      });
+                      return const SizedBox.shrink();
+                    },
+                    child: _BubbleBody(
+                      message: message,
+                      isMe: isMe,
+                      time: time,
+                    ),
+                  ),
                   if (reactions.isNotEmpty) ...[
                     SizedBox(height: 4.h),
                     ReactionRow(reactions: reactions),
@@ -107,7 +148,6 @@ class _BubbleBody extends StatelessWidget {
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.72,
       ),
-      // 2. Conditionally set zero padding for image messages
       padding: isImage
           ? EdgeInsets.zero
           : EdgeInsets.symmetric(vertical: 10.h, horizontal: 15.w),
@@ -126,8 +166,8 @@ class _BubbleBody extends StatelessWidget {
           ),
         ],
       ),
-      // 3. Clip the image child to respect the bubble's rounded corners
       child: ClipRRect(
+        borderRadius: borderRadius,
         child: isImage
             ? Stack(
                 children: [
@@ -146,7 +186,6 @@ class _BubbleBody extends StatelessWidget {
               )
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
-
                 children: [
                   MessageContent(message: message, isMe: isMe),
                   if (time != null) ...[
@@ -154,14 +193,11 @@ class _BubbleBody extends StatelessWidget {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Padding(
-                          padding: EdgeInsetsGeometry.symmetric(vertical:0, horizontal: 0),
-                          child: Text(
-                            time!,
-                            style: TextStyle(
-                              fontSize: 10.sp,
-                              color: AppColors.darkTextTertiary,
-                            ),
+                        Text(
+                          time!,
+                          style: TextStyle(
+                            fontSize: 10.sp,
+                            color: AppColors.darkTextTertiary,
                           ),
                         ),
                         if (isMe) ...[

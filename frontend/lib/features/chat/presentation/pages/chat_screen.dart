@@ -5,6 +5,7 @@ import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/data/datasources/chat_socket_datasource.dart';
+import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/message_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
@@ -45,6 +46,66 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _socketDataSource.setActiveChat(null);
     _socketDataSource.leaveChat(widget.chatId);
     super.dispose();
+  }
+
+  void _handleDeleteMessage(Message message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1733),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.darkBorder),
+        ),
+        title: const Text(
+          'Delete message?',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        content: const Text(
+          'This message will be deleted for everyone.',
+          style: TextStyle(color: AppColors.darkTextSecondary, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppColors.darkTextSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref
+                  .read(messageProvider(widget.chatId).notifier)
+                  .deleteMessage(widget.chatId, message.id);
+            },
+            child: const Text('Delete',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleStickerSend(String emoji) {
+    final user = ref.read(authProvider).user;
+    if (user == null) return;
+    final message = Message(
+      id: DateTime.now().microsecondsSinceEpoch,
+      chatId: widget.chatId,
+      senderId: user.id,
+      text: emoji,
+      createdAt: DateTime.now(),
+    );
+    ref
+        .read(messageProvider(widget.chatId).notifier)
+        .sendMessageFunction(message);
   }
 
   void _showBlockConfirmation(
@@ -330,6 +391,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         typingUserId: state.typingUserId,
                         isGroup: isGroup,
                         participants: users,
+                        onDelete: _handleDeleteMessage,
+                        onStickerSend: _handleStickerSend,
                       ),
               ),
               MessageInput(chatId: widget.chatId, isBlocked: isBlocked),

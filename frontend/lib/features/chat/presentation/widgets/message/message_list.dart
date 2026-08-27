@@ -16,6 +16,8 @@ class MessageList extends StatelessWidget {
   final int? typingUserId;
   final bool isGroup;
   final List<UserModel> participants;
+  final void Function(Message message)? onDelete;
+  final void Function(String emoji)? onStickerSend;
 
   const MessageList({
     super.key,
@@ -25,6 +27,8 @@ class MessageList extends StatelessWidget {
     this.typingUserId,
     this.isGroup = false,
     this.participants = const [],
+    this.onDelete,
+    this.onStickerSend,
   });
 
   @override
@@ -80,6 +84,10 @@ class MessageList extends StatelessWidget {
                         ),
                       )
                   : null,
+              onDelete: msg.senderId == userId
+                  ? () => onDelete?.call(msg)
+                  : null,
+              onStickerSend: onStickerSend,
             ),
           ],
         );

@@ -2,6 +2,7 @@
 import { Server } from 'socket.io';
 import db from '../db';
 import { messaging } from '../config/firebase';
+import { log } from 'console';
 
 interface SendChatPushPayload {
   fcmToken: string;
@@ -13,6 +14,8 @@ interface SendChatPushPayload {
 
 export async function sendChatPushNotification(payload: SendChatPushPayload): Promise<void> {
   if (!messaging || !payload.fcmToken) return;
+  console.log("🚀 ~ notificationService.ts:15 ~ sendChatPushNotification ~ payload:", payload)
+
 
   try {
     await messaging.send({
@@ -109,6 +112,7 @@ export async function sendPushToMembers(
     }
     // If io is null (no active socket), the user is definitely outside
     // the app, so we always send the push.
+console.log('socket is not active sendin gpush notifcation:', `${senderName} : ${body}`, member.fcm_token);
 
     await sendChatPushNotification({
       fcmToken: member.fcm_token,

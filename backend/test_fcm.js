@@ -11,7 +11,7 @@ const payload = {
     priority: 'high',
     notification: {
       channelId: 'chat_messages',
-      priority: 'high',
+      priority: 'max',
       sound: 'default'
     }
   }

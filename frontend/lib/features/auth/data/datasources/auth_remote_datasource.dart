@@ -60,4 +60,10 @@ class AuthRemoteDatasource {
       'newPassword': newPassword,
     });
   }
+
+  Future<void> verifyPassword(String currentPassword) async {
+    await api.post(ApiEndpoints.verifyPassword, {
+      'currentPassword': currentPassword,
+    });
+  }
 }

@@ -40,4 +40,9 @@ class AuthRepositoryImpl implements AuthRepository {
   }) {
     return remote.changePassword(currentPassword, newPassword);
   }
+
+  @override
+  Future<void> verifyPassword(String currentPassword) {
+    return remote.verifyPassword(currentPassword);
+  }
 }

@@ -136,4 +136,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       throw Exception(e.toString());
     }
   }
+
+  Future<void> verifyPassword(String currentPassword) async {
+    try {
+      await ref.read(authRepositoryProvider).verifyPassword(currentPassword);
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
 }

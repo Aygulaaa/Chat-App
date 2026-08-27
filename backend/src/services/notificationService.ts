@@ -34,7 +34,7 @@ export async function sendChatPushNotification(payload: SendChatPushPayload): Pr
         notification: {
           sound: 'default',
           channelId: 'chat_messages',
-          priority: 'high',
+          priority: 'max',
         },
       },
       apns: {

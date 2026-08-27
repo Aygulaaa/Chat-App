@@ -26,7 +26,7 @@ try {
       'chat_messages',
       'Chat Messages',
       importance: Importance.max,
-      priority: Priority.high,
+      priority: Priority.max,
       icon: '@mipmap/ic_launcher',
     );
     const notificationDetails = NotificationDetails(
@@ -156,7 +156,7 @@ class FcmService {
           channelDescription: _channel.description,
           icon: '@mipmap/ic_launcher',
           importance: Importance.max,
-          priority: Priority.high,
+          priority: Priority.max,
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,

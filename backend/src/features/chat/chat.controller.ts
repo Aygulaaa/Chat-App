@@ -79,11 +79,12 @@ export const chatController = {
 
             // FCM push — send to offline/backgrounded members not viewing this chat
             const senderResult = await db.query(
-                `SELECT name, username FROM users WHERE id = $1`,
+                `SELECT username FROM users WHERE id = $1`,
                 [senderId]
             );
+            console.log('sender result while sending message ', senderResult);
+            
             const senderName =
-                senderResult.rows[0]?.name ||
                 senderResult.rows[0]?.username ||
                 'New Message';
             await sendPushToMembers(io ?? null, chatId, senderId, senderName, text);

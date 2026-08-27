@@ -41,3 +41,22 @@ export const me = async (req: AuthRequest, res: Response) => {
 export const logout = async (_req: Request, res: Response) => {
   res.json({ message: "Logged out successfully" });
 };
+
+export const changePassword = async (req: AuthRequest, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: "Current and new password are required" });
+    }
+
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const result = await authService.changePassword(userId, currentPassword, newPassword);
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+};

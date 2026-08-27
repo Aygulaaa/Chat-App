@@ -53,4 +53,11 @@ class AuthRemoteDatasource {
 
     return UserModel.fromJson(response);
   }
+
+  Future<void> changePassword(String currentPassword, String newPassword) async {
+    await api.patch(ApiEndpoints.changePassword, {
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+    });
+  }
 }

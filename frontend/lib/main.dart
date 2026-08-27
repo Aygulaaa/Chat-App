@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:overlay_support/overlay_support.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:my_chat_app/core/auth/auth_gate.dart';
 import 'package:my_chat_app/core/constants/api_config.dart';
@@ -12,7 +13,13 @@ import 'package:my_chat_app/features/app_shell/presentation/pages/main__screen.d
 import 'package:my_chat_app/features/settings/presentation/providers/settings_provider.dart';
 import 'package:my_chat_app/core/network/fcm_service.dart';
 
-// Global Navigation Key for handling push notification routing
+// Top-level background handler
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print("🔥 Handling background message: ${message.messageId}");
+}
+
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
@@ -34,8 +41,8 @@ void main() async {
     await Firebase.initializeApp();
     print('✅ Firebase initialized successfully!');
 
-    // 3. Register FCM background isolates AFTER initializing Firebase
-    FcmService.registerBackgroundHandler();
+    // 3. Directly bind your top-level handler to Firebase Messaging
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     final fcmService = FcmService();
 
@@ -78,8 +85,7 @@ class MyApp extends ConsumerWidget {
       builder: (context, child) {
         return OverlaySupport.global(
           child: MaterialApp(
-            navigatorKey:
-                navigatorKey, // Attached for deep-linking from notifications
+            navigatorKey: navigatorKey,
             debugShowCheckedModeBanner: false,
             title: 'Chat App',
             themeMode: themeMode,

@@ -5,6 +5,7 @@ class ApiEndpoints {
   static const register = '$auth/register';
   static const currentUser = '$auth/me';
   static const logout = '$auth/logout';
+  static const changePassword = '$auth/password';
 
   static const chats = '/api/chats';
 

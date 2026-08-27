@@ -32,4 +32,12 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> logout() {
     return remote.logout();
   }
+
+  @override
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) {
+    return remote.changePassword(currentPassword, newPassword);
+  }
 }

@@ -122,4 +122,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     print("🔒 Logout complete: Socket closed and state reset.");
   }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await ref.read(authRepositoryProvider).changePassword(
+            currentPassword: currentPassword,
+            newPassword: newPassword,
+          );
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
 }

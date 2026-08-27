@@ -44,9 +44,17 @@ export const findByUsername = async (username: string) => {
 
 export const findById = async (id: number) => {
   const result = await db.query(
-    `SELECT id, username FROM users WHERE id = $1`,
+    `SELECT id, username, password FROM users WHERE id = $1`,
     [id]
   );
 
+  return result.rows[0];
+};
+
+export const updatePassword = async (id: number, hashedPassword: string) => {
+  const result = await db.query(
+    `UPDATE users SET password = $1 WHERE id = $2 RETURNING id, username`,
+    [hashedPassword, id]
+  );
   return result.rows[0];
 };

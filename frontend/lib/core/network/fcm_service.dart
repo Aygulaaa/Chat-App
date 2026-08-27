@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -8,10 +9,15 @@ import 'package:permission_handler/permission_handler.dart';
 // Top-Level background handler (Runs in a separate Dart Isolate)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  final prefs = await SharedPreferences.getInstance();
-  final notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
-  if (!notificationsEnabled) return;
+try {
+    final prefs = await SharedPreferences.getInstance();
+    final notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
+    if (!notificationsEnabled) return;
+  } catch (e) {
+    print('⚠️ Could not read SharedPreferences in background isolate: $e');
+  }
 
   // If the backend sends a data-only payload, display it manually in the background isolate
   if (message.notification == null && message.data.isNotEmpty) {
@@ -27,6 +33,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       android: androidDetails,
       iOS: DarwinNotificationDetails(),
     );
+    print("message background  $message");
 
     final title = message.data['title'] ?? 'New Message';
     final body = message.data['body'] ?? message.data['text'] ?? '';

@@ -7,6 +7,7 @@ import 'package:my_chat_app/features/settings/presentation/providers/settings_pr
 import 'package:my_chat_app/features/settings/presentation/widgets/blocked_contacts.dart';
 import 'package:my_chat_app/features/settings/presentation/widgets/settings_section.dart';
 import 'package:my_chat_app/features/settings/presentation/widgets/settings_tile.dart';
+import 'package:my_chat_app/features/settings/presentation/widgets/change_password_modal.dart' as my_chat_app_password_modal;
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -107,6 +108,26 @@ class SettingsScreen extends ConsumerWidget {
                     ref.read(settingsProvider.notifier).updateSettings({
                       'theme': current == 'dark' ? 'light' : 'dark',
                     });
+                  },
+                ),
+              ],
+            ),
+
+            // ── Security ─────────────────────────────────────────────
+            SettingsSection(
+              title: 'Security',
+              children: [
+                SettingsTile(
+                  icon: Icons.lock_outline_rounded,
+                  iconColor: Colors.orangeAccent,
+                  title: 'Change Password',
+                  onTap: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => const my_chat_app_password_modal.ChangePasswordModal(),
+                    );
                   },
                 ),
               ],

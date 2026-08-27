@@ -47,6 +47,21 @@ export const getCurrentUser = async (userId?: number) => {
   if (!userId) throw new Error("Not authenticated");
 
   const user = await authRepository.findById(userId);
+  if (!user) throw new Error("User not found");
+  
+  const { password, ...userWithoutPassword } = user;
+  return userWithoutPassword;
+};
 
-  return user;
+export const changePassword = async (userId: number, currentPassword: string, newPassword: string) => {
+  const user = await authRepository.findById(userId);
+  if (!user) throw new Error("User not found");
+
+  const isMatch = await bcrypt.compare(currentPassword, user.password);
+  if (!isMatch) throw new Error("Incorrect current password");
+
+  const hashed = await bcrypt.hash(newPassword, 10);
+  const updatedUser = await authRepository.updatePassword(userId, hashed);
+
+  return { success: true };
 };

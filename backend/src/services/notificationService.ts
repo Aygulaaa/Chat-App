@@ -13,9 +13,9 @@ interface SendChatPushPayload {
 }
 
 export async function sendChatPushNotification(payload: SendChatPushPayload): Promise<void> {
-  if (!messaging || !payload.fcmToken) return;
   console.log("🚀 ~ notificationService.ts:15 ~ sendChatPushNotification ~ payload:", payload)
 
+  if (!messaging || !payload.fcmToken) return;
 
   try {
     await messaging.send({
@@ -34,6 +34,7 @@ export async function sendChatPushNotification(payload: SendChatPushPayload): Pr
         notification: {
           sound: 'default',
           channelId: 'chat_messages',
+          priority: 'high',
         },
       },
       apns: {

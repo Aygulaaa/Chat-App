@@ -362,12 +362,21 @@ class MessageNotifier extends StateNotifier<MessageState> {
     try {
       final serverMessage = await repository.sendMessage(message);
 
-      // Replace the optimistic temp message with the confirmed server message
-      final updated = state.messages.map((m) {
-        return m.id == message.id ? serverMessage : m;
-      }).toList();
+      // Check if the socket already added this message
+      final exists = state.messages.any((m) => m.id == serverMessage.id);
 
-      state = state.copyWith(messages: updated);
+      if (exists) {
+        final updated = state.messages.where((m) => m.id != message.id).map((m) {
+          return m.id == serverMessage.id ? serverMessage : m;
+        }).toList();
+        state = state.copyWith(messages: updated);
+      } else {
+        // Replace the optimistic temp message with the confirmed server message
+        final updated = state.messages.map((m) {
+          return m.id == message.id ? serverMessage : m;
+        }).toList();
+        state = state.copyWith(messages: updated);
+      }
 
       // Emit message_received for the HTTP-sent message so the server
       // marks it as delivered for the recipient when they are online.
@@ -445,10 +454,19 @@ class MessageNotifier extends StateNotifier<MessageState> {
       print('✅ File sent: ${message.fileUrl}');
 
       // Replace temp message with server response
-      final updated = state.messages.map((m) {
-        return m.id == tempId ? message : m;
-      }).toList();
-      state = state.copyWith(messages: updated);
+      final exists = state.messages.any((m) => m.id == message.id);
+
+      if (exists) {
+        final updated = state.messages.where((m) => m.id != tempId).map((m) {
+          return m.id == message.id ? message : m;
+        }).toList();
+        state = state.copyWith(messages: updated);
+      } else {
+        final updated = state.messages.map((m) {
+          return m.id == tempId ? message : m;
+        }).toList();
+        state = state.copyWith(messages: updated);
+      }
 
       ref.read(chatProvider.notifier).updateChatLastMessage(message);
     } catch (e) {

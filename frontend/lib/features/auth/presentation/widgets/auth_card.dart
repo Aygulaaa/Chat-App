@@ -14,13 +14,13 @@ class AuthCard extends StatelessWidget {
   final VoidCallback onRegister;
   final VoidCallback onToggle;
   
-  // New parameters for password visibility and form control
   final bool obscurePassword;
   final bool obscureConfirmPassword;
   final VoidCallback onTogglePasswordVisibility;
   final VoidCallback onToggleConfirmPasswordVisibility;
   final bool isFormValid;
   final bool isFormDisabled;
+  final String? errorMessage; // Human-readable error message passed from AuthForm
 
   const AuthCard({
     super.key,
@@ -38,6 +38,7 @@ class AuthCard extends StatelessWidget {
     required this.onToggleConfirmPasswordVisibility,
     required this.isFormValid,
     required this.isFormDisabled,
+    this.errorMessage,
   });
 
   @override
@@ -120,19 +121,6 @@ class AuthCard extends StatelessWidget {
                         ),
                       ],
 
-                      if (state.error != null)
-                        Padding(
-                          padding: EdgeInsets.only(top: 16.h),
-                          child: Text(
-                            state.error!,
-                            style: TextStyle(
-                              color: AppColors.error,
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-
                       SizedBox(height: 28.h),
 
                       // Gradient Button (primary → accent)
@@ -177,6 +165,43 @@ class AuthCard extends StatelessWidget {
                                 ),
                               ),
                             ),
+
+                      // Inline Human-Readable Error Banner at bottom of Card
+                      if (errorMessage != null && errorMessage!.isNotEmpty) ...[
+                        SizedBox(height: 16.h),
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(
+                              color: AppColors.error.withValues(alpha: 0.4),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.error_outline_rounded,
+                                color: AppColors.error,
+                                size: 18.sp,
+                              ),
+                              SizedBox(width: 8.w),
+                              Expanded(
+                                child: Text(
+                                  errorMessage!,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
 
                       SizedBox(height: 20.h),
 

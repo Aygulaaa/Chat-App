@@ -144,4 +144,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       throw Exception(e.toString());
     }
   }
+
+  void clearError() {
+  if (state.error != null) {
+    state = state.copyWith(error: null);
+  }
+}
 }

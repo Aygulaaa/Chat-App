@@ -25,6 +25,7 @@ export async function sendChatPushNotification(payload: SendChatPushPayload): Pr
         chatId: String(payload.chatId),
         senderId: String(payload.senderId),
         click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        type: 'chat_message',
       },
       android: {
         priority: 'high',

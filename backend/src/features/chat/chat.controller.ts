@@ -55,17 +55,6 @@ export const chatController = {
 
             // Socket emit to all online members
             const io = req.app.get('io');
-            
-            // 1. Fetch sender name
-            const senderResult = await db.query(
-                `SELECT name, username FROM users WHERE id = $1`,
-                [senderId]
-            );
-            const senderName =
-                senderResult.rows[0]?.name ||
-                senderResult.rows[0]?.username ||
-                'New Message';
-
             if (io) {
                 const membersResult = await db.query(
                     `SELECT user_id FROM chat_members WHERE chat_id = $1`,
@@ -89,6 +78,14 @@ export const chatController = {
             }
 
             // FCM push — send to offline/backgrounded members not viewing this chat
+            const senderResult = await db.query(
+                `SELECT name, username FROM users WHERE id = $1`,
+                [senderId]
+            );
+            const senderName =
+                senderResult.rows[0]?.name ||
+                senderResult.rows[0]?.username ||
+                'New Message';
             await sendPushToMembers(io ?? null, chatId, senderId, senderName, text);
 
             res.json(message);
@@ -136,18 +133,6 @@ export const chatController = {
 
             // Socket emit to all online members
             const io = req.app.get('io');
-            
-            // 1. Fetch sender name
-            const senderResult = await db.query(
-                `SELECT name, username FROM users WHERE id = $1`,
-                [senderId]
-            );
-            const senderName =
-                senderResult.rows[0]?.name ||
-                senderResult.rows[0]?.username ||
-                'New Message';
-            const notifBody = req.file.originalname;
-
             if (io) {
                 const membersResult = await db.query(
                     `SELECT user_id FROM chat_members WHERE chat_id = $1`,
@@ -169,6 +154,16 @@ export const chatController = {
             }
 
             // FCM push — send to offline/backgrounded members not viewing this chat
+            const senderResult = await db.query(
+                `SELECT name, username FROM users WHERE id = $1`,
+                [senderId]
+            );
+            const senderName =
+                senderResult.rows[0]?.name ||
+                senderResult.rows[0]?.username ||
+                'New Message';
+            // Use original filename as notification body for file messages
+            const notifBody = req.file.originalname;
             await sendPushToMembers(io ?? null, chatId, senderId, senderName, notifBody);
 
             res.json(message);

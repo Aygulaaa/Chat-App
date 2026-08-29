@@ -29,7 +29,7 @@ app.set('trust proxy', 1);
 // ✅ Apply Brute-force protection specifically to auth routes
 const authLimiter = rateLimit({
   windowMs: 30 * 60 * 1000, // 30 minutes
-  max: 20,                  // Limit each IP to 20 requests per windowMs
+  max: 100,                  // Limit each IP to 20 requests per windowMs
   standardHeaders: true,    
   legacyHeaders: false,     
   message: { error: 'Too many requests from this IP, please try again after 30 minutes' },

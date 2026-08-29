@@ -23,7 +23,7 @@ import settingsRoutes from "./features/settings/settings.routes";
 const app = express();
 
 // Enable proxy trust for Render
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 
 app.use(helmet());
 

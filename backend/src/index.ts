@@ -13,6 +13,7 @@ import path from 'path';
 import { Server } from "socket.io";
 
 import { auth } from './middleware/auth.middleware';
+import { authService } from './features/auth/auth.service';
 import authRouter from "./features/auth/auth.routes";
 import chatRouter from "./features/chat/chat.routes";
 import { chatSocket } from "./features/chat/chat.socket";
@@ -27,11 +28,11 @@ app.use(helmet());
 
 // ✅ Apply Brute-force protection specifically to auth routes
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 30 * 60 * 1000, // 30 minutes
   max: 20,                  // Limit each IP to 20 requests per windowMs
   standardHeaders: true,    
   legacyHeaders: false,     
-  message: { error: 'Too many requests from this IP, please try again after 15 minutes' },
+  message: { error: 'Too many requests from this IP, please try again after 30 minutes' },
 });
 
 app.use(cors({
@@ -55,16 +56,21 @@ const io = new Server(server, {
 
 app.set('io', io);
 
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth?.token;
 
     if (!token) {
       return next(new Error("Unauthorized"));
     }
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { id: number };
+    
+    const session = await authService.validateSessionToken(token);
+    
+    if (!session) {
+      return next(new Error("Unauthorized"));
+    }
 
-    (socket as any).user = { id: decoded.id };
+    (socket as any).user = { id: session.userId };
 
     next();
   } catch (err) {

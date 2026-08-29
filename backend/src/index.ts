@@ -23,13 +23,16 @@ import settingsRoutes from "./features/settings/settings.routes";
 
 const app = express();
 
-// ✅ Apply Helmet security headers
-app.use(helmet());
+// 1. MUST BE SET IMMEDIATELY AFTER INITIALIZING APP
 app.set('trust proxy', 1);
-// ✅ Apply Brute-force protection specifically to auth routes
+
+// 2. Apply Helmet security headers
+app.use(helmet());
+
+// 3. Configure rate limiter (now safely trusts reverse proxies like Render)
 const authLimiter = rateLimit({
   windowMs: 30 * 60 * 1000, // 30 minutes
-  max: 100,                  // Limit each IP to 20 requests per windowMs
+  max: 100,                 
   standardHeaders: true,    
   legacyHeaders: false,     
   message: { error: 'Too many requests from this IP, please try again after 30 minutes' },

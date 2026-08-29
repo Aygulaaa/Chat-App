@@ -1,11 +1,29 @@
 import { db } from "../../db";
 
+// chat.repository.ts
 export const chatRepository = {
   async getChats(userId: number) {
     const result = await db.query(
       `
       WITH user_chats AS (
-        SELECT chat_id FROM chat_members WHERE user_id = $1
+        SELECT chat_id 
+        FROM chat_members 
+        WHERE user_id = $1
+      ),
+      chat_participants AS (
+        SELECT 
+          cm.chat_id,
+          json_agg(
+            json_build_object(
+              'id', u.id,
+              'username', u.username,
+              'avatar', u.avatar
+            )
+          ) AS participants
+        FROM chat_members cm
+        JOIN users u ON u.id = cm.user_id
+        WHERE cm.chat_id IN (SELECT chat_id FROM user_chats)
+        GROUP BY cm.chat_id
       )
       SELECT 
         c.id,
@@ -13,35 +31,24 @@ export const chatRepository = {
         c.type,
         c.avatar,
         c.created_by AS "createdBy",
-
-        json_agg(
-          json_build_object(
-            'id', u.id,
-            'username', u.username,
-            'avatar', u.avatar
-          )
-        ) AS participants,
-
+        cp.participants,
         lm.last_message AS "lastMessage",
         COALESCE(um.unread_count, 0) AS "unreadCount"
-
       FROM chats c
       JOIN user_chats uc ON c.id = uc.chat_id
-      JOIN chat_members cm ON cm.chat_id = c.id
-      JOIN users u ON u.id = cm.user_id
-
-      -- Single lateral join for latest valid message
+      JOIN chat_participants cp ON cp.chat_id = c.id
       LEFT JOIN LATERAL (
-        SELECT json_build_object(
-          'id', m.id,
-          'chatId', m.chat_id,
-          'senderId', m.sender_id,
-          'text', m.text,
-          'createdAt', m.created_at,
-          'deliveredAt', m.delivered_at,
-          'readAt', m.read_at
-        ) AS last_message,
-        m.created_at
+        SELECT 
+          json_build_object(
+            'id', m.id,
+            'chatId', m.chat_id,
+            'senderId', m.sender_id,
+            'text', m.text,
+            'createdAt', m.created_at,
+            'deliveredAt', m.delivered_at,
+            'readAt', m.read_at
+          ) AS last_message,
+          m.created_at
         FROM messages m
         WHERE m.chat_id = c.id
           AND NOT EXISTS (
@@ -53,8 +60,6 @@ export const chatRepository = {
         ORDER BY m.created_at DESC
         LIMIT 1
       ) lm ON TRUE
-
-      -- Efficient aggregate for unread message counts
       LEFT JOIN LATERAL (
         SELECT COUNT(*)::int AS unread_count
         FROM messages m
@@ -68,17 +73,6 @@ export const chatRepository = {
               AND block_c.status = 'blocked'
           )
       ) um ON TRUE
-
-      GROUP BY 
-        c.id,
-        c.name,
-        c.type,
-        c.avatar,
-        c.created_by,
-        lm.last_message,
-        lm.created_at,
-        um.unread_count
-
       ORDER BY lm.created_at DESC NULLS LAST;
     `,
       [userId]
@@ -89,28 +83,32 @@ export const chatRepository = {
   async getChat(chatId: number, userId: number) {
     const result = await db.query(
       `
+      WITH chat_participants AS (
+        SELECT 
+          cm.chat_id,
+          json_agg(
+            json_build_object(
+              'id', u.id,
+              'username', u.username,
+              'avatar', u.avatar
+            )
+          ) AS participants
+        FROM chat_members cm
+        JOIN users u ON u.id = cm.user_id
+        WHERE cm.chat_id = $1
+        GROUP BY cm.chat_id
+      )
       SELECT 
         c.id,
         c.name,
         c.type,
         c.avatar,
         c.created_by AS "createdBy",
-
-        json_agg(
-          json_build_object(
-            'id', u.id,
-            'username', u.username,
-            'avatar', u.avatar
-          )
-        ) AS participants,
-
+        cp.participants,
         lm.last_message AS "lastMessage",
         COALESCE(um.unread_count, 0) AS "unreadCount"
-
       FROM chats c
-      JOIN chat_members cm ON cm.chat_id = c.id
-      JOIN users u ON u.id = cm.user_id
-
+      JOIN chat_participants cp ON cp.chat_id = c.id
       LEFT JOIN LATERAL (
         SELECT json_build_object(
           'id', m.id,
@@ -132,7 +130,6 @@ export const chatRepository = {
         ORDER BY m.created_at DESC
         LIMIT 1
       ) lm ON TRUE
-
       LEFT JOIN LATERAL (
         SELECT COUNT(*)::int AS unread_count
         FROM messages m
@@ -146,20 +143,10 @@ export const chatRepository = {
               AND block_c.status = 'blocked'
           )
       ) um ON TRUE
-
       WHERE c.id = $1
         AND EXISTS (
           SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2
-        )
-
-      GROUP BY
-        c.id,
-        c.name,
-        c.type,
-        c.avatar,
-        c.created_by,
-        lm.last_message,
-        um.unread_count;
+        );
     `,
       [chatId, userId]
     );

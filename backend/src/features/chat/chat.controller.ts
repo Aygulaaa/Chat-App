@@ -47,6 +47,7 @@ export const chatController = {
       const chats = await chatService.getChats(req.user.id);
       res.json(chats);
     } catch (err) {
+      console.error('🔥 SQL ERROR IN getChats:', err);
       res.status(500).json({ error: 'Failed to fetch chats.' });
     }
   },
@@ -59,6 +60,7 @@ export const chatController = {
       if (!chat) return res.status(404).json({ error: 'Chat not found' });
       res.json(chat);
     } catch (err) {
+      console.error('🔥 SQL ERROR IN getChat:', err);
       res.status(500).json({ error: 'Failed to fetch chat.' });
     }
   },

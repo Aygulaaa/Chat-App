@@ -23,7 +23,7 @@ import settingsRoutes from "./features/settings/settings.routes";
 const app = express();
 
 // Enable proxy trust for Render
-app.set('trust proxy', 1);
+app.set('trust proxy', true);
 
 app.use(helmet());
 
@@ -33,9 +33,7 @@ const authLimiter = rateLimit({
   max: 100,                  
   standardHeaders: true,    
   legacyHeaders: false,     
-  validate: {
-    xForwardedForHeader: false, // Prevents ERR_ERL_UNEXPECTED_X_FORWARDED_FOR crash
-  },
+  validate: false,
   message: { error: 'Too many requests from this IP, please try again after 30 minutes' },
 });
 

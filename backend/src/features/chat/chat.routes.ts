@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { chatController } from '../chat/chat.controller';
+import { validateNumericParams } from '../../middleware/validateParams';
 import multer from 'multer';
 
 const upload = multer({
@@ -9,28 +10,35 @@ const upload = multer({
 
 const router = Router();
 
-// 1. Static routes MUST come first
+// Reusable middleware instances for chat routes
+const validateChatId = validateNumericParams('chatId');
+const validateChatAndMessage = validateNumericParams('chatId', 'messageId');
+const validateChatAndUser = validateNumericParams('chatId', 'userId');
+const validateContactId = validateNumericParams('contactId');
+
+// 1. Static routes
 router.get('/', chatController.getChats);
 router.post('/group', chatController.createGroupChat);
-router.post('/create/:contactId', chatController.createChat);
+router.post('/create/:contactId', validateContactId, chatController.createChat);
 
-// 2. Dynamic routes with parameters come after
-router.get('/:chatId', chatController.getChat);
-router.get('/:chatId/messages', chatController.getMessages);
-router.post('/:chatId/messages', chatController.sendMessage);
-router.patch('/:chatId/messages/read', chatController.markMessagesRead);
+// 2. Dynamic routes
+router.get('/:chatId', validateChatId, chatController.getChat);
+router.get('/:chatId/messages', validateChatId, chatController.getMessages);
+router.post('/:chatId/messages', validateChatId, chatController.sendMessage);
+router.patch('/:chatId/messages/read', validateChatId, chatController.markMessagesRead);
 
 router.post(
   '/:chatId/messages/file',
+  validateChatId,
   upload.single('file'),
   chatController.sendFileMessage
 );
 
-router.post('/:chatId/members', chatController.addMember);
-router.delete('/:chatId/members/:userId', chatController.removeMember);
-router.patch('/:chatId/group', upload.single('avatar'), chatController.updateGroupInfo);
-router.delete('/:chatId/messages/:messageId', chatController.deleteMessage);
-router.delete('/:chatId/group', chatController.deleteGroup);
-router.delete('/:chatId', chatController.deleteChat);
+router.post('/:chatId/members', validateChatId, chatController.addMember);
+router.delete('/:chatId/members/:userId', validateChatAndUser, chatController.removeMember);
+router.patch('/:chatId/group', validateChatId, upload.single('avatar'), chatController.updateGroupInfo);
+router.delete('/:chatId/messages/:messageId', validateChatAndMessage, chatController.deleteMessage);
+router.delete('/:chatId/group', validateChatId, chatController.deleteGroup);
+router.delete('/:chatId', validateChatId, chatController.deleteChat);
 
 export default router;

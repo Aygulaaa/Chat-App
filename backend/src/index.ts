@@ -2,8 +2,9 @@ import './db'; // Imports and initializes DB connection first
 import dotenv from "dotenv";
 dotenv.config();
 
-
 import express from "express";
+import helmet from "helmet"; // ✅ Added Helmet security headers
+import rateLimit from "express-rate-limit"; // ✅ Added Brute-force rate limiting
 import './config/firebase';
 import http from "http";
 import cors from "cors";
@@ -20,6 +21,18 @@ import contactsRoutes from "./features/contacts/contacts.routes";
 import settingsRoutes from "./features/settings/settings.routes";
 
 const app = express();
+
+// ✅ Apply Helmet security headers
+app.use(helmet());
+
+// ✅ Apply Brute-force protection specifically to auth routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,                  // Limit each IP to 20 requests per windowMs
+  standardHeaders: true,    
+  legacyHeaders: false,     
+  message: { error: 'Too many requests from this IP, please try again after 15 minutes' },
+});
 
 app.use(cors({
   origin: '*', 
@@ -61,7 +74,9 @@ io.use((socket, next) => {
 
 chatSocket(io);
 
-app.use("/api/auth", authRouter);
+// ✅ Applied authLimiter to protect authentication endpoints from brute-force attacks
+app.use("/api/auth", authLimiter, authRouter);
+
 app.use("/api/chats", auth, chatRouter);
 app.use("/api/users", userRouter);
 app.use("/api/contacts", auth, contactsRoutes);

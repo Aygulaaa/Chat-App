@@ -3,28 +3,95 @@ import { chatService } from "./chat.service";
 import { userService } from "../users/user.service";
 import { settingsService } from "../settings/settings.service";
 import db from "../../db";
-import { messaging } from "../../config/firebase";
 import { sendPushToMembers } from "../../services/notificationService";
 
-interface SendMessagePayload { chatId: number; text: string; }
-interface MessageReceivedPayload { messageId: number; }
-interface ReadMessagesPayload { chatId: number; }
+interface SendMessagePayload {
+  chatId: number;
+  text: string;
+}
+
+interface MessageReceivedPayload {
+  messageId: number;
+}
+
+interface ReadMessagesPayload {
+  chatId: number;
+}
 
 export interface AuthSocket extends Socket {
   user?: { id: number };
 }
 
+// In-Memory Presence & Disconnect Caches
 const onlineUsers = new Map<number, Set<string>>();
+const disconnectTimers = new Map<number, NodeJS.Timeout>();
 
-async function isBlocked(userId1: number, userId2: number): Promise<boolean> {
+/**
+ * Single-query retrieval of blocked contacts for a given user ID
+ */
+async function getBlockedUserIds(userId: number): Promise<Set<number>> {
   const result = await db.query(
-    `SELECT 1 FROM contacts 
-     WHERE ((user_id = $1 AND contact_user_id = $2)
-        OR (user_id = $2 AND contact_user_id = $1))
+    `SELECT 
+       CASE WHEN user_id = $1 THEN contact_user_id ELSE user_id END AS blocked_id
+     FROM contacts
+     WHERE (user_id = $1 OR contact_user_id = $1)
        AND status = 'blocked'`,
-    [userId1, userId2]
+    [userId]
   );
-  return (result.rowCount !== null && result.rowCount > 0) || (result.rows.length > 0);
+  return new Set(result.rows.map((r) => Number(r.blocked_id)));
+}
+
+/**
+ * Filter list of online users against a specific user's blocked contacts
+ */
+function getVisibleOnlineUsers(userId: number, blockedIds: Set<number>): number[] {
+  const filtered: number[] = [];
+  for (const id of onlineUsers.keys()) {
+    if (id === userId || !blockedIds.has(id)) {
+      filtered.push(id);
+    }
+  }
+  return filtered;
+}
+
+/**
+ * PRIVACY-SAFE TYPING HANDLER:
+ * Fetches group chat members and excludes any user who has a mutual block relationship 
+ * with the sender, ensuring typing events are never leaked to blocked users.
+ */
+async function handleTypingStatus(
+  socket: AuthSocket,
+  io: Server,
+  chatId: number,
+  isTyping: boolean
+) {
+  const currentUserId = socket.user?.id;
+  if (!currentUserId || !chatId) return;
+
+  try {
+    const result = await db.query(
+      `SELECT cm.user_id 
+       FROM chat_members cm
+       LEFT JOIN contacts c ON 
+         ((c.user_id = $1 AND c.contact_user_id = cm.user_id) 
+          OR (c.user_id = cm.user_id AND c.contact_user_id = $1))
+         AND c.status = 'blocked'
+       WHERE cm.chat_id = $2 
+         AND cm.user_id != $1 
+         AND c.user_id IS NULL`,
+      [currentUserId, chatId]
+    );
+
+    for (const row of result.rows) {
+      io.to(`user_${row.user_id}`).emit("user_typing", {
+        chatId,
+        userId: currentUserId,
+        isTyping,
+      });
+    }
+  } catch (error) {
+    console.error("handleTypingStatus error:", error);
+  }
 }
 
 export const chatSocket = (io: Server) => {
@@ -38,243 +105,179 @@ export const chatSocket = (io: Server) => {
 
       socket.data.user = socket.user;
 
+      // Clear any pending disconnect timer (reconnection within grace period)
+      if (disconnectTimers.has(userId)) {
+        clearTimeout(disconnectTimers.get(userId));
+        disconnectTimers.delete(userId);
+      }
+
+      // Track multi-device connections for this user
       if (!onlineUsers.has(userId)) {
         onlineUsers.set(userId, new Set());
       }
       onlineUsers.get(userId)!.add(socket.id);
 
+      // Join individual user room for targeted routing
       await socket.join(`user_${userId}`);
 
-      const allSockets = await io.fetchSockets();
-      for (const s of allSockets) {
-        if (s.data.user?.id && s.data.user.id !== userId) {
-          const blocked = await isBlocked(userId, s.data.user.id);
-          if (!blocked) {
-            s.emit("user_status", { userId, status: "online" });
-          }
+      const blockedIds = await getBlockedUserIds(userId);
+
+      // Broadcast 'online' status ONLY to non-blocked, connected contacts
+      for (const [onlineId] of onlineUsers.entries()) {
+        if (onlineId !== userId && !blockedIds.has(onlineId)) {
+          io.to(`user_${onlineId}`).emit("user_status", { userId, status: "online" });
         }
       }
 
-      const filteredOnline = [];
-      for (const id of Array.from(onlineUsers.keys())) {
-        if (id === userId) {
-          filteredOnline.push(id);
-          continue;
-        }
-        const blocked = await isBlocked(userId, id);
-        if (!blocked) {
-          filteredOnline.push(id);
-        }
-      }
-      socket.emit("initial_online_users", filteredOnline);
+      // Send initial snapshot of unblocked online contacts to the user
+      const initialOnline = getVisibleOnlineUsers(userId, blockedIds);
+      socket.emit("initial_online_users", initialOnline);
 
-      socket.on("join_chat", async ({ chatId }: { chatId: number }) => {
-        try {
-          if (!socket.user) return;
-          const room = `chat_${chatId}`;
-          socket.join(room);
-          socket.data.activeChatId = chatId;
-          console.log(`User ${socket.user.id} joined room chat_${chatId}`);
-        } catch (error) {
-          console.error("join_chat error:", error);
-        }
+      // --- EVENT HANDLERS ---
+
+      socket.on("join_chat", ({ chatId }: { chatId: number }) => {
+        if (!socket.user || !chatId) return;
+        socket.join(`chat_${chatId}`);
+        socket.data.activeChatId = chatId;
       });
 
       socket.on("leave_chat", ({ chatId }: { chatId: number }) => {
+        if (!chatId) return;
         socket.leave(`chat_${chatId}`);
         socket.data.activeChatId = null;
-        console.log(`User ${socket.user?.id} left room chat_${chatId}`);
       });
 
-      socket.on("read_messages", async ({ chatId }: ReadMessagesPayload) => {
-        if (!socket.user) return;
-        await handleMarkAsRead(chatId, socket.user.id);
+      socket.on("typing", ({ chatId }: { chatId: number }) => {
+        handleTypingStatus(socket, io, chatId, true);
       });
 
-      socket.on("send_message", async (data) => {
+      socket.on("stop_typing", ({ chatId }: { chatId: number }) => {
+        handleTypingStatus(socket, io, chatId, false);
+      });
+
+      socket.on("send_message", async (data: SendMessagePayload) => {
         try {
-          console.log("SEND:", data);
-
           const { chatId, text } = data;
+          const senderId = Number(socket.user?.id);
 
-          if (!chatId || !text?.trim() || !socket.user) {
-            console.log("INVALID MESSAGE");
-            return;
-          }
+          if (!chatId || !text?.trim() || !senderId) return;
 
-          const message = await chatService.sendMessage(
-            chatId,
-            socket.user.id,
-            text.trim()
-          );
+          // 1. Persist message atomically
+          const message = await chatService.sendMessage(chatId, senderId, text.trim());
+          if (!message) return;
 
-          console.log("MESSAGE CREATED:", message);
-
-          // 1. Resolve sender display name
-          const senderResult = await db.query(
-            `SELECT name, username FROM users WHERE id = $1`,
-            [socket.user.id]
-          );
-          const senderName =
-            senderResult.rows[0]?.name ||
-            senderResult.rows[0]?.username ||
-            'New Message';
-
-          // 2. Fetch members for socket emit (block check included)
+          // 2. Fetch sender name and unblocked chat members in ONE SQL query
           const membersResult = await db.query(
-            `SELECT cm.user_id
+            `SELECT 
+               cm.user_id,
+               u.username AS sender_name
              FROM chat_members cm
-             WHERE cm.chat_id = $1`,
-            [chatId]
+             LEFT JOIN users u ON u.id = $2
+             LEFT JOIN contacts c ON 
+               ((c.user_id = $2 AND c.contact_user_id = cm.user_id) 
+                OR (c.user_id = cm.user_id AND c.contact_user_id = $2))
+               AND c.status = 'blocked'
+             WHERE cm.chat_id = $1 
+               AND (cm.user_id = $2 OR c.user_id IS NULL)`,
+            [chatId, senderId]
           );
 
-          for (const member of membersResult.rows) {
-            const memberId = Number(member.user_id);
+          if (!membersResult.rows.length) return;
+          const senderName = membersResult.rows[0]?.sender_name || "New Message";
 
-            if (memberId !== socket.user.id) {
-              const blocked = await isBlocked(memberId, socket.user.id);
-              if (blocked) continue;
-            }
-
-            io.to(`user_${memberId}`).emit('message', message);
+          // 3. Emit message to unblocked members' targeted rooms
+          for (const row of membersResult.rows) {
+            const memberId = Number(row.user_id);
+            io.to(`user_${memberId}`).emit("message", message);
           }
 
-          // 3. FCM push — handled by shared helper (checks blocks, active chat, token)
-          await sendPushToMembers(io, chatId, socket.user.id, senderName, text.trim());
-
+          // 4. Trigger background FCM notifications asynchronously
+          sendPushToMembers(io, chatId, senderId, senderName, text.trim()).catch((err) =>
+            console.error("Async Push Notification Error:", err)
+          );
         } catch (e) {
           console.error("send_message FAILED:", e);
-        }
-      });
-
-      socket.on("request_online_users", async () => {
-        if (!socket.user) return;
-        const filteredOnline = [];
-        for (const id of Array.from(onlineUsers.keys())) {
-          if (id === socket.user.id) {
-            filteredOnline.push(id);
-            continue;
-          }
-          const blocked = await isBlocked(socket.user.id, id);
-          if (!blocked) {
-            filteredOnline.push(id);
-          }
-        }
-        socket.emit("initial_online_users", filteredOnline);
-      });
-
-      socket.on("typing", async ({ chatId, userId }: { chatId: number, userId: number }) => {
-        if (!socket.user || !chatId) return;
-        const membersResult = await db.query(`SELECT user_id FROM chat_members WHERE chat_id = $1`, [chatId]);
-        for (const member of membersResult.rows) {
-          const memberId = Number(member.user_id);
-          if (memberId !== socket.user.id) {
-            const blocked = await isBlocked(memberId, socket.user.id);
-            if (!blocked) {
-              io.to(`user_${memberId}`).emit("user_typing", { chatId, userId, isTyping: true });
-            }
-          }
-        }
-      });
-
-      socket.on("stop_typing", async ({ chatId, userId }: { chatId: number, userId: number }) => {
-        if (!socket.user || !chatId) return;
-        const membersResult = await db.query(`SELECT user_id FROM chat_members WHERE chat_id = $1`, [chatId]);
-        for (const member of membersResult.rows) {
-          const memberId = Number(member.user_id);
-          if (memberId !== socket.user.id) {
-            const blocked = await isBlocked(memberId, socket.user.id);
-            if (!blocked) {
-              io.to(`user_${memberId}`).emit("user_typing", { chatId, userId, isTyping: false });
-            }
-          }
         }
       });
 
       socket.on("message_received", async ({ messageId }: MessageReceivedPayload) => {
         try {
           const msgId = Number(messageId);
-          if (!msgId) return;
-          console.log(`message_received for messageId ${msgId} from user ${socket.user?.id}`);
-          
-          const msgResult = await db.query(
-            `SELECT sender_id, chat_id FROM messages WHERE id = $1`, [msgId]
-          );
-          if (msgResult.rowCount === 0) return;
-          const msg = msgResult.rows[0];
-          
-          if (msg.sender_id === socket.user?.id) {
-             return;
-          }
+          if (!msgId || !socket.user) return;
 
+          // Atomically mark delivered if not blocked
           const result = await db.query(
-            `UPDATE messages SET delivered_at = COALESCE(delivered_at, NOW()) WHERE id = $1 RETURNING *`,
-            [msgId]
+            `UPDATE messages m
+             SET delivered_at = COALESCE(m.delivered_at, NOW())
+             FROM chat_members cm
+             LEFT JOIN contacts c ON 
+               ((c.user_id = $2 AND c.contact_user_id = m.sender_id) 
+                OR (c.user_id = m.sender_id AND c.contact_user_id = $2))
+               AND c.status = 'blocked'
+             WHERE m.id = $1 
+               AND cm.chat_id = m.chat_id 
+               AND cm.user_id = $2
+               AND m.sender_id != $2
+               AND c.user_id IS NULL
+             RETURNING m.chat_id, m.sender_id`,
+            [msgId, socket.user.id]
           );
-          const message = result.rows[0];
-          if (!message) return;
-          console.log(`Message ${msgId} marked as delivered in DB`);
 
-          const blocked = await isBlocked(socket.user!.id, message.sender_id);
-          if (!blocked) {
-            io.to(`user_${message.sender_id}`).emit("messages_delivered", {
-              chatId: message.chat_id,
-              messageIds: [msgId],
-            });
-          }
+          if (result.rowCount === 0) return;
+          const { chat_id, sender_id } = result.rows[0];
+
+          io.to(`user_${sender_id}`).emit("messages_delivered", {
+            chatId: chat_id,
+            messageIds: [msgId],
+          });
         } catch (error) {
           console.error("message_received error:", error);
         }
       });
 
+      socket.on("read_messages", async ({ chatId }: ReadMessagesPayload) => {
+        if (!socket.user || !chatId) return;
+        await handleMarkAsRead(chatId, socket.user.id);
+      });
+
+      socket.on("request_online_users", async () => {
+        if (!socket.user) return;
+        const currentBlocked = await getBlockedUserIds(socket.user.id);
+        const onlineList = getVisibleOnlineUsers(socket.user.id, currentBlocked);
+        socket.emit("initial_online_users", onlineList);
+      });
+
       async function handleMarkAsRead(chatId: number, currentUserId: number) {
         const readMessages = await chatService.markMessagesRead(chatId, currentUserId);
-        if (!readMessages.length) return;
+        if (!readMessages || !readMessages.length) return;
 
         const currentUserSettings = await settingsService.getSettings(currentUserId);
-        if (currentUserSettings.hideReadReceipts) {
-          return;
-        }
+        if (currentUserSettings.hideReadReceipts) return;
 
-        const membersResult = await db.query(`SELECT user_id FROM chat_members WHERE chat_id = $1`, [chatId]);
-        for (const member of membersResult.rows) {
-          const memberId = Number(member.user_id);
-          const blocked = await isBlocked(currentUserId, memberId);
-          if (!blocked) {
-            io.to(`user_${memberId}`).emit("chat_read", {
-              chatId,
-              readBy: currentUserId,
-              messageIds: readMessages.map((m: any) => m.id)
-            });
-          }
-        }
-        
-        const senderIds = [...new Set(readMessages.map((m: any) => m.senderId ?? m.sender_id))] as number[];
+        // Broadcast read receipt to unblocked chat members
+        const membersResult = await db.query(
+          `SELECT cm.user_id 
+           FROM chat_members cm
+           LEFT JOIN contacts c ON 
+             ((c.user_id = $1 AND c.contact_user_id = cm.user_id) 
+              OR (c.user_id = cm.user_id AND c.contact_user_id = $1))
+             AND c.status = 'blocked'
+           WHERE cm.chat_id = $2 AND c.user_id IS NULL`,
+          [currentUserId, chatId]
+        );
 
-        for (const senderId of senderIds) {
-          if (senderId === currentUserId) continue;
-          
-          const blocked = await isBlocked(currentUserId, senderId);
-          if (blocked) continue;
+        const readMsgIds = readMessages.map((m) => m.id);
 
-          const senderSettings = await settingsService.getSettings(senderId);
-          if (senderSettings.hideReadReceipts) continue;
-
-          io.to(`user_${senderId}`).emit(
-            "messages_read",
-            {
-              chatId,
-              readBy: currentUserId,
-              messageIds: readMessages
-                .filter((m: any) => (m.senderId ?? m.sender_id) === senderId)
-                .map((m: any) => m.id),
-            }
-          );
+        for (const row of membersResult.rows) {
+          io.to(`user_${row.user_id}`).emit("chat_read", {
+            chatId,
+            readBy: currentUserId,
+            messageIds: readMsgIds,
+          });
         }
       }
 
-      const disconnectTimers = new Map<number, NodeJS.Timeout>();
-      socket.on("disconnect", async () => {
+      socket.on("disconnect", () => {
         try {
           if (!userId) return;
           const userConnections = onlineUsers.get(userId);
@@ -282,6 +285,7 @@ export const chatSocket = (io: Server) => {
 
           userConnections.delete(socket.id);
 
+          // Grace period (3s) before marking user offline to handle brief network switching
           if (userConnections.size === 0) {
             const timer = setTimeout(async () => {
               const currentConnections = onlineUsers.get(userId);
@@ -289,19 +293,17 @@ export const chatSocket = (io: Server) => {
                 onlineUsers.delete(userId);
                 await userService.updateLastSeen(userId);
                 const settings = await settingsService.getSettings(userId);
-                
-                const allSockets = await io.fetchSockets();
-                for (const s of allSockets) {
-                  if (s.data.user?.id && s.data.user.id !== userId) {
-                    const blocked = await isBlocked(userId, s.data.user.id);
-                    if (!blocked) {
-                      s.emit("user_status", {
-                        userId,
-                        status: "offline",
-                        lastSeen: settings.hideLastSeen ? null : new Date().toISOString(),
-                        lastSeenFuzzy: settings.hideLastSeen ? 'recently' : null,
-                      });
-                    }
+
+                const disconnectBlockedIds = await getBlockedUserIds(userId);
+
+                for (const [onlineId] of onlineUsers.entries()) {
+                  if (onlineId !== userId && !disconnectBlockedIds.has(onlineId)) {
+                    io.to(`user_${onlineId}`).emit("user_status", {
+                      userId,
+                      status: "offline",
+                      lastSeen: settings.hideLastSeen ? null : new Date().toISOString(),
+                      lastSeenFuzzy: settings.hideLastSeen ? "recently" : null,
+                    });
                   }
                 }
               }

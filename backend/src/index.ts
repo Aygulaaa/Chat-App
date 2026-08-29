@@ -1,14 +1,13 @@
-import './db'; // Imports and initializes DB connection first
+import './db'; 
 import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
-import helmet from "helmet"; // ✅ Added Helmet security headers
-import rateLimit from "express-rate-limit"; // ✅ Added Brute-force rate limiting
+import helmet from "helmet"; 
+import rateLimit from "express-rate-limit"; 
 import './config/firebase';
 import http from "http";
 import cors from "cors";
-import jwt from "jsonwebtoken";
 import path from 'path';
 import { Server } from "socket.io";
 
@@ -23,18 +22,20 @@ import settingsRoutes from "./features/settings/settings.routes";
 
 const app = express();
 
-// 1. MUST BE SET IMMEDIATELY AFTER INITIALIZING APP
+// Enable proxy trust for Render
 app.set('trust proxy', 1);
 
-// 2. Apply Helmet security headers
 app.use(helmet());
 
-// 3. Configure rate limiter (now safely trusts reverse proxies like Render)
+// Disable xForwardedForHeader check in rateLimit validation options
 const authLimiter = rateLimit({
-  windowMs: 30 * 60 * 1000, // 30 minutes
-  max: 100,                 
+  windowMs: 30 * 60 * 1000, 
+  max: 100,                  
   standardHeaders: true,    
   legacyHeaders: false,     
+  validate: {
+    xForwardedForHeader: false, // Prevents ERR_ERL_UNEXPECTED_X_FORWARDED_FOR crash
+  },
   message: { error: 'Too many requests from this IP, please try again after 30 minutes' },
 });
 
@@ -83,7 +84,6 @@ io.use(async (socket, next) => {
 
 chatSocket(io);
 
-// ✅ Applied authLimiter to protect authentication endpoints from brute-force attacks
 app.use("/api/auth", authLimiter, authRouter);
 
 app.use("/api/chats", auth, chatRouter);

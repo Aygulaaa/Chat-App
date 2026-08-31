@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { contactsService } from './contacts.service';
+import { chatRepository } from '../chat/chat.repository';
 import { AuthRequest } from '../../middleware/auth.middleware';
 
 export const contactsController = {
@@ -72,6 +73,12 @@ export const contactsController = {
     try {
       const contactId = Number(req.params.contactId);
       await contactsService.unblockUser(req.user!.id, contactId);
+
+      // Mark undelivered messages as delivered for both users after unblocking
+      const io = req.app.get('io');
+      await chatRepository.markUndeliveredMessagesForUser(req.user!.id, io);
+      await chatRepository.markUndeliveredMessagesForUser(contactId, io);
+
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: 'Failed to unblock user' });

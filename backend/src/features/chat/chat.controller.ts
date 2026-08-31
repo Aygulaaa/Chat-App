@@ -75,13 +75,22 @@ export const chatController = {
       const io = req.app.get('io');
       const deliveredMessages = await chatService.markMessagesDelivered(chatId, req.user.id);
       if (deliveredMessages && deliveredMessages.length > 0 && io) {
-        const msgIds = deliveredMessages.map((m: any) => m.id);
-        const senderId = deliveredMessages[0].senderId;
-        io.to(`user_${senderId}`).emit("messages_delivered", {
-          chatId,
-          messageIds: msgIds,
-          deliveredAt: deliveredMessages[0].deliveredAt || new Date(),
-        });
+        // Group by senderId so all senders get notified (multi-sender chats)
+        const senderMap = new Map<number, { messageIds: number[]; deliveredAt: Date }>();
+        for (const m of deliveredMessages) {
+          const sid = m.senderId;
+          if (!senderMap.has(sid)) {
+            senderMap.set(sid, { messageIds: [], deliveredAt: m.deliveredAt || new Date() });
+          }
+          senderMap.get(sid)!.messageIds.push(m.id);
+        }
+        for (const [sid, payload] of senderMap.entries()) {
+          io.to(`user_${sid}`).emit("messages_delivered", {
+            chatId,
+            messageIds: payload.messageIds,
+            deliveredAt: payload.deliveredAt,
+          });
+        }
       }
       const messages = await chatService.getMessages(chatId, req.user.id);
       res.json(messages);

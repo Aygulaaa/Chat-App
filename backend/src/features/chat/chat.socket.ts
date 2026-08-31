@@ -144,12 +144,13 @@ export const chatSocket = (io: Server) => {
       socket.on("join_chat", ({ chatId }: { chatId: number }) => {
         if (!socket.user || !chatId) return;
         socket.join(`chat_${chatId}`);
-        socket.data.activeChatId = chatId;
+        socket.data.activeChatId = Number(chatId);
       });
 
-      socket.on("leave_chat", ({ chatId }: { chatId: number }) => {
-        if (!chatId) return;
-        socket.leave(`chat_${chatId}`);
+      socket.on("leave_chat", ({ chatId }: { chatId?: number }) => {
+        if (chatId) {
+          socket.leave(`chat_${chatId}`);
+        }
         socket.data.activeChatId = null;
       });
 

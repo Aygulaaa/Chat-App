@@ -50,7 +50,13 @@ export async function sendChatPushNotification(payload: SendChatPushPayload): Pr
     });
   } catch (error: any) {
     console.error('FCM send error:', error?.message ?? error);
-    // Invalid / expired tokens can be cleaned up here if needed
+    if (
+      error?.code === 'messaging/invalid-registration-token' ||
+      error?.code === 'messaging/registration-token-not-registered'
+    ) {
+      await db.query('UPDATE users SET fcm_token = NULL WHERE fcm_token = $1', [payload.fcmToken]);
+      console.log(`Cleaned up invalid FCM token from database: ${payload.fcmToken}`);
+    }
   }
 }
 

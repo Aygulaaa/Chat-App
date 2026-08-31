@@ -2,11 +2,60 @@ import { db } from "../../db";
 
 // chat.repository.ts
 export const chatRepository = {
+  async markUndeliveredMessagesForUser(userId: number, io?: any) {
+    try {
+      const result = await db.query(
+        `
+        UPDATE messages m
+        SET delivered_at = COALESCE(m.delivered_at, NOW())
+        FROM chat_members cm
+        WHERE cm.chat_id = m.chat_id
+          AND cm.user_id = $1
+          AND m.sender_id != $1
+          AND m.delivered_at IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM contacts block_c
+            WHERE ((block_c.user_id = $1 AND block_c.contact_user_id = m.sender_id)
+               OR (block_c.user_id = m.sender_id AND block_c.contact_user_id = $1))
+              AND block_c.status = 'blocked'
+          )
+        RETURNING m.id, m.chat_id, m.sender_id, m.delivered_at
+        `,
+        [userId]
+      );
+
+      if (result.rows.length > 0 && io) {
+        const senderMap = new Map<number, { chatId: number; messageIds: number[]; deliveredAt: Date }>();
+        for (const row of result.rows) {
+          const senderId = Number(row.sender_id);
+          const chatId = Number(row.chat_id);
+          const msgId = Number(row.id);
+          if (!senderMap.has(senderId)) {
+            senderMap.set(senderId, { chatId, messageIds: [], deliveredAt: row.delivered_at });
+          }
+          senderMap.get(senderId)!.messageIds.push(msgId);
+        }
+
+        for (const [senderId, payload] of senderMap.entries()) {
+          io.to(`user_${senderId}`).emit("messages_delivered", {
+            chatId: payload.chatId,
+            messageIds: payload.messageIds,
+            deliveredAt: payload.deliveredAt,
+          });
+        }
+      }
+      return result.rows;
+    } catch (err) {
+      console.error("markUndeliveredMessagesForUser DB ERROR:", err);
+      return [];
+    }
+  },
+
   async getChats(userId: number) {
     const result = await db.query(
       `
       WITH user_chats AS (
-        SELECT chat_id 
+        SELECT DISTINCT chat_id 
         FROM chat_members 
         WHERE user_id = $1
       ),
@@ -20,9 +69,12 @@ export const chatRepository = {
               'avatar', u.avatar
             )
           ) AS participants
-        FROM chat_members cm
+        FROM (
+          SELECT DISTINCT chat_id, user_id
+          FROM chat_members
+          WHERE chat_id IN (SELECT chat_id FROM user_chats)
+        ) cm
         JOIN users u ON u.id = cm.user_id
-        WHERE cm.chat_id IN (SELECT chat_id FROM user_chats)
         GROUP BY cm.chat_id
       )
       SELECT 
@@ -44,6 +96,11 @@ export const chatRepository = {
             'chatId', m.chat_id,
             'senderId', m.sender_id,
             'text', m.text,
+            'fileUrl', m.file_url,
+            'fileType', m.file_type,
+            'originalName', m.original_name,
+            'mimeType', m.mime_type,
+            'fileSize', m.file_size,
             'createdAt', m.created_at,
             'deliveredAt', m.delivered_at,
             'readAt', m.read_at
@@ -93,9 +150,12 @@ export const chatRepository = {
               'avatar', u.avatar
             )
           ) AS participants
-        FROM chat_members cm
+        FROM (
+          SELECT DISTINCT chat_id, user_id
+          FROM chat_members
+          WHERE chat_id = $1
+        ) cm
         JOIN users u ON u.id = cm.user_id
-        WHERE cm.chat_id = $1
         GROUP BY cm.chat_id
       )
       SELECT 
@@ -115,6 +175,11 @@ export const chatRepository = {
           'chatId', m.chat_id,
           'senderId', m.sender_id,
           'text', m.text,
+          'fileUrl', m.file_url,
+          'fileType', m.file_type,
+          'originalName', m.original_name,
+          'mimeType', m.mime_type,
+          'fileSize', m.file_size,
           'createdAt', m.created_at,
           'deliveredAt', m.delivered_at,
           'readAt', m.read_at

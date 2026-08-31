@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { chatService } from '../chat/chat.service';
+import { chatRepository } from '../chat/chat.repository';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import db from '../../db';
 import { sendPushToMembers } from '../../services/notificationService';
@@ -33,17 +34,19 @@ async function broadcastToChatMembers(
 // Fetch sender details in a single clean query
 async function getSenderName(senderId: number): Promise<string> {
   const result = await db.query(
-    `SELECT username, name FROM users WHERE id = $1`,
+    `SELECT username FROM users WHERE id = $1`,
     [senderId]
   );
   const user = result.rows[0];
-  return user?.name || user?.username || 'New Message';
+  return  user?.username || 'New Message';
 }
 
 export const chatController = {
   async getChats(req: AuthRequest, res: Response) {
     try {
       if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+      const io = req.app.get('io');
+      await chatRepository.markUndeliveredMessagesForUser(req.user.id, io);
       const chats = await chatService.getChats(req.user.id);
       res.json(chats);
     } catch (err) {
@@ -69,6 +72,17 @@ export const chatController = {
     try {
       if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
       const chatId = Number(req.params.chatId);
+      const io = req.app.get('io');
+      const deliveredMessages = await chatService.markMessagesDelivered(chatId, req.user.id);
+      if (deliveredMessages && deliveredMessages.length > 0 && io) {
+        const msgIds = deliveredMessages.map((m: any) => m.id);
+        const senderId = deliveredMessages[0].senderId;
+        io.to(`user_${senderId}`).emit("messages_delivered", {
+          chatId,
+          messageIds: msgIds,
+          deliveredAt: deliveredMessages[0].deliveredAt || new Date(),
+        });
+      }
       const messages = await chatService.getMessages(chatId, req.user.id);
       res.json(messages);
     } catch (err) {

@@ -1,5 +1,6 @@
 import { Server, Socket } from "socket.io";
 import { chatService } from "./chat.service";
+import { chatRepository } from "./chat.repository";
 import { userService } from "../users/user.service";
 import { settingsService } from "../settings/settings.service";
 import db from "../../db";
@@ -119,6 +120,11 @@ export const chatSocket = (io: Server) => {
 
       // Join individual user room for targeted routing
       await socket.join(`user_${userId}`);
+
+      // Auto-mark any undelivered messages sent to this user as delivered
+      chatRepository.markUndeliveredMessagesForUser(userId, io).catch((err) =>
+        console.error("markUndeliveredMessagesForUser error on connect:", err)
+      );
 
       const blockedIds = await getBlockedUserIds(userId);
 

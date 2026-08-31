@@ -72,6 +72,10 @@ export const chatService = {
     return await chatRepository.getMessages(chatId, userId, limit, beforeId);
   },
 
+  async getMessageById(messageId: number, userId: number) {
+    return await chatRepository.getMessageById(messageId, userId);
+  },
+
   async createChat(userId: number, contactId: number) {
     if (userId === contactId) {
       throw new Error('Cannot create a chat with yourself');

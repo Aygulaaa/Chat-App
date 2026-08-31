@@ -27,6 +27,8 @@ export async function sendChatPushNotification(payload: SendChatPushPayload): Pr
       data: {
         chatId: String(payload.chatId),
         senderId: String(payload.senderId),
+        title: String(payload.title),
+        body: String(payload.body),
         click_action: 'FLUTTER_NOTIFICATION_CLICK',
       },
       android: {
@@ -81,11 +83,12 @@ export async function sendPushToMembers(
   body: string,
   messageId?: number
 ): Promise<void> {
-  // Fetch all members with their FCM tokens in one query
+  // Fetch all members with their FCM tokens and notification settings in one query
   const membersResult = await db.query(
-    `SELECT cm.user_id, u.fcm_token
+    `SELECT cm.user_id, u.fcm_token, COALESCE(us.notifications_enabled, true) AS notifications_enabled
      FROM chat_members cm
      JOIN users u ON u.id = cm.user_id
+     LEFT JOIN user_settings us ON us.user_id = cm.user_id
      WHERE cm.chat_id = $1`,
     [chatId]
   );
@@ -95,6 +98,9 @@ export async function sendPushToMembers(
 
     // Never push to the sender themselves
     if (memberId === senderId) continue;
+
+    // Skip if recipient has notifications disabled in their settings
+    if (member.notifications_enabled === false) continue;
 
     // Skip blocked pairs
     const blocked = await isBlocked(memberId, senderId);
@@ -108,7 +114,7 @@ export async function sendPushToMembers(
     if (io) {
       const recipientSockets = await io.in(`user_${memberId}`).fetchSockets();
       const isInsideActiveChat = recipientSockets.some(
-        (s: any) => s.data.activeChatId === chatId
+        (s: any) => s.data.activeChatId != null && Number(s.data.activeChatId) === Number(chatId)
       );
       if (isInsideActiveChat) continue;
     }

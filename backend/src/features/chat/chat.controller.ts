@@ -96,7 +96,8 @@ export const chatController = {
       const senderName = await getSenderName(senderId);
       await sendPushToMembers(io ?? null, chatId, senderId, senderName, text.trim(), message.id);
 
-      res.json(message);
+      const finalMessage = (await chatService.getMessageById(message.id, senderId)) || message;
+      res.json(finalMessage);
     } catch (err: any) {
       res.status(err.status || 500).json({ error: err.message || 'Failed to send message.' });
     }
@@ -124,7 +125,8 @@ export const chatController = {
       const senderName = await getSenderName(senderId);
       await sendPushToMembers(io ?? null, chatId, senderId, senderName, req.file.originalname, message.id);
 
-      res.json(message);
+      const finalMessage = (await chatService.getMessageById(message.id, senderId)) || message;
+      res.json(finalMessage);
     } catch (err: any) {
       console.error('File upload error:', err);
       res.status(err.status || 500).json({ error: err.message || 'Failed to send file.' });

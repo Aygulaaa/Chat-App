@@ -205,30 +205,31 @@ export const chatSocket = (io: Server) => {
           const msgId = Number(messageId);
           if (!msgId || !socket.user) return;
 
-          // Atomically mark delivered if not blocked
           const result = await db.query(
             `UPDATE messages m
-             SET delivered_at = COALESCE(m.delivered_at, NOW())
-             FROM chat_members cm
-             LEFT JOIN contacts c ON 
-               ((c.user_id = $2 AND c.contact_user_id = m.sender_id) 
-                OR (c.user_id = m.sender_id AND c.contact_user_id = $2))
-               AND c.status = 'blocked'
-             WHERE m.id = $1 
-               AND cm.chat_id = m.chat_id 
-               AND cm.user_id = $2
-               AND m.sender_id != $2
-               AND c.user_id IS NULL
-             RETURNING m.chat_id, m.sender_id`,
+       SET delivered_at = COALESCE(m.delivered_at, NOW())
+       FROM chat_members cm
+       LEFT JOIN contacts c ON 
+         ((c.user_id = $2 AND c.contact_user_id = m.sender_id) 
+          OR (c.user_id = m.sender_id AND c.contact_user_id = $2))
+         AND c.status = 'blocked'
+       WHERE m.id = $1 
+         AND cm.chat_id = m.chat_id 
+         AND cm.user_id = $2
+         AND m.sender_id != $2
+         AND c.user_id IS NULL
+       RETURNING m.chat_id, m.sender_id, m.delivered_at`, // Return delivered_at
             [msgId, socket.user.id]
           );
 
           if (result.rowCount === 0) return;
-          const { chat_id, sender_id } = result.rows[0];
+          const { chat_id, sender_id, delivered_at } = result.rows[0];
 
+          // Emit to sender's room
           io.to(`user_${sender_id}`).emit("messages_delivered", {
             chatId: chat_id,
             messageIds: [msgId],
+            deliveredAt: delivered_at,
           });
         } catch (error) {
           console.error("message_received error:", error);

@@ -186,6 +186,34 @@ export const chatRepository = {
     return result.rows;
   },
 
+  async getMessageById(messageId: number, userId: number) {
+    const result = await db.query(
+      `
+      SELECT 
+        m.id,
+        m.chat_id as "chatId",
+        m.sender_id as "senderId",
+        m.text,
+        m.file_type as "fileType",
+        m.file_url as "fileUrl",
+        m.original_name as "originalName",
+        m.mime_type as "mimeType",
+        m.file_size as "fileSize",
+        m.created_at as "createdAt",  
+        m.delivered_at AS "deliveredAt",
+        m.read_at AS "readAt"
+      FROM messages m
+      WHERE m.id = $1
+        AND EXISTS (
+          SELECT 1 FROM chat_members WHERE chat_id = m.chat_id AND user_id = $2
+        )
+      LIMIT 1
+      `,
+      [messageId, userId]
+    );
+    return result.rows[0] ?? null;
+  },
+
   async sendMessage(chatId: number, senderId: number, text: string) {
     const result = await db.query(
       `

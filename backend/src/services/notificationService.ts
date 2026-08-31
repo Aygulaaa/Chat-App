@@ -78,7 +78,8 @@ export async function sendPushToMembers(
   chatId: number,
   senderId: number,
   senderName: string,
-  body: string
+  body: string,
+  messageId?: number
 ): Promise<void> {
   // Fetch all members with their FCM tokens in one query
   const membersResult = await db.query(
@@ -113,14 +114,32 @@ export async function sendPushToMembers(
     }
     // If io is null (no active socket), the user is definitely outside
     // the app, so we always send the push.
-console.log('socket is not active sendin gpush notifcation:', `${senderName} : ${body}`, member.fcm_token);
+    console.log('socket is not active sendin gpush notifcation:', `${senderName} : ${body}`, member.fcm_token);
 
-    await sendChatPushNotification({
-      fcmToken: member.fcm_token,
-      title: senderName,
-      body,
-      chatId,
-      senderId,
-    });
+    try {
+      await sendChatPushNotification({
+        fcmToken: member.fcm_token,
+        title: senderName,
+        body,
+        chatId,
+        senderId,
+      });
+
+      // Mark delivered in db if messageId is provided
+      if (messageId) {
+        await db.query(
+          `UPDATE messages SET delivered_at = COALESCE(delivered_at, NOW()) WHERE id = $1`,
+          [messageId]
+        );
+        if (io) {
+          io.to(`user_${senderId}`).emit("messages_delivered", {
+            chatId,
+            messageIds: [messageId],
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Error sending push notification for member:', e);
+    }
   }
 }

@@ -192,7 +192,7 @@ export const chatSocket = (io: Server) => {
           }
 
           // 4. Trigger background FCM notifications asynchronously
-          sendPushToMembers(io, chatId, senderId, senderName, text.trim()).catch((err) =>
+          sendPushToMembers(io, chatId, senderId, senderName, text.trim(), message.id).catch((err) =>
             console.error("Async Push Notification Error:", err)
           );
         } catch (e) {

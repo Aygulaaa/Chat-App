@@ -94,7 +94,7 @@ export const chatController = {
       // Async executions run cleanly without redundant queries
       await broadcastToChatMembers(io, chatId, senderId, 'message', message);
       const senderName = await getSenderName(senderId);
-      await sendPushToMembers(io ?? null, chatId, senderId, senderName, text.trim());
+      await sendPushToMembers(io ?? null, chatId, senderId, senderName, text.trim(), message.id);
 
       res.json(message);
     } catch (err: any) {
@@ -122,7 +122,7 @@ export const chatController = {
       const io = req.app.get('io');
       await broadcastToChatMembers(io, chatId, senderId, 'message', message);
       const senderName = await getSenderName(senderId);
-      await sendPushToMembers(io ?? null, chatId, senderId, senderName, req.file.originalname);
+      await sendPushToMembers(io ?? null, chatId, senderId, senderName, req.file.originalname, message.id);
 
       res.json(message);
     } catch (err: any) {

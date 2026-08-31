@@ -127,16 +127,29 @@ export const chatSocket = (io: Server) => {
       );
 
       const blockedIds = await getBlockedUserIds(userId);
+      const mySettings = await settingsService.getSettings(userId);
 
-      // Broadcast 'online' status ONLY to non-blocked, connected contacts
+      // Broadcast 'online' status ONLY to non-blocked, connected contacts with mutual last seen visibility
       for (const [onlineId] of onlineUsers.entries()) {
         if (onlineId !== userId && !blockedIds.has(onlineId)) {
-          io.to(`user_${onlineId}`).emit("user_status", { userId, status: "online" });
+          const receiverSettings = await settingsService.getSettings(onlineId);
+          if (!mySettings.hideLastSeen && !receiverSettings.hideLastSeen) {
+            io.to(`user_${onlineId}`).emit("user_status", { userId, status: "online" });
+          }
         }
       }
 
-      // Send initial snapshot of unblocked online contacts to the user
-      const initialOnline = getVisibleOnlineUsers(userId, blockedIds);
+      // Send initial snapshot of unblocked online contacts to the user (applying reciprocal privacy)
+      const initialOnlineUnfiltered = getVisibleOnlineUsers(userId, blockedIds);
+      const initialOnline = (await Promise.all(
+        initialOnlineUnfiltered.map(async (id) => {
+          if (id === userId) return id;
+          const otherSettings = await settingsService.getSettings(id);
+          if (mySettings.hideLastSeen || otherSettings.hideLastSeen) return null;
+          return id;
+        })
+      )).filter((id) => id !== null) as number[];
+      
       socket.emit("initial_online_users", initialOnline);
 
       // --- EVENT HANDLERS ---
@@ -250,8 +263,20 @@ export const chatSocket = (io: Server) => {
 
       socket.on("request_online_users", async () => {
         if (!socket.user) return;
-        const currentBlocked = await getBlockedUserIds(socket.user.id);
-        const onlineList = getVisibleOnlineUsers(socket.user.id, currentBlocked);
+        const currentId = socket.user.id;
+        const currentBlocked = await getBlockedUserIds(currentId);
+        const currentUserSettings = await settingsService.getSettings(currentId);
+
+        const onlineListUnfiltered = getVisibleOnlineUsers(currentId, currentBlocked);
+        const onlineList = (await Promise.all(
+          onlineListUnfiltered.map(async (id) => {
+            if (id === currentId) return id;
+            const otherSettings = await settingsService.getSettings(id);
+            if (currentUserSettings.hideLastSeen || otherSettings.hideLastSeen) return null;
+            return id;
+          })
+        )).filter((id) => id !== null) as number[];
+
         socket.emit("initial_online_users", onlineList);
       });
 
@@ -260,7 +285,7 @@ export const chatSocket = (io: Server) => {
         if (!readMessages || !readMessages.length) return;
 
         const currentUserSettings = await settingsService.getSettings(currentUserId);
-        if (currentUserSettings.hideReadReceipts) return;
+        if (currentUserSettings.hideReadReceipts) return; // User hides theirs, don't broadcast
 
         // Broadcast read receipt to unblocked chat members
         const membersResult = await db.query(
@@ -277,7 +302,15 @@ export const chatSocket = (io: Server) => {
         const readMsgIds = readMessages.map((m) => m.id);
 
         for (const row of membersResult.rows) {
-          io.to(`user_${row.user_id}`).emit("chat_read", {
+          const memberId = Number(row.user_id);
+          
+          // Apply reciprocal privacy for read receipts
+          if (memberId !== currentUserId) {
+            const memberSettings = await settingsService.getSettings(memberId);
+            if (memberSettings.hideReadReceipts) continue;
+          }
+
+          io.to(`user_${memberId}`).emit("chat_read", {
             chatId,
             readBy: currentUserId,
             messageIds: readMsgIds,
@@ -293,7 +326,7 @@ export const chatSocket = (io: Server) => {
 
           userConnections.delete(socket.id);
 
-          // Grace period (3s) before marking user offline to handle brief network switching
+          // Grace period (30s) before marking user offline to handle brief network switching
           if (userConnections.size === 0) {
             const timer = setTimeout(async () => {
               const currentConnections = onlineUsers.get(userId);
@@ -306,17 +339,21 @@ export const chatSocket = (io: Server) => {
 
                 for (const [onlineId] of onlineUsers.entries()) {
                   if (onlineId !== userId && !disconnectBlockedIds.has(onlineId)) {
+                    // Apply reciprocal logic: if either user hides last seen, it is obscured
+                    const receiverSettings = await settingsService.getSettings(onlineId);
+                    const hideExact = settings.hideLastSeen || receiverSettings.hideLastSeen;
+
                     io.to(`user_${onlineId}`).emit("user_status", {
                       userId,
                       status: "offline",
-                      lastSeen: settings.hideLastSeen ? null : new Date().toISOString(),
-                      lastSeenFuzzy: settings.hideLastSeen ? "recently" : null,
+                      lastSeen: hideExact ? null : new Date().toISOString(),
+                      lastSeenFuzzy: hideExact ? "recently" : null,
                     });
                   }
                 }
               }
               disconnectTimers.delete(userId);
-            }, 3000);
+            }, 30000);
 
             disconnectTimers.set(userId, timer);
           }

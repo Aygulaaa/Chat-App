@@ -23,9 +23,10 @@ export interface AuthSocket extends Socket {
   user?: { id: number };
 }
 
-// In-Memory Presence & Disconnect Caches
+// In-Memory Presence, Disconnect, & Privacy Caches
 const onlineUsers = new Map<number, Set<string>>();
 const disconnectTimers = new Map<number, NodeJS.Timeout>();
+const userSettingsCache = new Map<number, boolean>(); // Tracks 'hideLastSeen' to prevent DB bottleneck
 
 /**
  * Single-query retrieval of blocked contacts for a given user ID
@@ -43,22 +44,36 @@ async function getBlockedUserIds(userId: number): Promise<Set<number>> {
 }
 
 /**
- * Filter list of online users against a specific user's blocked contacts
+ * Filter list of online users against a specific user's blocked contacts AND privacy settings
  */
 function getVisibleOnlineUsers(userId: number, blockedIds: Set<number>): number[] {
+  // Check if current requesting user hid their own last seen
+  const requestingUserIsHidden = userSettingsCache.get(userId) ?? false;
+  
+  // Reciprocity Rule: If I hide my last seen, I can't see anyone else's
+  if (requestingUserIsHidden) {
+    return [];
+  }
+
   const filtered: number[] = [];
   for (const id of onlineUsers.keys()) {
-    if (id === userId || !blockedIds.has(id)) {
+    if (id === userId) {
       filtered.push(id);
+      continue;
+    }
+
+    if (!blockedIds.has(id)) {
+      const isHidden = userSettingsCache.get(id) ?? false;
+      if (!isHidden) {
+        filtered.push(id);
+      }
     }
   }
   return filtered;
 }
 
 /**
- * PRIVACY-SAFE TYPING HANDLER:
- * Fetches group chat members and excludes any user who has a mutual block relationship 
- * with the sender, ensuring typing events are never leaked to blocked users.
+ * PRIVACY-SAFE TYPING HANDLER
  */
 async function handleTypingStatus(
   socket: AuthSocket,
@@ -106,36 +121,37 @@ export const chatSocket = (io: Server) => {
 
       socket.data.user = socket.user;
 
-      // Clear any pending disconnect timer (reconnection within grace period)
       if (disconnectTimers.has(userId)) {
         clearTimeout(disconnectTimers.get(userId));
         disconnectTimers.delete(userId);
       }
 
-      // Track multi-device connections for this user
       if (!onlineUsers.has(userId)) {
         onlineUsers.set(userId, new Set());
       }
       onlineUsers.get(userId)!.add(socket.id);
 
-      // Join individual user room for targeted routing
       await socket.join(`user_${userId}`);
 
-      // Auto-mark any undelivered messages sent to this user as delivered
+      // --- FETCH AND CACHE PRIVACY SETTINGS ON CONNECT ---
+      const settings = await settingsService.getSettings(userId);
+      userSettingsCache.set(userId, settings.hideLastSeen);
+
       chatRepository.markUndeliveredMessagesForUser(userId, io).catch((err) =>
         console.error("markUndeliveredMessagesForUser error on connect:", err)
       );
 
       const blockedIds = await getBlockedUserIds(userId);
 
-      // Broadcast 'online' status ONLY to non-blocked, connected contacts
-      for (const [onlineId] of onlineUsers.entries()) {
-        if (onlineId !== userId && !blockedIds.has(onlineId)) {
-          io.to(`user_${onlineId}`).emit("user_status", { userId, status: "online" });
+      // --- BROADCAST PRESENCE ONLY IF PRIVACY SETTINGS ALLOW IT ---
+      if (!settings.hideLastSeen) {
+        for (const [onlineId] of onlineUsers.entries()) {
+          if (onlineId !== userId && !blockedIds.has(onlineId)) {
+            io.to(`user_${onlineId}`).emit("user_status", { userId, status: "online" });
+          }
         }
       }
 
-      // Send initial snapshot of unblocked online contacts to the user
       const initialOnline = getVisibleOnlineUsers(userId, blockedIds);
       socket.emit("initial_online_users", initialOnline);
 
@@ -148,9 +164,7 @@ export const chatSocket = (io: Server) => {
       });
 
       socket.on("leave_chat", ({ chatId }: { chatId?: number }) => {
-        if (chatId) {
-          socket.leave(`chat_${chatId}`);
-        }
+        if (chatId) socket.leave(`chat_${chatId}`);
         socket.data.activeChatId = null;
       });
 
@@ -169,11 +183,9 @@ export const chatSocket = (io: Server) => {
 
           if (!chatId || !text?.trim() || !senderId) return;
 
-          // 1. Persist message atomically
           const message = await chatService.sendMessage(chatId, senderId, text.trim());
           if (!message) return;
 
-          // 2. Fetch sender name and unblocked chat members in ONE SQL query
           const membersResult = await db.query(
             `SELECT 
                cm.user_id,
@@ -192,13 +204,11 @@ export const chatSocket = (io: Server) => {
           if (!membersResult.rows.length) return;
           const senderName = membersResult.rows[0]?.sender_name || "New Message";
 
-          // 3. Emit message to unblocked members' targeted rooms
           for (const row of membersResult.rows) {
             const memberId = Number(row.user_id);
             io.to(`user_${memberId}`).emit("message", message);
           }
 
-          // 4. Trigger background FCM notifications asynchronously
           sendPushToMembers(io, chatId, senderId, senderName, text.trim(), message.id).catch((err) =>
             console.error("Async Push Notification Error:", err)
           );
@@ -214,25 +224,24 @@ export const chatSocket = (io: Server) => {
 
           const result = await db.query(
             `UPDATE messages m
-       SET delivered_at = COALESCE(m.delivered_at, NOW())
-       FROM chat_members cm
-       LEFT JOIN contacts c ON 
-         ((c.user_id = $2 AND c.contact_user_id = m.sender_id) 
-          OR (c.user_id = m.sender_id AND c.contact_user_id = $2))
-         AND c.status = 'blocked'
-       WHERE m.id = $1 
-         AND cm.chat_id = m.chat_id 
-         AND cm.user_id = $2
-         AND m.sender_id != $2
-         AND c.user_id IS NULL
-       RETURNING m.chat_id, m.sender_id, m.delivered_at`, // Return delivered_at
+             SET delivered_at = COALESCE(m.delivered_at, NOW())
+             FROM chat_members cm
+             LEFT JOIN contacts c ON 
+               ((c.user_id = $2 AND c.contact_user_id = m.sender_id) 
+                OR (c.user_id = m.sender_id AND c.contact_user_id = $2))
+               AND c.status = 'blocked'
+             WHERE m.id = $1 
+               AND cm.chat_id = m.chat_id 
+               AND cm.user_id = $2
+               AND m.sender_id != $2
+               AND c.user_id IS NULL
+             RETURNING m.chat_id, m.sender_id, m.delivered_at`,
             [msgId, socket.user.id]
           );
 
           if (result.rowCount === 0) return;
           const { chat_id, sender_id, delivered_at } = result.rows[0];
 
-          // Emit to sender's room
           io.to(`user_${sender_id}`).emit("messages_delivered", {
             chatId: chat_id,
             messageIds: [msgId],
@@ -243,10 +252,48 @@ export const chatSocket = (io: Server) => {
         }
       });
 
-      socket.on("read_messages", async ({ chatId }: ReadMessagesPayload) => {
-        if (!socket.user || !chatId) return;
-        await handleMarkAsRead(chatId, socket.user.id);
+socket.on("read_messages", async ({ chatId }: ReadMessagesPayload) => {
+  if (!socket.user || !chatId) return;
+
+  const readerId = socket.user.id;
+
+  // 1. Check if the reader hid their read receipts
+  const readerSettings = await settingsService.getSettings(readerId);
+  if (readerSettings.hideReadReceipts) {
+    // Reciprocity: The user who hid receipts doesn't send read status to others
+    return;
+  }
+
+  const readMessages = await chatService.markMessagesRead(chatId, readerId);
+  if (!readMessages || !readMessages.length) return;
+
+  const membersResult = await db.query(
+    `SELECT cm.user_id 
+     FROM chat_members cm
+     LEFT JOIN contacts c ON 
+       ((c.user_id = $1 AND c.contact_user_id = cm.user_id) 
+        OR (c.user_id = cm.user_id AND c.contact_user_id = $1))
+       AND c.status = 'blocked'
+     WHERE cm.chat_id = $2 AND c.user_id IS NULL`,
+    [readerId, chatId]
+  );
+
+  const readMsgIds = readMessages.map((m) => m.id);
+
+  for (const row of membersResult.rows) {
+    const memberId = Number(row.user_id);
+
+    // 2. Also check if the recipient hid their read receipts
+    const recipientSettings = await settingsService.getSettings(memberId);
+    if (!recipientSettings.hideReadReceipts) {
+      io.to(`user_${memberId}`).emit("chat_read", {
+        chatId,
+        readBy: readerId,
+        messageIds: readMsgIds,
       });
+    }
+  }
+});
 
       socket.on("request_online_users", async () => {
         if (!socket.user) return;
@@ -254,36 +301,6 @@ export const chatSocket = (io: Server) => {
         const onlineList = getVisibleOnlineUsers(socket.user.id, currentBlocked);
         socket.emit("initial_online_users", onlineList);
       });
-
-      async function handleMarkAsRead(chatId: number, currentUserId: number) {
-        const readMessages = await chatService.markMessagesRead(chatId, currentUserId);
-        if (!readMessages || !readMessages.length) return;
-
-        const currentUserSettings = await settingsService.getSettings(currentUserId);
-        if (currentUserSettings.hideReadReceipts) return;
-
-        // Broadcast read receipt to unblocked chat members
-        const membersResult = await db.query(
-          `SELECT cm.user_id 
-           FROM chat_members cm
-           LEFT JOIN contacts c ON 
-             ((c.user_id = $1 AND c.contact_user_id = cm.user_id) 
-              OR (c.user_id = cm.user_id AND c.contact_user_id = $1))
-             AND c.status = 'blocked'
-           WHERE cm.chat_id = $2 AND c.user_id IS NULL`,
-          [currentUserId, chatId]
-        );
-
-        const readMsgIds = readMessages.map((m) => m.id);
-
-        for (const row of membersResult.rows) {
-          io.to(`user_${row.user_id}`).emit("chat_read", {
-            chatId,
-            readBy: currentUserId,
-            messageIds: readMsgIds,
-          });
-        }
-      }
 
       socket.on("disconnect", () => {
         try {
@@ -293,27 +310,31 @@ export const chatSocket = (io: Server) => {
 
           userConnections.delete(socket.id);
 
-          // Grace period (3s) before marking user offline to handle brief network switching
           if (userConnections.size === 0) {
             const timer = setTimeout(async () => {
               const currentConnections = onlineUsers.get(userId);
               if (!currentConnections || currentConnections.size === 0) {
                 onlineUsers.delete(userId);
                 await userService.updateLastSeen(userId);
-                const settings = await settingsService.getSettings(userId);
 
+                const isHidden = userSettingsCache.get(userId) ?? false;
                 const disconnectBlockedIds = await getBlockedUserIds(userId);
 
-                for (const [onlineId] of onlineUsers.entries()) {
-                  if (onlineId !== userId && !disconnectBlockedIds.has(onlineId)) {
-                    io.to(`user_${onlineId}`).emit("user_status", {
-                      userId,
-                      status: "offline",
-                      lastSeen: settings.hideLastSeen ? null : new Date().toISOString(),
-                      lastSeenFuzzy: settings.hideLastSeen ? "recently" : null,
-                    });
+                // --- DO NOT BROADCAST OFFLINE STATUS IF THEY ARE HIDDEN ---
+                if (!isHidden) {
+                  for (const [onlineId] of onlineUsers.entries()) {
+                    if (onlineId !== userId && !disconnectBlockedIds.has(onlineId)) {
+                      io.to(`user_${onlineId}`).emit("user_status", {
+                        userId,
+                        status: "offline",
+                        lastSeen: new Date().toISOString(),
+                        lastSeenFuzzy: null,
+                      });
+                    }
                   }
                 }
+                
+                userSettingsCache.delete(userId); // Cleanup
               }
               disconnectTimers.delete(userId);
             }, 3000);
@@ -323,7 +344,7 @@ export const chatSocket = (io: Server) => {
         } catch (error) {
           console.error("disconnect error:", error);
         }
-      }); 
+      });
     } catch (error) {
       console.error("connection error:", error);
     }

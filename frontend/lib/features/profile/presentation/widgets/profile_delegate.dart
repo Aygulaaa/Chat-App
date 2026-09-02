@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/core/utils/format_last_seen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
-import 'package:my_chat_app/features/profile/presentation/pages/edit_profile_screen.dart';
 import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
 
 class ProfileHeaderDelegate extends SliverPersistentHeaderDelegate {
@@ -104,7 +104,7 @@ class ProfileHeaderDelegate extends SliverPersistentHeaderDelegate {
                     left: 8.w,
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => context.pop(),
                     ),
                   ),
                 if (isMe)
@@ -113,12 +113,7 @@ class ProfileHeaderDelegate extends SliverPersistentHeaderDelegate {
                     right: 8.w,
                     child: IconButton(
                       icon: const Icon(Icons.edit_outlined, color: Colors.white),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EditProfileScreen(user: user),
-                        ),
-                      ),
+                      onPressed: () => context.push('/edit-profile', extra: user),
                     ),
                   ),
                 Positioned(

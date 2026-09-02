@@ -7,12 +7,17 @@ class ApiEndpoints {
   static const logout = '$auth/logout';
   static const changePassword = '$auth/password';
   static const verifyPassword = '$auth/verify-password';
+  
+  static const getSessions = '$auth/sessions';
+  static const terminateOtherSessions = '$auth/sessions/others';
+  static String revokeSession(int sessionId) => '$auth/sessions/$sessionId';
 
   static const chats = '/api/chats';
 
   static String chat(int chatId) => '$chats/$chatId';
   static String createChat(int contactId) => '$chats/create/$contactId';
   static String messages(int chatId) => '$chats/$chatId/messages';
+  static String markMessagesRead(int chatId) => '$chats/$chatId/messages/read'; // Added
   static String fileMessage(int chatId) => '$chats/$chatId/messages/file';
   static const createGroupChat = '$chats/group';
   static String addMember(int chatId) => '$chats/$chatId/members';

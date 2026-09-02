@@ -1,6 +1,7 @@
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
+import 'package:my_chat_app/features/auth/domain/entity/user_session.dart';
 
-abstract class AuthRepository {
+abstract interface class AuthRepository {
   Future<UserEntity> login({
     required String username,
     required String password,
@@ -20,5 +21,11 @@ abstract class AuthRepository {
     required String newPassword,
   });
 
-  Future<void> verifyPassword(String currentPassword);
+  Future<bool> verifyPassword(String currentPassword);
+  
+  Future<List<UserSessionEntity>> getSessions();
+  
+  Future<void> revokeSession(int sessionId);
+  
+  Future<void> terminateOtherSessions();
 }

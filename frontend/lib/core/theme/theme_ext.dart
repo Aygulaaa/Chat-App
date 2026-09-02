@@ -1,43 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 
+/// Production-ready Theme and Color extension on [BuildContext].
+/// Provides safe, high-performance, and reactive theme token access.
 extension ThemeExt on BuildContext {
-  // Check if current theme is light
-  bool get isLight => Theme.of(this).brightness == Brightness.light;
+  /// Theme brightness helper with safety context check.
+  bool get isLight {
+    return Theme.of(this).brightness == Brightness.light;
+  }
 
-  // Scaffold background color (Dynamic glassmorphism backdrop)
-  Color get appBg => isLight ? AppColors.lightBg : AppColors.darkBg;
+  /// Active color scheme token source (resolves [LightColors] or [DarkColors]).
+  AppColorScheme get colors => AppColors.of(this);
 
-  // Standard card background color
-  Color get cardBg => isLight ? AppColors.lightCard : AppColors.darkCard;
+  // ==========================================
+  // Background & Surface Tokens
+  // ==========================================
+  Color get appBg => colors.bg;
+  Color get cardBg => colors.card;
+  Color get cardAltBg => colors.cardAlt;
+  Color get surfaceBg => colors.surface;
+  Color get appBarBg => colors.appBar;
+  Color get inputFill => colors.inputFill;
+  Color get modalBg => colors.modalBg;
+  Color get modalSurface => colors.modalSurface;
 
-  // Glassmorphic panel background
-  Color get glassBg => isLight
-      ? Colors.white.withValues(alpha: 0.75)
-      : Colors.white.withValues(alpha: 0.04);
+  // ==========================================
+  // Glassmorphic & Border Tokens
+  // ==========================================
+  Color get glassBg => colors.surface;
+  Color get glassBorder => colors.glassBorder;
+  Color get border => colors.border;
 
-  // Glassmorphic panel border color
-  Color get glassBorder => isLight ? AppColors.lightBorder : AppColors.darkBorder;
+  // ==========================================
+  // Typography Tokens
+  // ==========================================
+  Color get textPrimary => colors.textPrimary;
+  Color get textSecondary => colors.textSecondary;
+  Color get textTertiary => colors.textTertiary;
 
-  // Text color - primary
-  Color get textPrimary => isLight ? AppColors.lightTextPrimary : AppColors.darkTextPrimary;
-
-  // Text color - secondary
-  Color get textSecondary => isLight ? AppColors.lightTextSecondary : AppColors.darkTextSecondary;
-
-  // Text color - tertiary / captions
-  Color get textTertiary => isLight ? AppColors.lightTextTertiary : AppColors.darkTextTertiary;
-
-  // Primary brand color
+  // ==========================================
+  // Brand Identity Tokens
+  // ==========================================
   Color get primaryColor => AppColors.primary;
-
-  // Accent brand color
   Color get accentColor => AppColors.accent;
+  Color get onlineStatus => AppColors.online;
+  Color get errorColor => AppColors.error;
 
-  // Dynamic gradient for backgrounds / page headers
-  LinearGradient get appBgGradient =>
-      isLight ? AppColors.lightBgGradient : AppColors.darkBgGradient;
-
-  // Dynamic gradient for message bubbles / items
+  // ==========================================
+  // Gradient Tokens
+  // ==========================================
+  LinearGradient get appBgGradient => colors.bgGradient;
+  LinearGradient get authBgGradient => colors.authGradient;
+  LinearGradient get headerGradient => colors.headerGradient;
   LinearGradient get primaryGradient => AppColors.primaryGradient;
 }
+
+

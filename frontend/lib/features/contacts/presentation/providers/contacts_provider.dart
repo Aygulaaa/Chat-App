@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:my_chat_app/core/di/global_provider.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/contacts/data/datasources/contacts_remote_datasource.dart';
+import 'package:my_chat_app/features/contacts/data/models/contact_model.dart';
 import 'package:my_chat_app/features/contacts/data/repositories/contacts_repository_impl.dart';
 import 'package:my_chat_app/features/contacts/domain/entities/contact.dart';
 import 'package:my_chat_app/features/contacts/domain/repositories/contacts_repository.dart';
@@ -42,12 +46,55 @@ class ContactsNotifier extends AsyncNotifier<List<Contact>> {
     final repo = ref.read(contactsRepositoryProvider);
     _getContacts = GetContacts(repo);
 
-    return await _getContacts!();
+    List<Contact> cachedList = [];
+    try {
+      final cachedStr = Hive.box<String>('contacts_cache').get('my_contacts');
+      if (cachedStr != null) {
+        final List<dynamic> decoded = jsonDecode(cachedStr);
+        cachedList = decoded.map((e) => ContactModel.fromJson(e)).toList();
+      }
+    } catch (_) {}
+
+    _fetchServerContacts();
+
+    return cachedList;
+  }
+
+  Future<void> _fetchServerContacts() async {
+    try {
+      final contacts = await _getContacts!();
+      if (!ref.mounted) return;
+      state = AsyncValue.data(contacts);
+      _persistCache(contacts);
+    } catch (e, st) {
+      if (!ref.mounted) return;
+      if (state.value == null || state.value!.isEmpty) {
+        state = AsyncValue.error(e, st);
+      }
+    }
+  }
+
+  Future<void> _persistCache(List<Contact> contacts) async {
+    try {
+      final toCache = contacts
+          .map((c) => ContactModel(
+                id: c.id,
+                username: c.username,
+                avatar: c.avatar,
+                bio: c.bio,
+                lastSeen: c.lastSeen,
+                lastSeenFuzzy: c.lastSeenFuzzy,
+                status: c.status,
+                isContact: c.isContact,
+                isBlocked: c.isBlocked,
+              ).toJson())
+          .toList();
+      await Hive.box<String>('contacts_cache').put('my_contacts', jsonEncode(toCache));
+    } catch (_) {}
   }
 
   Future<void> refresh() async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _getContacts!());
+    await _fetchServerContacts();
   }
 
   Future<void> addContact(int contactId) async {
@@ -128,18 +175,11 @@ class BlockedContactsNotifier extends AsyncNotifier<List<Contact>> {
 }
 
 final searchUsersProvider =
-    AsyncNotifierProvider.family<SearchNotifier, List<Contact>, String>(
-      SearchNotifier.new,
-    );
+    FutureProvider.family<List<Contact>, String>((ref, query) async {
+  if (query.trim().isEmpty) return [];
 
-class SearchNotifier extends FamilyAsyncNotifier<List<Contact>, String> {
-  @override
-  Future<List<Contact>> build(String query) async {
-    if (query.trim().isEmpty) return [];
+  final searchUsers = SearchUsers(ref.read(contactsRepositoryProvider));
+  await Future.delayed(const Duration(milliseconds: 300));
 
-    final searchUsers = SearchUsers(ref.read(contactsRepositoryProvider));
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    return await searchUsers(query.trim());
-  }
-}
+  return await searchUsers(query.trim());
+});

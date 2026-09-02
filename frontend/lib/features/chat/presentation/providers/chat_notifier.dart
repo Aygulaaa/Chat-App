@@ -1,135 +1,115 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:overlay_support/overlay_support.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
-
-import 'package:my_chat_app/features/chat/data/datasources/chat_remote_datatsources.dart';
-import 'package:my_chat_app/features/chat/data/datasources/chat_socket_datasource.dart';
+import 'package:my_chat_app/features/chat/data/models/chat_model.dart';
 import 'package:my_chat_app/features/chat/data/models/message_model.dart';
-
-import 'package:my_chat_app/features/chat/data/repositories/chat_repository_impl.dart';
-import 'package:my_chat_app/features/chat/data/repositories/chat_socket_datasourceImpl.dart';
-
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
-
-import 'package:my_chat_app/features/chat/domain/usecases/create_chat.dart';
-import 'package:my_chat_app/features/chat/domain/usecases/get_chat.dart';
-import 'package:my_chat_app/features/chat/domain/usecases/get_chats.dart';
-import 'package:my_chat_app/features/chat/domain/usecases/get_messages.dart';
-import 'package:my_chat_app/features/chat/domain/usecases/send_message.dart';
-
+import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_state.dart';
-import 'package:my_chat_app/features/chat/presentation/providers/message_notifier.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 
+part 'chat_notifier.g.dart';
 
-final chatRemoteDataSourceProvider = Provider(
-  (ref) => ChatRemoteDatatsources(ref.read(apiClientProvider)),
-);
+// -----------------------------------------------------------------------------
+// Presentation Layer — Chat Notifier
+// -----------------------------------------------------------------------------
 
-
-final chatSocketDataSourceProvider =
-    StateNotifierProvider<SocketNotifier, ChatSocketDatasource>(
-      (ref) => SocketNotifier(),
-    );
-
-class SocketNotifier extends StateNotifier<ChatSocketDatasource> {
-  SocketNotifier() : super(ChatSocketDatasourceImpl());
-
-  @override
-  void dispose() {
-    state.disconnect();
-    super.dispose();
-  }
-}
-
-final chatRepositoryProvider = Provider(
-  (ref) => ChatRepositoryImpl(
-    remote: ref.read(chatRemoteDataSourceProvider),
-    socket: ref.watch(chatSocketDataSourceProvider),
-  ),
-);
-
-/// ───────────────── USECASES ─────────────────
-
-final getChatsProvider = Provider(
-  (ref) => GetChats(ref.read(chatRepositoryProvider)),
-);
-
-final getChatProvider = Provider(
-  (ref) => GetChat(ref.read(chatRepositoryProvider)),
-);
-
-final getMessagesProvider = Provider(
-  (ref) => GetMessages(ref.read(chatRepositoryProvider)),
-);
-
-final sendMessageProvider = Provider(
-  (ref) => SendMessage(ref.read(chatRepositoryProvider)),
-);
-
-final createChatProvider = Provider(
-  (ref) => CreateChat(ref.read(chatRepositoryProvider)),
-);
-
-/// ───────────────── CHAT PROVIDER ─────────────────
-
-final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
-  return ChatNotifier(
-    getChats: ref.read(getChatsProvider),
-    datasource: ref.read(chatSocketDataSourceProvider),
-    ref: ref,
-  );
-});
-
-/// ───────────────── CHAT NOTIFIER ─────────────────
-
-class ChatNotifier extends StateNotifier<ChatState> {
-  final GetChats getChats;
-  final ChatSocketDatasource datasource;
-  final Ref ref;
-
+@Riverpod(keepAlive: true)
+class ChatNotifier extends _$ChatNotifier {
   StreamSubscription? _messageSub;
   StreamSubscription? _readSub;
   StreamSubscription? _deliveredSub;
   StreamSubscription? _groupDeletedSub;
 
-  /// Cached set of user IDs blocked by the current user.
-  /// Populated eagerly before socket listeners start.
   final Set<int> _blockedUserIds = {};
 
-  ChatNotifier({
-    required this.getChats,
-    required this.datasource,
-    required this.ref,
-  }) : super(const ChatState()) {
-    _initBlocked();
-  }
+  @override
+  ChatState build() {
+    ref.onDispose(() {
+      _cancelSubscriptions();
+    });
 
-  /// Load blocked IDs FIRST, then start socket + load chats.
-  Future<void> _initBlocked() async {
-    try {
-      final blocked = await ref.read(blockedContactsProvider.future);
-      _blockedUserIds.addAll(blocked.map((c) => c.id));
-      print('🚫 Loaded ${_blockedUserIds.length} blocked user IDs');
-    } catch (_) {
-      // If it fails, proceed with an empty set — backend is the safety net.
+    Future.microtask(() => _initBlocked());
+
+    // Load cached chats synchronously so UI never starts empty
+    if (Hive.isBoxOpen('chats_cache')) {
+      try {
+        final box = Hive.box<String>('chats_cache');
+        final cachedStr = box.get('all_chats');
+        if (cachedStr != null) {
+          final List<dynamic> decoded = jsonDecode(cachedStr);
+          final cachedChats = decoded
+              .map((e) => ChatModel.fromJson(e))
+              .toList();
+          cachedChats.sort((a, b) {
+            final aDate = a.lastMessage?.createdAt ?? DateTime(0);
+            final bDate = b.lastMessage?.createdAt ?? DateTime(0);
+            return bDate.compareTo(aDate);
+          });
+          if (cachedChats.isNotEmpty) {
+            return ChatState(chats: cachedChats);
+          }
+        }
+      } catch (_) {}
     }
 
-    // Auto-refresh the cached set whenever the provider is invalidated
-    // (e.g. after block/unblock actions).
+    return const ChatState();
+  }
+
+  void _cancelSubscriptions() {
+    _messageSub?.cancel();
+    _readSub?.cancel();
+    _deliveredSub?.cancel();
+    _groupDeletedSub?.cancel();
+  }
+
+  /// Centralized cache helper to ensure Hive stays perfectly synced with `state`
+  Future<void> _persistCache() async {
+    try {
+      if (!Hive.isBoxOpen('chats_cache')) return;
+      final box = Hive.box<String>('chats_cache');
+      final toCache = state.chats
+          .whereType<ChatModel>()
+          .map((e) => e.toJson())
+          .toList();
+      await box.put('all_chats', jsonEncode(toCache));
+    } catch (_) {}
+  }
+
+Future<void> _initBlocked() async {
+    try {
+      final blocked = await ref.read(blockedContactsProvider.future);
+      if (!ref.mounted) return;
+      _blockedUserIds.addAll(blocked.map((c) => c.id));
+    } catch (_) {}
+
+    if (!ref.mounted) return;
+
     ref.listen<AsyncValue<List<dynamic>>>(blockedContactsProvider, (_, next) {
+      if (!ref.mounted) return;
       next.whenData((blocked) {
+        final newBlockedIds = blocked.map((c) => c.id as int).toSet();
+        
+        // Check if any user was unblocked (was in old set, absent in new set)
+        final bool someoneWasUnblocked = _blockedUserIds.any((id) => !newBlockedIds.contains(id));
+
         _blockedUserIds
           ..clear()
-          ..addAll(blocked.map((c) => c.id));
-        print('🔄 Auto-refreshed blocked IDs: $_blockedUserIds');
+          ..addAll(newBlockedIds);
+
+        // Force a chat reload to fetch history/messages missed during the block
+        if (someoneWasUnblocked) {
+          loadChats();
+        }
       });
     });
 
@@ -137,41 +117,41 @@ class ChatNotifier extends StateNotifier<ChatState> {
     loadChats();
   }
 
-  /// Public method — can also be called manually if needed.
   void refreshBlockedIds() {
     ref
         .read(blockedContactsProvider.future)
         .then((blocked) {
+          if (!ref.mounted) return;
           _blockedUserIds
             ..clear()
             ..addAll(blocked.map((c) => c.id));
-          print('🔄 Refreshed blocked IDs: $_blockedUserIds');
         })
         .catchError((_) {});
   }
 
-  /// ───────────────── SOCKET EVENTS ─────────────────
+  // ─────────────────────────── SOCKET EVENTS ───────────────────────────────
 
   void _listenSocketEvents() {
-    _messageSub?.cancel();
+    final datasource = ref.read(chatSocketDataSourceProvider);
 
-    /// ✅ NEW MESSAGE
+    _cancelSubscriptions();
+
     _messageSub = datasource.onMessage().listen((data) {
+      if (!ref.mounted) return;
       try {
         final message = MessageModel.fromJson(data);
         final myId = ref.read(authProvider).user?.id;
 
-        // ── Block filter ──────────────────────────────────────────
-        // Reject messages from anyone in the blocked set (bidirectional
-        // — backend also enforces this, frontend is an extra guard).
         if (message.senderId != myId &&
             _blockedUserIds.contains(message.senderId)) {
-          print(
-            '🚫 ChatNotifier: dropped msg from blocked ${message.senderId}',
-          );
           return;
         }
-        // ──────────────────────────────────────────────────────────
+        print("message sender id  $message");
+        print("my id: $myId");
+
+        if (message.senderId != myId) {
+          datasource.emitMessageReceived(message.id);
+        }
 
         updateChatLastMessage(message);
 
@@ -197,7 +177,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
                   ? message.text!
                   : '📎 Attachment';
 
-              // ── In-app glassmorphic popup (only visible while app is open) ──
               showOverlay(
                 (context, progress) => Positioned(
                   top: MediaQuery.of(context).padding.top + 10,
@@ -245,7 +224,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Glowing avatar circle
                                   Container(
                                     width: 42,
                                     height: 42,
@@ -261,8 +239,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: AppColors.primary
-                                              .withOpacity(0.5),
+                                          color: AppColors.primary.withOpacity(
+                                            0.5,
+                                          ),
                                           blurRadius: 12,
                                           spreadRadius: -2,
                                         ),
@@ -275,7 +254,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
                                     ),
                                   ),
                                   const SizedBox(width: 12),
-                                  // Sender name + message body
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -310,7 +288,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  // Dismiss chevron
                                   Padding(
                                     padding: const EdgeInsets.only(top: 2),
                                     child: Icon(
@@ -333,17 +310,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
             }
           }
         }
-
-        print('📨 ChatNotifier received message ${message.id}');
-      } catch (e) {
-        print('❌ Message parse error: $e');
-      }
+      } catch (_) {}
     });
 
     /// ✅ READ EVENTS
     _readSub = datasource.onMessagesRead().listen((data) {
+      if (!ref.mounted) return;
       try {
-        final int chatId = int.tryParse(data['chatId']?.toString() ?? '') ?? 0;
+        final rawChatId = data['chatId'] ?? data['chat_id'];
+        final int chatId = int.tryParse(rawChatId?.toString() ?? '') ?? 0;
         if (chatId == 0) return;
 
         final List<int> messageIds = (data['messageIds'] as List? ?? [])
@@ -352,107 +327,139 @@ class ChatNotifier extends StateNotifier<ChatState> {
             .toList();
 
         final updatedChats = state.chats.map((chat) {
-          if (chat.id != chatId) {
-            return chat;
-          }
+          if (chat.id != chatId) return chat;
 
           final last = chat.lastMessage;
+          final bool isLastMessageRead =
+              last != null &&
+              (messageIds.isEmpty || messageIds.contains(last.id));
 
           return chat.copyWith(
             unreadCount: 0,
-
-            lastMessage: last != null && messageIds.contains(last.id)
-                ? last.copyWith(readAt: DateTime.now())
+            lastMessage: isLastMessageRead
+                ? last.copyWith(readAt: last.readAt ?? DateTime.now())
                 : last,
           );
         }).toList();
 
         state = state.copyWith(chats: updatedChats);
-
-        print('👀 Chat $chatId marked read');
-      } catch (e) {
-        print('❌ Read event error: $e');
-      }
+        _persistCache();
+      } catch (_) {}
     });
 
     /// ✅ DELIVERED EVENTS
     _deliveredSub = datasource.onMessagesDelivered().listen((data) {
+      if (!ref.mounted) return;
       try {
         final List<int> messageIds = (data['messageIds'] as List? ?? [])
             .map((e) => int.tryParse(e.toString()))
             .whereType<int>()
             .toList();
 
+        if (messageIds.isEmpty) return;
+
         final updatedChats = state.chats.map((chat) {
           final last = chat.lastMessage;
-
           if (last != null && messageIds.contains(last.id)) {
             return chat.copyWith(
-              lastMessage: last.copyWith(deliveredAt: DateTime.now()),
+              lastMessage: last.copyWith(
+                deliveredAt: last.deliveredAt ?? DateTime.now(),
+              ),
             );
           }
-
           return chat;
         }).toList();
 
         state = state.copyWith(chats: updatedChats);
-
-        print('📦 Messages delivered updated');
-      } catch (e) {
-        print('❌ Delivery event error: $e');
-      }
+        _persistCache();
+      } catch (_) {}
     });
 
-    /// ✅ GROUP DELETED (for non-creator members)
-    _groupDeletedSub?.cancel();
+    /// ✅ GROUP DELETED
     _groupDeletedSub = datasource.onGroupDeleted().listen((deletedChatId) {
-      print('🗑️ ChatNotifier: group_deleted for chatId=$deletedChatId');
+      if (!ref.mounted) return;
       removeChatFromList(deletedChatId);
     });
   }
 
-  /// ───────────────── LOAD CHATS ─────────────────
+  // ─────────────────────────── LOAD CHATS ──────────────────────────────────
 
   Future<void> loadChats() async {
-    state = state.copyWith(isLoading: true, error: null);
+    bool hasCache = false;
+    if (Hive.isBoxOpen('chats_cache')) {
+      final box = Hive.box<String>('chats_cache');
+      final cachedStr = box.get('all_chats');
+      if (cachedStr != null) {
+        try {
+          final List<dynamic> decoded = jsonDecode(cachedStr);
+          final cachedChats = decoded
+              .map((e) => ChatModel.fromJson(e))
+              .toList();
+          cachedChats.sort((a, b) {
+            final aDate = a.lastMessage?.createdAt ?? DateTime(0);
+            final bDate = b.lastMessage?.createdAt ?? DateTime(0);
+            return bDate.compareTo(aDate);
+          });
+          if (cachedChats.isNotEmpty) {
+            hasCache = true;
+            if (ref.mounted) {
+              state = state.copyWith(
+                chats: cachedChats,
+                isLoading: false,
+                error: null,
+              );
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (!hasCache && state.chats.isEmpty) {
+      state = state.copyWith(isLoading: true, error: null);
+    }
 
     try {
-      final chats = await getChats();
+      final chats = await ref.read(getChatsProvider).call();
+      if (!ref.mounted) return;
 
-      chats.sort((a, b) {
+      // Merge server chats with existing local state by ID
+      // Server chats take priority, but any locally-present chats
+      // not returned by the server are preserved to avoid disappearing
+      final serverChatMap = {for (final c in chats) c.id: c};
+      final existingChatMap = {for (final c in state.chats) c.id: c};
+
+      // Start with all server chats, then add any local-only chats
+      final mergedMap = {...existingChatMap, ...serverChatMap};
+      final mergedChats = mergedMap.values.toList();
+
+      mergedChats.sort((a, b) {
         final aDate = a.lastMessage?.createdAt ?? DateTime(0);
-
         final bDate = b.lastMessage?.createdAt ?? DateTime(0);
-
         return bDate.compareTo(aDate);
       });
 
-      state = state.copyWith(chats: chats, isLoading: false);
-
-      // 🔥 CRITICAL FIX: Initialize messageProvider for each chat
-      // This ensures socket listeners are active even when not viewing a chat
-      for (final chat in chats) {
-        print('🚀 Pre-initializing messageProvider for chatId: ${chat.id}');
-        ref.read(messageProvider(chat.id));
-      }
+      state = state.copyWith(chats: mergedChats, isLoading: false, error: null);
+      _persistCache();
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      if (!ref.mounted) return;
+      if (state.chats.isEmpty) {
+        state = state.copyWith(isLoading: false, error: e.toString());
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
     }
   }
 
-  /// ───────────────── RESET UNREAD ─────────────────
+  // ─────────────────────────── STATE MUTATIONS ─────────────────────────────
 
   void resetUnreadCount(int chatId) {
-    print('🧹 resetUnreadCount called for chat $chatId');
     final updated = state.chats.map((chat) {
-      if (chat.id == chatId) {
-        return chat.copyWith(unreadCount: 0);
-      }
-
+      if (chat.id == chatId) return chat.copyWith(unreadCount: 0);
       return chat;
     }).toList();
 
     state = state.copyWith(chats: updated);
+    _persistCache();
   }
 
   void updateChatLastMessage(Message message) {
@@ -465,8 +472,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
       }
       return chat;
     }).toList();
+
     if (!chatFound) {
-      // 🚨 The chat wasn't in the list yet! Force a reload so it appears with the new message.
       loadChats();
       return;
     }
@@ -478,24 +485,28 @@ class ChatNotifier extends StateNotifier<ChatState> {
     });
 
     state = state.copyWith(chats: updatedChats);
+    _persistCache();
   }
 
   void incrementUnreadCount(int chatId) {
     final updatedChats = state.chats.map((chat) {
       if (chat.id == chatId) {
-        print("chatId: ${chat.id}, unreadCount: ${chat.unreadCount}");
         return chat.copyWith(unreadCount: chat.unreadCount + 1);
       }
       return chat;
     }).toList();
     state = state.copyWith(chats: updatedChats);
+    _persistCache();
   }
 
   void removeChatFromList(int chatId) {
     state = state.copyWith(
       chats: state.chats.where((c) => c.id != chatId).toList(),
     );
+    _persistCache();
   }
+
+  // ─────────────────────────── MUTATIONS ───────────────────────────────────
 
   Future<void> updateGroupInfo(
     int chatId, {
@@ -508,45 +519,49 @@ class ChatNotifier extends StateNotifier<ChatState> {
       final updatedData = await ref
           .read(chatRepositoryProvider)
           .updateGroupInfo(
-            chatId,
+            chatId: chatId,
             name: name,
             avatarBytes: avatarBytes,
             filename: filename,
             mimeType: mimeType,
           );
 
+      if (!ref.mounted) return;
+
       final updatedChats = state.chats.map((chat) {
         if (chat.id == chatId) {
           return chat.copyWith(
-            name: updatedData['name'],
-            avatar: updatedData['avatar'],
+            name: updatedData.name,
+            avatar: updatedData.avatar,
           );
         }
         return chat;
       }).toList();
       state = state.copyWith(chats: updatedChats);
+      _persistCache();
     } catch (e) {
-      print('❌ updateGroupInfo error: $e');
       rethrow;
     }
   }
 
   Future<void> addMember(int chatId, int userId) async {
     try {
-      await ref.read(chatRepositoryProvider).addMember(chatId, userId);
-      await loadChats();
+      await ref
+          .read(chatRepositoryProvider)
+          .addMember(chatId: chatId, userId: userId);
+      if (ref.mounted) await loadChats();
     } catch (e) {
-      print('❌ addMember error: $e');
       rethrow;
     }
   }
 
   Future<void> removeMember(int chatId, int userId) async {
     try {
-      await ref.read(chatRepositoryProvider).removeMember(chatId, userId);
-      await loadChats();
+      await ref
+          .read(chatRepositoryProvider)
+          .removeMember(chatId: chatId, userId: userId);
+      if (ref.mounted) await loadChats();
     } catch (e) {
-      print('❌ removeMember error: $e');
       rethrow;
     }
   }
@@ -554,9 +569,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
   Future<void> deleteChat(int chatId) async {
     try {
       await ref.read(chatRepositoryProvider).deleteChat(chatId);
-      removeChatFromList(chatId);
+      if (ref.mounted) removeChatFromList(chatId);
     } catch (e) {
-      print('❌ deleteChat error: $e');
       rethrow;
     }
   }
@@ -564,11 +578,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
   Future<void> deleteGroup(int chatId) async {
     try {
       await ref.read(chatRepositoryProvider).deleteGroup(chatId);
-      // Remove locally for the creator immediately;
-      // other members are removed via the group_deleted socket event
-      removeChatFromList(chatId);
+      if (ref.mounted) removeChatFromList(chatId);
     } catch (e) {
-      print('❌ deleteGroup error: $e');
       rethrow;
     }
   }
@@ -581,15 +592,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
       return chat;
     }).toList();
     state = state.copyWith(chats: updatedChats);
-  }
-
-  @override
-  void dispose() {
-    _messageSub?.cancel();
-    _readSub?.cancel();
-    _deliveredSub?.cancel();
-    _groupDeletedSub?.cancel();
-
-    super.dispose();
+    _persistCache();
   }
 }

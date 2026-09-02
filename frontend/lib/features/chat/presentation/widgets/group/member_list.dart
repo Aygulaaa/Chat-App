@@ -1,11 +1,9 @@
-
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
-import 'package:my_chat_app/features/profile/presentation/pages/profile_screen.dart';
 
 /// Member List View Section
 class MemberListSection extends StatelessWidget {
@@ -89,12 +87,7 @@ class MemberListSection extends StatelessWidget {
               ),
               onTap: () {
                 if (!isCurrentUser) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProfileScreen(user: member),
-                    ),
-                  );
+                  context.push('/user-profile', extra: member);
                 }
               },
               trailing: isCurrentUser

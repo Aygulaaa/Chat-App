@@ -1,35 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
-import 'package:my_chat_app/features/contacts/presentation/pages/contacts_screen.dart';
 import 'package:my_chat_app/features/app_shell/presentation/widgets/glass_nav_bar.dart';
-import 'package:my_chat_app/features/chat/presentation/pages/home_page.dart';
-import 'package:my_chat_app/features/profile/presentation/pages/profile_screen.dart';
 
-class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+/// App shell host for preserving state across shell branch tabs.
+class MainScreen extends StatelessWidget {
+  const MainScreen({
+    required this.navigationShell,
+    super.key,
+  });
 
-  @override
-  State<MainScreen> createState() => _MainScreenState();
-}
+  final StatefulNavigationShell navigationShell;
 
-class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0;
+  /// Handles tab switching safely and prevents out-of-bounds assertions.
+  void _onTabChanged(int index) {
+    if (index < 0 || index >= 3) return;
+
+    navigationShell.goBranch(
+      index,
+      // Reset branch stack when tapping the active tab again
+      initialLocation: index == navigationShell.currentIndex,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      const HomePage(),
-      const ContactsScreen(),
-      const ProfileScreen(),
-    ];
-
     return Scaffold(
       backgroundColor: context.appBg,
       extendBody: true,
-      body: IndexedStack(index: _currentIndex, children: pages),
+      // StatefulNavigationShell renders the current branch directly
+      // preserving state across routes automatically.
+      body: navigationShell,
       bottomNavigationBar: GlassNavBar(
-        index: _currentIndex,
-        onChanged: (val) => setState(() => _currentIndex = val),
+        index: navigationShell.currentIndex.clamp(0, 2),
+        onChanged: _onTabChanged,
       ),
     );
   }

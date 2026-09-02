@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:go_router/go_router.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/data/datasources/chat_socket_datasource.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
+import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/message_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_app_bar.dart';
@@ -32,11 +33,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
     _socketDataSource = ref.read(chatSocketDataSourceProvider);
     Future.microtask(() async {
-      // Set active chat FIRST so incoming messages auto-trigger read
       _socketDataSource.setActiveChat(widget.chatId);
-      // Join must complete before read so the socket room is ready
       await _socketDataSource.joinChat(widget.chatId);
-      // Now safe to mark as read — socket is connected and room is joined
       await _socketDataSource.markChatAsRead(widget.chatId);
     });
   }
@@ -52,41 +50,51 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1733),
+        backgroundColor: ctx.modalSurface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.darkBorder),
+          side: BorderSide(color: ctx.border),
         ),
-        title: const Text(
+        title: Text(
           'Delete message?',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            color: ctx.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        content: const Text(
+        content: Text(
           'This message will be deleted for everyone.',
-          style: TextStyle(color: AppColors.darkTextSecondary, fontSize: 14),
+          style: TextStyle(
+            color: ctx.textSecondary,
+            fontSize: 14,
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.darkTextSecondary)),
+            onPressed: () => ctx.pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: ctx.textSecondary),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
+              backgroundColor: ctx.errorColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
               elevation: 0,
             ),
             onPressed: () {
-              Navigator.pop(ctx);
+              ctx.pop();
               ref
                   .read(messageProvider(widget.chatId).notifier)
                   .deleteMessage(widget.chatId, message.id);
             },
-            child: const Text('Delete',
-                style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -116,18 +124,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     bool deleteChat = false;
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
           return AlertDialog(
-            backgroundColor: context.cardBg,
+            backgroundColor: dialogCtx.modalSurface,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: context.glassBorder),
+              side: BorderSide(color: dialogCtx.border),
             ),
             title: Text(
               'Block $username?',
               style: TextStyle(
-                color: context.textPrimary,
+                color: dialogCtx.textPrimary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -138,7 +146,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 Text(
                   'Are you sure you want to block this user? They will not be able to message you.',
                   style: TextStyle(
-                    color: context.textSecondary,
+                    color: dialogCtx.textSecondary,
                     fontSize: 14,
                   ),
                 ),
@@ -159,7 +167,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           width: 24,
                           child: Checkbox(
                             value: deleteChat,
-                            activeColor: AppColors.error,
+                            activeColor: dialogCtx.errorColor,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(4),
                             ),
@@ -175,7 +183,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           child: Text(
                             'Delete chat history',
                             style: TextStyle(
-                              color: context.textPrimary,
+                              color: dialogCtx.textPrimary,
                               fontSize: 14,
                             ),
                           ),
@@ -188,27 +196,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Cancel', style: TextStyle(color: context.textSecondary)),
+                onPressed: () => dialogCtx.pop(),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: dialogCtx.textSecondary),
+                ),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.error,
+                  backgroundColor: dialogCtx.errorColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                   elevation: 0,
                 ),
                 onPressed: () async {
-                  final nav = Navigator.of(context);
-                  nav.pop(); // Close dialog
-                  // Block the user
-                  await ref.read(contactsProvider.notifier).blockUser(otherUserId);
+                  dialogCtx.pop();
+                  await ref
+                      .read(contactsProvider.notifier)
+                      .blockUser(otherUserId);
                   if (deleteChat) {
-                    // Delete the chat and go back
-                    await ref.read(chatProvider.notifier).deleteChat(widget.chatId);
-                    if (mounted) {
-                      nav.pop(); // Go back to home screen
+                    await ref
+                        .read(chatProvider.notifier)
+                        .deleteChat(widget.chatId);
+                    if (context.mounted) {
+                      context.pop();
                     }
                   }
                 },
@@ -227,46 +239,57 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(messageProvider(widget.chatId));
-    final chatState = ref.watch(chatProvider);
     final userId = ref.watch(authProvider).user?.id;
 
-    final chats = chatState.chats.where((c) => c.id == widget.chatId).toList();
-    if (chats.isEmpty) {
+    // Optimized Provider Selectors to prevent extra widget rebuilds
+    final chat = ref.watch(
+      chatProvider.select(
+        (s) => s.chats.cast<dynamic>().firstWhere(
+              (c) => c.id == widget.chatId,
+              orElse: () => null,
+            ),
+      ),
+    );
+
+    if (chat == null) {
       return Scaffold(
         backgroundColor: context.appBg,
-        body: const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
+        body: Center(
+          child: CircularProgressIndicator(color: context.primaryColor),
         ),
       );
     }
 
-    final chat = chats.first;
     final bool isGroup = chat.isGroup;
-
-    UserModel? otherUser;
     final users = List<UserModel>.from(chat.participants);
+    
+    UserModel? otherUser;
     if (!isGroup && users.isNotEmpty) {
       final filteredUsers = users.where((u) => u.id != userId).toList();
       otherUser = filteredUsers.isNotEmpty ? filteredUsers.first : users.first;
     }
 
-    final typingStatus = ref.watch(
-      messageProvider(widget.chatId).select((s) => s.typingStatus),
+    final isOnline = ref.watch(
+      userStatusProvider.select(
+        (s) => otherUser != null ? (s.onlineUsers[otherUser.id] ?? false) : false,
+      ),
     );
-    final onlineUsers = ref.watch(userStatusProvider).onlineUsers;
-    final bool isOnline = otherUser != null
-        ? (onlineUsers[otherUser.id] ?? false)
-        : false;
 
-    // Contact and block status
-    final contacts = ref.watch(contactsProvider).valueOrNull ?? [];
-    final blockedContacts =
-        ref.watch(blockedContactsProvider).valueOrNull ?? [];
+    final isContact = ref.watch(
+      contactsProvider.select(
+        (asyncVal) =>
+            otherUser != null &&
+            (asyncVal.value?.any((c) => c.id == otherUser!.id) ?? false),
+      ),
+    );
 
-    final bool isContact =
-        otherUser != null && contacts.any((c) => c.id == otherUser!.id);
-    final bool isBlocked =
-        otherUser != null && blockedContacts.any((c) => c.id == otherUser!.id);
+    final isBlocked = ref.watch(
+      blockedContactsProvider.select(
+        (asyncVal) =>
+            otherUser != null &&
+            (asyncVal.value?.any((c) => c.id == otherUser!.id) ?? false),
+      ),
+    );
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -283,10 +306,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           isBlocked: isBlocked,
           onBlock: otherUser != null
               ? () => _showBlockConfirmation(
-                  context,
-                  otherUser!.id,
-                  otherUser.username,
-                )
+                    context,
+                    otherUser!.id,
+                    otherUser.username,
+                  )
               : null,
           onUnblock: otherUser != null
               ? () => ref
@@ -344,9 +367,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 otherUser!.id,
                                 otherUser.username,
                               ),
-                              child: const Text(
+                              child: Text(
                                 'Block User',
-                                style: TextStyle(color: Colors.redAccent),
+                                style: TextStyle(color: context.errorColor),
                               ),
                             ),
                           ),
@@ -379,15 +402,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 ),
               Expanded(
                 child: state.isLoading
-                    ? const Center(
+                    ? Center(
                         child: CircularProgressIndicator(
-                          color: AppColors.primary,
+                          color: context.primaryColor,
                         ),
                       )
                     : MessageList(
                         messages: state.messages,
                         userId: userId,
-                        isTyping: typingStatus != null,
+                        isTyping: state.typingStatus != null,
                         typingUserId: state.typingUserId,
                         isGroup: isGroup,
                         participants: users,

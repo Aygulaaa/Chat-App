@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
+import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_list.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_search_bar.dart';
@@ -25,6 +26,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   void initState() {
     super.initState();
+    // Eagerly warm up keepAlive singletons so they are alive before widgets read them.
     ref.read(chatSocketDataSourceProvider);
     ref.read(chatProvider);
     ref.read(userStatusProvider);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,14 +8,12 @@ import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/domain/entities/chat.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
-import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_tile.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 
 class ChatList extends ConsumerWidget {
   const ChatList({super.key});
-
 
   void _showChatOptions(BuildContext context, Chat chat, WidgetRef ref) {
     showModalBottomSheet(
@@ -44,7 +43,9 @@ class ChatList extends ConsumerWidget {
 
             ListTile(
               leading: Icon(
-                chat.isMuted ? Icons.notifications_active_outlined : Icons.notifications_off_outlined,
+                chat.isMuted
+                    ? Icons.notifications_active_outlined
+                    : Icons.notifications_off_outlined,
                 color: Colors.white70,
               ),
               title: Text(
@@ -53,7 +54,7 @@ class ChatList extends ConsumerWidget {
               ),
               onTap: () {
                 ref.read(chatProvider.notifier).toggleMute(chat.id);
-                Navigator.pop(context);
+                context.pop();
               },
             ),
 
@@ -68,7 +69,7 @@ class ChatList extends ConsumerWidget {
               ),
               onTap: () {
                 ref.read(chatProvider.notifier).deleteChat(chat.id);
-                Navigator.pop(context);
+                context.pop();
               },
             ),
 
@@ -83,7 +84,7 @@ class ChatList extends ConsumerWidget {
                     orElse: () => users.first,
                   );
                 }
-                
+
                 if (otherUser != null) {
                   return ListTile(
                     leading: const Icon(
@@ -95,8 +96,14 @@ class ChatList extends ConsumerWidget {
                       style: TextStyle(color: Colors.redAccent),
                     ),
                     onTap: () {
-                      Navigator.pop(context); // Close bottom sheet
-                      _showBlockConfirmation(context, otherUser!.id, otherUser.username, chat.id, ref);
+                      context.pop(); // Close bottom sheet
+                      _showBlockConfirmation(
+                        context,
+                        otherUser!.id,
+                        otherUser.username,
+                        chat.id,
+                        ref,
+                      );
                     },
                   );
                 }
@@ -111,12 +118,18 @@ class ChatList extends ConsumerWidget {
     );
   }
 
-  void _showBlockConfirmation(BuildContext context, int otherUserId, String username, int chatId, WidgetRef ref) {
+  void _showBlockConfirmation(
+    BuildContext context,
+    int otherUserId,
+    String username,
+    int chatId,
+    WidgetRef ref,
+  ) {
     bool deleteChat = false;
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
           return AlertDialog(
             backgroundColor: context.cardBg,
             shape: RoundedRectangleBorder(
@@ -187,8 +200,9 @@ class ChatList extends ConsumerWidget {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Cancel', style: TextStyle(color: context.textSecondary)),
+                onPressed: () => dialogContext.pop(),
+                child: Text('Cancel',
+                    style: TextStyle(color: context.textSecondary)),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -199,14 +213,16 @@ class ChatList extends ConsumerWidget {
                   elevation: 0,
                 ),
                 onPressed: () async {
-                  final nav = Navigator.of(context);
-                  nav.pop();
-                  await ref.read(contactsProvider.notifier).blockUser(otherUserId);
+                  dialogContext.pop();
+                  await ref
+                      .read(contactsProvider.notifier)
+                      .blockUser(otherUserId);
                   if (deleteChat) {
                     await ref.read(chatProvider.notifier).deleteChat(chatId);
                   }
                 },
-                child: const Text('Block', style: TextStyle(color: Colors.white)),
+                child:
+                    const Text('Block', style: TextStyle(color: Colors.white)),
               ),
             ],
           );
@@ -221,7 +237,7 @@ class ChatList extends ConsumerWidget {
 
     final currentUserId = ref.watch(authProvider).user?.id;
 
-    if (state.isLoading) {
+    if (state.isLoading && state.chats.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(
           color: AppColors.primary,
@@ -239,9 +255,7 @@ class ChatList extends ConsumerWidget {
               color: Colors.redAccent,
               size: 40,
             ),
-
             const SizedBox(height: 12),
-
             Text(
               state.error!,
               style: const TextStyle(
@@ -271,30 +285,23 @@ class ChatList extends ConsumerWidget {
       onRefresh: () async {
         await ref.read(chatProvider.notifier).loadChats();
       },
-
       color: AppColors.primary,
       backgroundColor: AppColors.darkCard,
-
       child: ListView.builder(
         physics: const BouncingScrollPhysics(
           parent: AlwaysScrollableScrollPhysics(),
         ),
-
         padding: EdgeInsets.symmetric(
           horizontal: 12.w,
           vertical: 8.h,
         ),
-
         itemCount: state.chats.length,
-
         itemBuilder: (context, index) {
           final chat = state.chats[index];
 
           final isGroup = chat.isGroup;
 
-          final users = chat.participants
-              .whereType<UserModel>()
-              .toList();
+          final users = chat.participants.whereType<UserModel>().toList();
 
           UserModel? otherUser;
 
@@ -309,9 +316,7 @@ class ChatList extends ConsumerWidget {
               ? (chat.name ?? 'Group')
               : (otherUser?.username ?? 'Unknown');
 
-          final avatar = isGroup
-              ? chat.avatar
-              : otherUser?.avatar;
+          final avatar = isGroup ? chat.avatar : otherUser?.avatar;
 
           final lastMsg = chat.lastMessage;
           String subtitle = 'No messages yet';
@@ -327,40 +332,21 @@ class ChatList extends ConsumerWidget {
 
           return Padding(
             padding: EdgeInsets.only(bottom: 8.h),
-
             child: ChatTile(
               userId: otherUser?.id ?? 0,
-
               name: title,
-
               avatarUrl: avatar,
-
               message: subtitle,
-
               time: _formatTime(
                 chat.lastMessage?.createdAt,
               ),
-
               unread: chat.unreadCount > 0,
-
               unreadCount: chat.unreadCount,
-
               isMuted: chat.isMuted,
-
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ChatScreen(
-                      chatId: chat.id,
-                      username: title,
-                    ),
-                  ),
-                );
+                context.push('/chat/conversation/${chat.id}', extra: title);
               },
-
-              onLongPress: () =>
-                  _showChatOptions(context, chat, ref),
+              onLongPress: () => _showChatOptions(context, chat, ref),
             ),
           );
         },

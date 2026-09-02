@@ -36,4 +36,23 @@ class ChatModel extends Chat {
           .toList(),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'type': type,
+      'name': name,
+      'avatar': avatar,
+      'createdBy': createdBy,
+      'unreadCount': unreadCount,
+      'lastMessage': (lastMessage is MessageModel) 
+          ? (lastMessage as MessageModel).toJson() 
+          : null,
+      'participants': participants.map((p) {
+        if (p is UserModel) return p.toJson();
+        return {'id': p.id, 'username': p.username, 'avatar': p.avatar};
+      }).toList(),
+      'isMuted': isMuted,
+    };
+  }
 }

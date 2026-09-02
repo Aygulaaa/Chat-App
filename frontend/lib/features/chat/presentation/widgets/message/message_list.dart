@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/utils/date_formatter.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
@@ -6,7 +7,6 @@ import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat/date_divider.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message/message_bubble.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message/typing_indicator.dart';
-import 'package:my_chat_app/features/profile/presentation/pages/profile_screen.dart';
 import 'package:collection/collection.dart';
 
 class MessageList extends StatelessWidget {
@@ -67,6 +67,7 @@ class MessageList extends StatelessWidget {
             msg.createdAt.day != messages[msgIndex + 1].createdAt.day;
 
         return Column(
+          key: ValueKey(msg.id),
           children: [
             if (showDateHeader)
               DateDivider(text: DateFormatter.formatHeaderDate(msg.createdAt)),
@@ -77,11 +78,9 @@ class MessageList extends StatelessWidget {
               isGroup: isGroup,
               senderAvatar: sender?.avatar,
               onAvatarTap: sender != null
-                  ? () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProfileScreen(user: sender),
-                        ),
+                  ? () => context.pushNamed(
+                        'profile',
+                        extra: sender,
                       )
                   : null,
               onDelete: msg.senderId == userId

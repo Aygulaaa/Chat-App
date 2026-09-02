@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/settings/presentation/providers/settings_provider.dart';
-import 'package:my_chat_app/features/settings/presentation/widgets/blocked_contacts.dart';
+import 'package:my_chat_app/features/settings/presentation/widgets/change_password_modal.dart'
+    as my_chat_app_password_modal;
 import 'package:my_chat_app/features/settings/presentation/widgets/settings_section.dart';
 import 'package:my_chat_app/features/settings/presentation/widgets/settings_tile.dart';
-import 'package:my_chat_app/features/settings/presentation/widgets/change_password_modal.dart' as my_chat_app_password_modal;
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -34,7 +35,10 @@ class SettingsScreen extends ConsumerWidget {
       body: settingsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
-          child: Text('$e', style: TextStyle(color: AppColors.error, fontSize: 13.sp)),
+          child: Text(
+            '$e',
+            style: TextStyle(color: AppColors.error, fontSize: 13.sp),
+          ),
         ),
         data: (settings) => ListView(
           padding: EdgeInsets.only(bottom: 40.h),
@@ -102,7 +106,8 @@ class SettingsScreen extends ConsumerWidget {
                       : Icons.light_mode_outlined,
                   iconColor: Colors.purpleAccent,
                   title: 'Theme',
-                  subtitle: settings?.theme == 'dark' ? 'Dark Mode' : 'Light Mode',
+                  subtitle:
+                      settings?.theme == 'dark' ? 'Dark Mode' : 'Light Mode',
                   onTap: () {
                     final current = settings?.theme ?? 'dark';
                     ref.read(settingsProvider.notifier).updateSettings({
@@ -126,7 +131,8 @@ class SettingsScreen extends ConsumerWidget {
                       context: context,
                       isScrollControlled: true,
                       backgroundColor: Colors.transparent,
-                      builder: (context) => const my_chat_app_password_modal.ChangePasswordModal(),
+                      builder: (context) =>
+                          const my_chat_app_password_modal.ChangePasswordModal(),
                     );
                   },
                 ),
@@ -142,16 +148,13 @@ class SettingsScreen extends ConsumerWidget {
                   iconColor: Colors.cyanAccent,
                   title: 'Blocked Contacts',
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const BlockedContactsPage()),
-                    );
+                    context.push('/blocked-contacts');
                   },
                 ),
               ],
             ),
 
-            SizedBox(height: 24.h),
+            SizedBox(height: 30.h),
           ],
         ),
       ),

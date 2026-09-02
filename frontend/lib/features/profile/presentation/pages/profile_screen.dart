@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
-import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
+import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
 import 'package:my_chat_app/features/profile/presentation/widgets/info_card.dart';
@@ -172,14 +173,9 @@ class _OtherProfile extends ConsumerWidget {
 
                               if (!context.mounted) return;
 
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ChatScreen(
-                                    chatId: chatId,
-                                    username: effectiveUser.username,
-                                  ),
-                                ),
+                              context.push(
+                                '/chat/conversation/$chatId',
+                                extra: effectiveUser.username,
                               );
                             } catch (e) {
                               if (context.mounted) {

@@ -5,6 +5,7 @@ import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/core/utils/error_handler.dart';
+import 'package:go_router/go_router.dart';
 
 class ChangePasswordModal extends ConsumerStatefulWidget {
   const ChangePasswordModal({super.key});
@@ -96,7 +97,7 @@ class _ChangePasswordModalState extends ConsumerState<ChangePasswordModal> {
           );
 
       if (mounted) {
-        Navigator.pop(context);
+        context.pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Password changed successfully'),

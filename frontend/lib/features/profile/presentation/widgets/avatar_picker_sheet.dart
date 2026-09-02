@@ -1,5 +1,5 @@
 import 'dart:ui';
-
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
@@ -10,6 +10,7 @@ class AvatarPickerSheet extends StatelessWidget {
   final VoidCallback onGallery;
 
   const AvatarPickerSheet({
+    super.key,
     required this.hasAvatar,
     required this.onCamera,
     required this.onGallery,
@@ -92,7 +93,7 @@ class AvatarPickerSheet extends StatelessWidget {
               
                   // Cancel
                   GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () => context.pop(),
                     child: Container(
                       width: double.infinity,
                       padding: EdgeInsets.symmetric(vertical: 14.h),

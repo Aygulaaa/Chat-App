@@ -179,7 +179,7 @@ class _BubbleBody extends StatelessWidget {
                       child: _ImageTimeOverlay(
                         time: time!,
                         isMe: isMe,
-                        status: message.status,
+                        message: message,
                       ),
                     ),
                 ],
@@ -202,7 +202,7 @@ class _BubbleBody extends StatelessWidget {
                         ),
                         if (isMe) ...[
                           SizedBox(width: 3.w),
-                          MessageStatusTick(status: message.status),
+                          MessageStatusTick(message: message),
                         ],
                       ],
                     ),
@@ -218,12 +218,12 @@ class _BubbleBody extends StatelessWidget {
 class _ImageTimeOverlay extends StatelessWidget {
   final String time;
   final bool isMe;
-  final dynamic status;
+  final dynamic message;
 
   const _ImageTimeOverlay({
     required this.time,
     required this.isMe,
-    required this.status,
+    required this.message,
   });
 
   @override
@@ -246,7 +246,7 @@ class _ImageTimeOverlay extends StatelessWidget {
           ),
           if (isMe) ...[
             SizedBox(width: 3.w),
-            MessageStatusTick(status: status),
+            MessageStatusTick(message: message),
           ],
         ],
       ),

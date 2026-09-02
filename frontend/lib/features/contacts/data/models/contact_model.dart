@@ -31,4 +31,18 @@ class ContactModel extends Contact {
       isBlocked: json['isBlocked'] ?? (status == 'blocked'),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'username': username,
+      'avatar': avatar,
+      'bio': bio,
+      'lastSeen': lastSeen?.toIso8601String(),
+      'lastSeenFuzzy': lastSeenFuzzy,
+      'status': status,
+      'isContact': isContact,
+      'isBlocked': isBlocked,
+    };
+  }
 }

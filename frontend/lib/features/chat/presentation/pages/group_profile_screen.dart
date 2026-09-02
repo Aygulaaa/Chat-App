@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
@@ -101,7 +102,7 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () => ctx.pop(),
             child: Text('Cancel', style: TextStyle(color: context.textSecondary)),
           ),
           ElevatedButton(
@@ -113,13 +114,13 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
               ),
             ),
             onPressed: () async {
-              Navigator.pop(ctx); // close dialog
+              ctx.pop(); // close dialog
               await ref
                   .read(chatProvider.notifier)
                   .deleteGroup(widget.chatId);
               if (mounted) {
-                // pop group profile + chat screen back to home
-                Navigator.of(context).popUntil((route) => route.isFirst);
+                // Navigate back to home root using GoRouter
+                context.go('/');
               }
             },
             child: const Text(
@@ -139,9 +140,9 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
 
     if (chats.isEmpty) {
       return Scaffold(
-        backgroundColor: AppColors.darkBg,
-        body: const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
+        backgroundColor: context.appBg,
+        body: Center(
+          child: CircularProgressIndicator(color: context.primaryColor),
         ),
       );
     }
@@ -154,7 +155,7 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
     final imageHeight = totalHeight * (1.0 - _sheetExtent);
 
     return Scaffold(
-      backgroundColor: AppColors.darkBg,
+      backgroundColor: context.appBg,
       body: NotificationListener<DraggableScrollableNotification>(
         onNotification: (notification) {
           setState(() {
@@ -189,7 +190,7 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
               left: 12.w,
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => context.pop(),
               ),
             ),
 

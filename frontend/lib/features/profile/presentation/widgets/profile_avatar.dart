@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
 import 'package:my_chat_app/features/profile/presentation/widgets/avatar_picker_sheet.dart';
+import 'package:go_router/go_router.dart';
 
 class ProfileAvatar extends ConsumerStatefulWidget {
   final String username;
@@ -28,7 +29,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
 
   Future<void> _showPickerSheet() async {
     final currentAvatar =
-        ref.read(userProfileProvider).valueOrNull?.avatar ?? widget.imageUrl;
+        ref.read(userProfileProvider).value?.avatar ?? widget.imageUrl;
 
     await showModalBottomSheet(
       context: context,
@@ -37,11 +38,11 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
       builder: (ctx) => AvatarPickerSheet(
         hasAvatar: currentAvatar != null,
         onCamera: () async {
-          Navigator.pop(ctx);
+          ctx.pop();
           await _pickAndUpload(ImageSource.camera);
         },
         onGallery: () async {
-          Navigator.pop(ctx);
+          ctx.pop();
           await _pickAndUpload(ImageSource.gallery);
         },
       ),
@@ -71,7 +72,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
     final String? latestUrl;
     if (widget.isMe) {
       latestUrl =
-          ref.watch(userProfileProvider).valueOrNull?.avatar ?? widget.imageUrl;
+          ref.watch(userProfileProvider).value?.avatar ?? widget.imageUrl;
     } else {
       latestUrl = widget.imageUrl;
     }

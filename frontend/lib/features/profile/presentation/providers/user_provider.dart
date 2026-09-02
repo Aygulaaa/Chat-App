@@ -1,11 +1,15 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
+import 'package:my_chat_app/core/di/global_provider.dart';
+import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import '../../domain/repository/user_repository.dart';
 import '../../data/repository/user_remote_datasourceImpl.dart';
 import '../../data/datasources/user_remote_datasource.dart';
-import 'dart:async';
 
 final userRemoteDatasourceProvider = Provider((ref) {
   final api = ref.read(apiClientProvider);
@@ -33,44 +37,85 @@ class UserProfileNotifier extends AsyncNotifier<UserEntity?> {
     final authState = ref.watch(authProvider);
     if (authState.isLoading) return null;
 
-    if (authState.user == null) return null;
+    if (authState.user != null) {
+      _fetchServerProfile();
+      return authState.user;
+    }
 
-    return ref.read(userRepositoryProvider).getMe();
+    UserEntity? cached;
+    try {
+      final cachedStr = Hive.box<String>('user_profile_cache').get('my_profile');
+      if (cachedStr != null) {
+        cached = UserModel.fromJson(jsonDecode(cachedStr));
+      }
+    } catch (_) {}
+
+    _fetchServerProfile();
+    return cached;
+  }
+
+  Future<void> _fetchServerProfile() async {
+    try {
+      final fresh = await ref.read(userRepositoryProvider).getMe();
+      if (!ref.mounted) return;
+      state = AsyncValue.data(fresh);
+      _cacheProfile(fresh);
+    } catch (e, st) {
+      if (!ref.mounted) return;
+      if (state.value == null) {
+        state = AsyncValue.error(e, st);
+      }
+    }
+  }
+
+  Future<void> _cacheProfile(UserEntity user) async {
+    try {
+      final model = UserModel(
+        id: user.id,
+        username: user.username,
+        avatar: user.avatar,
+        bio: user.bio,
+        birthDate: user.birthDate,
+        status: user.status,
+        lastSeen: user.lastSeen,
+        lastSeenFuzzy: user.lastSeenFuzzy,
+      );
+      await Hive.box<String>('user_profile_cache').put('my_profile', jsonEncode(model.toJson()));
+    } catch (_) {}
   }
 
   Future<void> fetchProfile() async {
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(
-      () => ref.read(userRepositoryProvider).getMe(),
-    );
+    await _fetchServerProfile();
   }
 
-Future<void> updateAvatarFromBytes(Uint8List bytes, String filename) async {
-  final previous = state;
-  state = await AsyncValue.guard(() async {
-    return ref
-        .read(userRepositoryProvider)
-        .uploadAvatarFromBytes(bytes, filename);
-  });
-  if (state.hasError) {
-    print('❌ Avatar upload failed: ${state.error}');
-    state = previous;
+  Future<void> updateAvatarFromBytes(Uint8List bytes, String filename) async {
+    final previous = state;
+    state = await AsyncValue.guard(() async {
+      final updated = await ref
+          .read(userRepositoryProvider)
+          .uploadAvatarFromBytes(bytes, filename);
+      _cacheProfile(updated);
+      return updated;
+    });
+    if (state.hasError) {
+      print('❌ Avatar upload failed: ${state.error}');
+      state = previous;
+    }
   }
-}
 
   Future<void> updateInfo(Map<String, dynamic> data) async {
     final previous = state;
-    state = await AsyncValue.guard(
-      () => ref.read(userRepositoryProvider).updateProfile(data),
-    );
+    state = await AsyncValue.guard(() async {
+      final updated = await ref.read(userRepositoryProvider).updateProfile(data);
+      _cacheProfile(updated);
+      return updated;
+    });
     if (state.hasError) state = previous;
   }
 
   Future<UserEntity> getUserById(int userId) async {
-    state = 
-    state = await AsyncValue.guard(
-      () => ref.read(userRepositoryProvider).getUserById(userId),
-    );
-    return state.value!;
+    final result = await ref.read(userRepositoryProvider).getUserById(userId);
+    return result;
   }
 }

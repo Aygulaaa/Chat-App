@@ -132,6 +132,10 @@ class ChatRemoteDatatsources {
     await api.delete(ApiEndpoints.deleteMessage(chatId, messageId));
   }
 
+  Future<void> markMessagesRead(int chatId) async {
+    await api.patch(ApiEndpoints.markMessagesRead(chatId), {});
+  }
+
   Future<void> deleteChat(int chatId) async {
     await api.delete(ApiEndpoints.deleteChat(chatId));
   }

@@ -72,10 +72,9 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
         _connectionCompleter!.complete();
       }
 
-      // ✅ rejoin chats after reconnect
+      // ✅ Rejoin chats and acknowledge delivery on reconnect
       for (final chatId in _joinedChats) {
         _socket?.emit('join_chat', {'chatId': chatId});
-
         print('♻️ Rejoined chat_$chatId');
       }
     });
@@ -87,7 +86,6 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
 
       for (final chatId in _joinedChats) {
         _socket?.emit('join_chat', {'chatId': chatId});
-
         print('♻️ Rejoined chat_$chatId');
       }
     });
@@ -108,7 +106,6 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
 
     _socket?.onDisconnect((reason) {
       print('❌ Socket disconnected: $reason');
-
       _connectionCompleter = Completer<void>();
     });
 
@@ -147,12 +144,19 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
     _socket?.on('chat_read', (data) {
       try {
         if (data is Map) {
-          _chatReadController.add(Map<String, dynamic>.from(data));
+          final mapData = Map<String, dynamic>.from(data);
+          _chatReadController.add(mapData);
+          _readController.add(
+            mapData,
+          ); // Send to onMessagesRead() listener in ChatNotifier
+          print('👀 Read receipt received: $mapData');
         }
       } catch (e) {
         print('chat_read error: $e');
       }
     });
+
+    // ───────────────── INCOMING MESSAGES ─────────────────
 
     _socket?.on('message', (data) async {
       try {
@@ -167,19 +171,25 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
 
         if (messageId == null || chatId == null) return;
 
-        _socket?.emit('message_received', {'messageId': messageId});
+        // 🚚 1. ALWAYS emit message_received as soon as payload hits the socket client
+        _socket?.emit('message_received', {
+          'messageId': messageId,
+          'chatId': chatId,
+        });
+        print('🚚 Emitted message_received for message $messageId');
 
-        if (_activeChatId == chatId) {
-          _socket?.emit('read_messages', {'chatId': chatId});
-
-          print('👀 Auto read for chat $chatId');
+        // 👀 2. If user is currently viewing this chat, trigger read receipt
+        // Use int comparison to avoid dynamic/num type mismatch
+        final chatIdInt = int.tryParse(chatId.toString());
+        if (_activeChatId != null && chatIdInt != null && _activeChatId == chatIdInt) {
+          _socket?.emit('read_messages', {'chatId': chatIdInt});
+          print('👀 Auto read emitted for chat $chatIdInt');
         }
       } catch (e) {
         print('message event error: $e');
       }
     });
 
- 
     _socket?.on('user_typing', (data) {
       try {
         if (data is Map) {
@@ -190,22 +200,22 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
       }
     });
 
- 
-    _socket?.on('messages_read', (data) {
-      try {
-        if (data is Map) {
-          _readController.add(Map<String, dynamic>.from(data));
-        }
-      } catch (e) {
-        print('messages_read error: $e');
-      }
-    });
+    // _socket?.on('messages_read', (data) {
+    //   try {
+    //     if (data is Map) {
+    //       _readController.add(Map<String, dynamic>.from(data));
+    //     }
+    //   } catch (e) {
+    //     print('messages_read error: $e');
+    //   }
+    // });
 
- 
+    // 🚚 Server acknowledges to sender that recipient received the message
     _socket?.on('messages_delivered', (data) {
       try {
         if (data is Map) {
           _deliveredController.add(Map<String, dynamic>.from(data));
+          print('🚚 Delivered update received: $data');
         }
       } catch (e) {
         print('messages_delivered error: $e');
@@ -214,7 +224,7 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
 
     _socket?.connect();
 
-    // ───────────────── GROUP DELETED ─────────────────
+    // ───────────────── GROUP / MESSAGE DELETED ─────────────────
 
     _socket?.on('group_deleted', (data) {
       try {
@@ -242,21 +252,19 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
     });
   }
 
-
   Future<void> _waitUntilConnected() async {
     if (_isConnected) return;
 
-    if (_connectionCompleter == null) {
-      throw Exception('Socket not initialized. Call connect() first.');
-    }
+    // if (_connectionCompleter == null) {
+    //   throw Exception('Socket not initialized. Call connect() first.');
+    // }
 
-    try {
-      await _connectionCompleter!.future.timeout(const Duration(seconds: 10));
-    } on TimeoutException {
-      print('⏳ Socket connection timeout');
-    }
+    // try {
+    //   await _connectionCompleter!.future.timeout(const Duration(seconds: 20));
+    // } on TimeoutException {
+    //   print('⏳ Socket connection timeout');
+    // }
   }
-
 
   @override
   void requestOnlineUsers() {
@@ -265,20 +273,39 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
 
   @override
   void setActiveChat(int? chatId) {
+    final previousChatId = _activeChatId;
     _activeChatId = chatId;
+    // Notify the backend so activeChatId on s.data is always accurate for push filtering
+    if (_isConnected) {
+      if (chatId != null) {
+        _socket?.emit('join_chat', {'chatId': chatId});
+      } else {
+        // Emit leave_chat with previous active chat ID to clear room membership and activeChatId state
+        _socket?.emit('leave_chat', {'chatId': previousChatId ?? 0});
+      }
+    }
   }
 
   @override
   int? get activeChatId => _activeChatId;
 
-  @override
-  Future<void> joinChat(int chatId) async {
-    await _waitUntilConnected();
-    if (_joinedChats.contains(chatId)) return;
-    _joinedChats.add(chatId);
+@override
+Future<void> joinChat(int chatId) async {
+  // 1. Optimistic local state update (Immediate)
+  if (_joinedChats.contains(chatId)) return;
+  _joinedChats.add(chatId);
+  print('🚪 Optimistically joined chat_$chatId');
+
+  // 2. Perform connection & socket emit in background without blocking
+  _waitUntilConnected().then((_) {
     _socket?.emit('join_chat', {'chatId': chatId});
-    print('🚪 Joined chat_$chatId');
-  }
+    print('✅ Confirmed join on socket for chat_$chatId');
+  }).catchError((error) {
+    // 3. Rollback local state if connection fails or times out
+    _joinedChats.remove(chatId);
+    print('❌ Failed to join chat_$chatId: $error');
+  });
+}
 
   @override
   Future<void> markChatAsRead(int chatId) async {
@@ -293,12 +320,11 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
     print('📬 message_received emitted for messageId $messageId');
   }
 
-
   @override
   Future<void> leaveChat(int chatId) async {
     _joinedChats.remove(chatId);
-
     _socket?.emit('leave_chat', {'chatId': chatId});
+
     if (_activeChatId == chatId) {
       _activeChatId = null;
     }
@@ -306,7 +332,6 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
     print('🚪 Left chat_$chatId');
   }
 
- 
   @override
   Future<void> sendMessage(dynamic message) async {
     await _waitUntilConnected();
@@ -319,7 +344,6 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
     print('📤 Sent message to chat ${message.chatId}');
   }
 
-
   @override
   Future<void> sendTypingEvent(int chatId, bool isTyping, int userId) async {
     await _waitUntilConnected();
@@ -331,7 +355,6 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
     print('✍️ Typing event: $eventName for user $userId');
   }
 
-  
   @override
   Stream<Map<String, dynamic>> onMessage() => _messageController.stream;
 
@@ -359,7 +382,8 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
   Stream<int> onGroupDeleted() => _groupDeletedController.stream;
 
   @override
-  Stream<Map<String, dynamic>> onMessageDeleted() => _messageDeletedController.stream;
+  Stream<Map<String, dynamic>> onMessageDeleted() =>
+      _messageDeletedController.stream;
 
   // ───────────────── DISCONNECT ─────────────────
 
@@ -368,11 +392,8 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
     print('🔌 Disconnecting socket...');
 
     _socket?.dispose();
-
     _socket?.disconnect();
-
     _socket = null;
-
     _connectionCompleter = null;
 
     print('🔌 Socket disconnected');

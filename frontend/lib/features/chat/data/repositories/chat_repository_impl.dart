@@ -4,6 +4,7 @@ import 'package:my_chat_app/features/chat/data/datasources/chat_remote_datatsour
 import 'package:my_chat_app/features/chat/data/datasources/chat_socket_datasource.dart';
 import 'package:my_chat_app/features/chat/data/models/message_model.dart';
 import 'package:my_chat_app/features/chat/domain/entities/chat.dart';
+import 'package:my_chat_app/features/chat/domain/entities/group_update_result.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/domain/repositories/chat_repository.dart';
 
@@ -24,13 +25,27 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<List<Message>> getMessages({required int chatId}) {
+  Future<List<Message>> getMessages({
+    required int chatId,
+    int limit = 50,
+    int? beforeId,
+  }) {
     return remote.getMessages(chatId);
   }
 
   @override
-  Future<Message> sendMessage(Message message) async {
+  Future<Message> sendMessage({
+    required int chatId,
+    required String text,
+  }) async {
     try {
+      final message = MessageModel(
+        id: 0,
+        chatId: chatId,
+        senderId: 0,
+        text: text,
+        createdAt: DateTime.now(),
+      );
       final response = await remote.sendMessageHttp(message);
       return response;
     } catch (e) {
@@ -51,17 +66,36 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
+  Future<void> leaveChat(int chatId) {
+    return socket.leaveChat(chatId);
+  }
+
+  @override
   Future<int> createChat(int contactId) async {
     final chat = await remote.createChat(contactId: contactId);
     return chat.id; // ✅ return just the id
   }
 
   @override
-  Future<Message> sendFileMessage(
-    int chatId,
-    Uint8List bytes,
-    String filename,
-    String mimeType, {
+  Future<int> createGroupChat({
+    required String name,
+    required List<int> memberIds,
+    String? avatar,
+  }) async {
+    final response = await remote.createGroupChat(
+      name: name,
+      memberIds: memberIds,
+      avatar: avatar,
+    );
+    return response['id'] as int;
+  }
+
+  @override
+  Future<Message> sendFileMessage({
+    required int chatId,
+    required Uint8List bytes,
+    required String filename,
+    required String mimeType,
     Function(int sent, int total)? onProgress,
   }) async {
     try {
@@ -79,30 +113,41 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<void> addMember(int chatId, int userId) {
+  Future<void> addMember({required int chatId, required int userId}) {
     return remote.addMember(chatId, userId);
   }
 
   @override
-  Future<void> removeMember(int chatId, int userId) {
+  Future<void> removeMember({required int chatId, required int userId}) {
     return remote.removeMember(chatId, userId);
   }
 
   @override
-  Future<Map<String, dynamic>> updateGroupInfo(
-    int chatId, {
+  Future<GroupUpdateResult> updateGroupInfo({
+    required int chatId,
     String? name,
     Uint8List? avatarBytes,
     String? filename,
     String? mimeType,
-  }) {
-    return remote.updateGroupInfo(
+  }) async {
+    final response = await remote.updateGroupInfo(
       chatId,
       name: name,
       avatarBytes: avatarBytes,
       filename: filename,
       mimeType: mimeType,
     );
+    return GroupUpdateResult(
+      id: response['id'] ?? chatId,
+      name: response['name'],
+      avatar: response['avatar'],
+      type: response['type'] ?? 'group',
+    );
+  }
+
+  @override
+  Future<void> markMessagesRead(int chatId) {
+    return remote.markMessagesRead(chatId);
   }
 
   @override
@@ -121,7 +166,7 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<void> deleteMessage(int chatId, int messageId) {
+  Future<void> deleteMessage({required int chatId, required int messageId}) {
     return remote.deleteMessage(chatId, messageId);
   }
 }

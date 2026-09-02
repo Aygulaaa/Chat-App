@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
-import 'package:my_chat_app/features/chat/presentation/pages/group_profile_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message/typing_status.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message/user_avatar.dart';
-import 'package:my_chat_app/features/profile/presentation/pages/profile_screen.dart';
 
 class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int chatId;
@@ -51,19 +50,9 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
       title: InkWell(
         onTap: () {
           if (isGroup) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => GroupProfileScreen(chatId: chatId),
-              ),
-            );
+            context.push('/group-profile/$chatId');
           } else {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProfileScreen(user: otherUser),
-              ),
-            );
+            context.push('/user-profile', extra: otherUser);
           }
         },
         highlightColor: Colors.transparent,

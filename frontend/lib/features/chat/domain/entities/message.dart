@@ -1,8 +1,26 @@
+// domain/entities/message.dart
 import 'package:equatable/equatable.dart';
 
 enum MessageStatus { sent, delivered, read, uploading, error }
 
-enum MessageType { text, image, video, audio, pdf, archive, file }
+enum MessageType {
+  text,
+  image,
+  video,
+  audio,
+  pdf,
+  archive,
+  file,
+  unknown;
+
+  static MessageType fromString(String? type) {
+    if (type == null) return MessageType.text;
+    return MessageType.values.firstWhere(
+      (e) => e.name.toLowerCase() == type.toLowerCase(),
+      orElse: () => MessageType.unknown,
+    );
+  }
+}
 
 class Message extends Equatable {
   final int id;
@@ -25,7 +43,7 @@ class Message extends Equatable {
     required this.id,
     required this.chatId,
     required this.senderId,
-    required this.text,
+    this.text,
     this.fileType = MessageType.text,
     this.fileUrl,
     this.originalName,
@@ -77,20 +95,20 @@ class Message extends Equatable {
 
   @override
   List<Object?> get props => [
-    id,
-    chatId,
-    senderId,
-    text,
-    fileUrl,
-    fileType,
-    originalName,
-    mimeType,
-    fileSize,
-    createdAt,
-    deliveredAt,
-    readAt,
-    status,
-    localPath,
-    uploadedBytes,
-  ];
+        id,
+        chatId,
+        senderId,
+        text,
+        fileUrl,
+        fileType,
+        originalName,
+        mimeType,
+        fileSize,
+        createdAt,
+        deliveredAt,
+        readAt,
+        status,
+        localPath,
+        uploadedBytes,
+      ];
 }

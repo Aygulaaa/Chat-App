@@ -42,6 +42,9 @@ async function getBlockedUserIds(userId: number): Promise<Set<number>> {
   );
   return new Set(result.rows.map((r) => Number(r.blocked_id)));
 }
+function isHiddenFor(userId: number): boolean {
+  return userSettingsCache.get(userId) ?? false;
+}
 
 /**
  * Filter list of online users against a specific user's blocked contacts AND privacy settings
@@ -49,7 +52,9 @@ async function getBlockedUserIds(userId: number): Promise<Set<number>> {
 function getVisibleOnlineUsers(userId: number, blockedIds: Set<number>): number[] {
   // Check if current requesting user hid their own last seen
   const requestingUserIsHidden = userSettingsCache.get(userId) ?? false;
-  
+
+  console.log("requestingUserIsHidden", requestingUserIsHidden);
+
   // Reciprocity Rule: If I hide my last seen, I can't see anyone else's
   if (requestingUserIsHidden) {
     return [];
@@ -70,6 +75,25 @@ function getVisibleOnlineUsers(userId: number, blockedIds: Set<number>): number[
     }
   }
   return filtered;
+}
+function emitPresence(
+  io: Server,
+  recipientId: number,
+  subjectUserId: number,
+  status: "online" | "offline",
+  subjectHidden: boolean
+) {
+  const viewerHidden = isHiddenFor(recipientId);
+
+  const payload: Record<string, unknown> = { userId: subjectUserId, status };
+
+  if (status === "offline") {
+    const shouldHideTimestamp = subjectHidden || viewerHidden;
+    payload.lastSeen = shouldHideTimestamp ? null : new Date().toISOString();
+    payload.lastSeenFuzzy = shouldHideTimestamp ? "recently" : null;
+  }
+
+  io.to(`user_${recipientId}`).emit("user_status", payload);
 }
 
 /**
@@ -144,12 +168,23 @@ export const chatSocket = (io: Server) => {
       const blockedIds = await getBlockedUserIds(userId);
 
       // --- BROADCAST PRESENCE ONLY IF PRIVACY SETTINGS ALLOW IT ---
-      if (!settings.hideLastSeen) {
-        for (const [onlineId] of onlineUsers.entries()) {
-          if (onlineId !== userId && !blockedIds.has(onlineId)) {
-            io.to(`user_${onlineId}`).emit("user_status", { userId, status: "online" });
-          }
-        }
+      // if (!settings.hideLastSeen) {
+      //   for (const [onlineId] of onlineUsers.entries()) {
+      //     if (onlineId === userId || blockedIds.has(onlineId)) continue;
+      //     const viewerHidden = userSettingsCache.get(onlineId) ?? false;
+      //     io.to(`user_${onlineId}`).emit("user_status", {
+      //       userId,
+      //       status: "offline",
+      //       lastSeen: viewerHidden ? null : (new Date().toISOString()),
+      //       lastSeenFuzzy: viewerHidden ? null : ("last seen recently"),
+      //     });
+      //   }
+      // }
+
+      for (const [onlineId] of onlineUsers.entries()) {
+        if (onlineId === userId || blockedIds.has(onlineId)) continue;
+        if (isHiddenFor(onlineId)) continue; // reciprocity: hidden viewers see nothing
+        io.to(`user_${onlineId}`).emit("user_status", { userId, status: "online" });
       }
 
       const initialOnline = getVisibleOnlineUsers(userId, blockedIds);
@@ -157,6 +192,15 @@ export const chatSocket = (io: Server) => {
 
       // --- EVENT HANDLERS ---
 
+      socket.on("update_settings", (payload: { hideLastSeen?: boolean }) => {
+        if (!socket.user || typeof payload?.hideLastSeen !== "boolean") return;
+        userSettingsCache.set(socket.user.id, payload.hideLastSeen);
+        // Note: the actual persistence (DB write) should already have happened
+        // via the REST settings endpoint before the client emits this — this
+        // handler only keeps the in-memory presence cache in sync so it doesn't
+        // go stale for the rest of the session.
+      });
+  
       socket.on("join_chat", ({ chatId }: { chatId: number }) => {
         if (!socket.user || !chatId) return;
         socket.join(`chat_${chatId}`);
@@ -216,13 +260,13 @@ export const chatSocket = (io: Server) => {
           console.error("send_message FAILED:", e);
         }
       });
-socket.on("message_received", async ({ messageId }: MessageReceivedPayload) => {
-  try {
-    const msgId = Number(messageId);
-    if (!msgId || !socket.user) return;
+      socket.on("message_received", async ({ messageId }: MessageReceivedPayload) => {
+        try {
+          const msgId = Number(messageId);
+          if (!msgId || !socket.user) return;
 
-    const result = await db.query(
-      `UPDATE messages m
+          const result = await db.query(
+            `UPDATE messages m
        SET delivered_at = COALESCE(m.delivered_at, NOW())
        WHERE m.id = $1 
          AND m.sender_id != $2
@@ -244,64 +288,64 @@ socket.on("message_received", async ({ messageId }: MessageReceivedPayload) => {
              AND c.status = 'blocked'
          )
        RETURNING m.chat_id, m.sender_id, m.delivered_at`,
-      [msgId, socket.user.id]
-    );
+            [msgId, socket.user.id]
+          );
 
-    if (result.rowCount === 0) return;
-    const { chat_id, sender_id, delivered_at } = result.rows[0];
+          if (result.rowCount === 0) return;
+          const { chat_id, sender_id, delivered_at } = result.rows[0];
 
-    io.to(`user_${sender_id}`).emit("messages_delivered", {
-      chatId: chat_id,
-      messageIds: [msgId],
-      deliveredAt: delivered_at,
-    });
-  } catch (error) {
-    console.error("message_received error:", error);
-  }
-});
+          io.to(`user_${sender_id}`).emit("messages_delivered", {
+            chatId: chat_id,
+            messageIds: [msgId],
+            deliveredAt: delivered_at,
+          });
+        } catch (error) {
+          console.error("message_received error:", error);
+        }
+      });
 
-socket.on("read_messages", async ({ chatId }: ReadMessagesPayload) => {
-  if (!socket.user || !chatId) return;
+      socket.on("read_messages", async ({ chatId }: ReadMessagesPayload) => {
+        if (!socket.user || !chatId) return;
 
-  const readerId = socket.user.id;
+        const readerId = socket.user.id;
 
-  // 1. Check if the reader hid their read receipts
-  const readerSettings = await settingsService.getSettings(readerId);
-  if (readerSettings.hideReadReceipts) {
-    // Reciprocity: The user who hid receipts doesn't send read status to others
-    return;
-  }
+        // 1. Check if the reader hid their read receipts
+        const readerSettings = await settingsService.getSettings(readerId);
+        if (readerSettings.hideReadReceipts) {
+          // Reciprocity: The user who hid receipts doesn't send read status to others
+          return;
+        }
 
-  const readMessages = await chatService.markMessagesRead(chatId, readerId);
-  if (!readMessages || !readMessages.length) return;
+        const readMessages = await chatService.markMessagesRead(chatId, readerId);
+        if (!readMessages || !readMessages.length) return;
 
-  const membersResult = await db.query(
-    `SELECT cm.user_id 
+        const membersResult = await db.query(
+          `SELECT cm.user_id 
      FROM chat_members cm
      LEFT JOIN contacts c ON 
        ((c.user_id = $1 AND c.contact_user_id = cm.user_id) 
         OR (c.user_id = cm.user_id AND c.contact_user_id = $1))
        AND c.status = 'blocked'
      WHERE cm.chat_id = $2 AND c.user_id IS NULL`,
-    [readerId, chatId]
-  );
+          [readerId, chatId]
+        );
 
-  const readMsgIds = readMessages.map((m) => m.id);
+        const readMsgIds = readMessages.map((m) => m.id);
 
-  for (const row of membersResult.rows) {
-    const memberId = Number(row.user_id);
+        for (const row of membersResult.rows) {
+          const memberId = Number(row.user_id);
 
-    // 2. Also check if the recipient hid their read receipts
-    const recipientSettings = await settingsService.getSettings(memberId);
-    if (!recipientSettings.hideReadReceipts) {
-      io.to(`user_${memberId}`).emit("chat_read", {
-        chatId,
-        readBy: readerId,
-        messageIds: readMsgIds,
+          // 2. Also check if the recipient hid their read receipts
+          const recipientSettings = await settingsService.getSettings(memberId);
+          if (!recipientSettings.hideReadReceipts) {
+            io.to(`user_${memberId}`).emit("chat_read", {
+              chatId,
+              readBy: readerId,
+              messageIds: readMsgIds,
+            });
+          }
+        }
       });
-    }
-  }
-});
 
       socket.on("request_online_users", async () => {
         if (!socket.user) return;
@@ -326,22 +370,27 @@ socket.on("read_messages", async ({ chatId }: ReadMessagesPayload) => {
                 await userService.updateLastSeen(userId);
 
                 const isHidden = userSettingsCache.get(userId) ?? false;
+                const subjectHidden = isHiddenFor(userId);
                 const disconnectBlockedIds = await getBlockedUserIds(userId);
 
                 // --- DO NOT BROADCAST OFFLINE STATUS IF THEY ARE HIDDEN ---
-                if (!isHidden) {
-                  for (const [onlineId] of onlineUsers.entries()) {
-                    if (onlineId !== userId && !disconnectBlockedIds.has(onlineId)) {
-                      io.to(`user_${onlineId}`).emit("user_status", {
-                        userId,
-                        status: "offline",
-                        lastSeen: new Date().toISOString(),
-                        lastSeenFuzzy: null,
-                      });
-                    }
-                  }
+                // if (!isHidden) {
+                //   for (const [onlineId] of onlineUsers.entries()) {
+                //     if (onlineId !== userId && !disconnectBlockedIds.has(onlineId)) {
+                //       io.to(`user_${onlineId}`).emit("user_status", {
+                //         userId,
+                //         status: "offline",
+                //         lastSeen: new Date().toISOString(),
+                //         lastSeenFuzzy: null,
+                //       });
+                //     }
+                //   }
+                // }
+
+                for (const [onlineId] of onlineUsers.entries()) {
+                  if (onlineId === userId || disconnectBlockedIds.has(onlineId)) continue;
+                  emitPresence(io, onlineId, userId, "offline", subjectHidden);
                 }
-                
                 userSettingsCache.delete(userId); // Cleanup
               }
               disconnectTimers.delete(userId);

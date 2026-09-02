@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:my_chat_app/core/theme/app_colors.dart'; // Make sure to import your AppColors file
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 
-import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_tile.dart';
 
@@ -107,15 +107,7 @@ class ChatSearchResults extends ConsumerWidget {
             unread: chat.unreadCount > 0,
             unreadCount: chat.unreadCount,
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChatScreen(
-                    chatId: chat.id,
-                    username: title,
-                  ),
-                ),
-              );
+              context.push('/chat/conversation/${chat.id}', extra: title);
             },
             onLongPress: () {},
           ),

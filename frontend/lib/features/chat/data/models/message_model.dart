@@ -20,11 +20,14 @@ class MessageModel extends Message {
   });
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
-    final readAt = json['readAt'] != null
-        ? DateTime.tryParse(json['readAt'].toString())
+    final rawReadAt = json['readAt'] ?? json['read_at'];
+    final rawDeliveredAt = json['deliveredAt'] ?? json['delivered_at'];
+
+    final readAt = rawReadAt != null
+        ? DateTime.tryParse(rawReadAt.toString())
         : null;
-    final deliveredAt = json['deliveredAt'] != null
-        ? DateTime.tryParse(json['deliveredAt'].toString())
+    final deliveredAt = rawDeliveredAt != null
+        ? DateTime.tryParse(rawDeliveredAt.toString())
         : null;
 
     final status = readAt != null
@@ -85,5 +88,24 @@ class MessageModel extends Message {
       default:
         return MessageType.text;
     }
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'chatId': chatId,
+      'senderId': senderId,
+      'text': text,
+      'fileUrl': fileUrl,
+      'type': fileType.toString().split('.').last,
+      'originalName': originalName,
+      'mimeType': mimeType,
+      'fileSize': fileSize,
+      'createdAt': createdAt.toIso8601String(),
+      'deliveredAt': deliveredAt?.toIso8601String(),
+      'readAt': readAt?.toIso8601String(),
+      'localPath': localPath,
+      'uploadedBytes': uploadedBytes,
+    };
   }
 }

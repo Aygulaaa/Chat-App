@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
-import 'package:my_chat_app/features/auth/presentation/pages/auth_page.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
-import 'package:my_chat_app/features/profile/presentation/pages/edit_profile_screen.dart';
-import 'package:my_chat_app/features/settings/presentation/pages/settings_screen.dart';
 
 class ActionCard extends ConsumerWidget {
   final UserEntity user;
@@ -15,12 +13,13 @@ class ActionCard extends ConsumerWidget {
 
   void _showLogoutConfirmation(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
+      useRootNavigator: true,
       context: context,
       backgroundColor: context.appBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
+      builder: (modalContext) {
         return SafeArea(
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
@@ -31,7 +30,7 @@ class ActionCard extends ConsumerWidget {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: context.glassBorder,
+                    color: modalContext.glassBorder,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -53,7 +52,7 @@ class ActionCard extends ConsumerWidget {
                 Text(
                   'Log Out',
                   style: TextStyle(
-                    color: context.textPrimary,
+                    color: modalContext.textPrimary,
                     fontSize: 18.sp,
                     fontWeight: FontWeight.w600,
                   ),
@@ -62,7 +61,7 @@ class ActionCard extends ConsumerWidget {
                 Text(
                   'Are you sure you want to log out of your account?',
                   style: TextStyle(
-                    color: context.textSecondary,
+                    color: modalContext.textSecondary,
                     fontSize: 14.sp,
                   ),
                   textAlign: TextAlign.center,
@@ -73,17 +72,17 @@ class ActionCard extends ConsumerWidget {
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: context.glassBorder),
+                          side: BorderSide(color: modalContext.glassBorder),
                           padding: EdgeInsets.symmetric(vertical: 12.h),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12.r),
                           ),
                         ),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () => modalContext.pop(),
                         child: Text(
                           'Cancel',
                           style: TextStyle(
-                            color: context.textPrimary,
+                            color: modalContext.textPrimary,
                             fontSize: 14.sp,
                             fontWeight: FontWeight.w500,
                           ),
@@ -102,15 +101,9 @@ class ActionCard extends ConsumerWidget {
                           elevation: 0,
                         ),
                         onPressed: () {
-                          Navigator.pop(context); // Close bottom sheet
+                          modalContext.pop(); // Close bottom sheet modal
+                          // State change triggers GoRouter redirect to /auth automatically
                           ref.read(authProvider.notifier).logout();
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const AuthPage(),
-                            ),
-                            (route) => false,
-                          );
                         },
                         child: Text(
                           'Log Out',
@@ -154,20 +147,14 @@ class ActionCard extends ConsumerWidget {
             icon: Icons.settings_outlined,
             iconColor: AppColors.primary,
             label: 'Settings',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
+            onTap: () => context.push('/settings'),
           ),
           Divider(color: context.glassBorder, height: 1, indent: 52.w),
           ActionRow(
             icon: Icons.edit_outlined,
             iconColor: Colors.blueAccent,
             label: 'Edit Profile',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => EditProfileScreen(user: user)),
-            ),
+            onTap: () => context.push('/edit-profile', extra: user),
           ),
           Divider(color: context.glassBorder, height: 1, indent: 52.w),
           ActionRow(

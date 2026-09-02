@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
@@ -132,7 +133,7 @@ class _FullscreenVideoPlayerState extends State<FullscreenVideoPlayer> {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.arrow_back, color: Colors.white),
-                          onPressed: () => Navigator.of(context).pop(),
+                          onPressed: () => context.pop(),
                         ),
                         Expanded(
                           child: Text(

@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
-import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
+import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.dart';
 import 'package:my_chat_app/features/contacts/domain/entities/contact.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
-import 'package:my_chat_app/features/profile/presentation/pages/profile_screen.dart';
 
 void showUserActionSheet(BuildContext context, Contact contact) {
   showModalBottomSheet(
     context: context,
+    useRootNavigator: true,
     backgroundColor: context.appBg,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -41,20 +42,17 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: GestureDetector(
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProfileScreen(
-                            user: UserEntity(
-                              id: contact.id,
-                              username: contact.username,
-                              bio: contact.bio,
-                              avatar: contact.avatar,
-                              status: contact.status,
-                              lastSeen: contact.lastSeen,
-                              lastSeenFuzzy: contact.lastSeenFuzzy
-                            ),
-                          ),
+                      context.pop(); // Dismiss action sheet first
+                      context.push(
+                        '/user-profile',
+                        extra: UserEntity(
+                          id: contact.id,
+                          username: contact.username,
+                          bio: contact.bio,
+                          avatar: contact.avatar,
+                          status: contact.status,
+                          lastSeen: contact.lastSeen,
+                          lastSeenFuzzy: contact.lastSeenFuzzy,
                         ),
                       );
                     },
@@ -126,7 +124,7 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                         style: TextStyle(color: context.textPrimary),
                       ),
                       onTap: () {
-                        Navigator.pop(context);
+                        context.pop();
                         ref
                             .read(contactsProvider.notifier)
                             .addContact(contact.id);
@@ -143,7 +141,7 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                         style: TextStyle(color: context.textPrimary),
                       ),
                       onTap: () {
-                        Navigator.pop(context);
+                        context.pop();
                         ref
                             .read(contactsProvider.notifier)
                             .removeContact(contact.id);
@@ -168,17 +166,9 @@ void showUserActionSheet(BuildContext context, Contact contact) {
 
                         if (!context.mounted) return;
 
-                        Navigator.pop(context);
+                        context.pop();
 
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatScreen(
-                              chatId: chatId,
-                              username: contact.username,
-                            ),
-                          ),
-                        );
+                        context.push('/chat/conversation/$chatId', extra: contact.username);
                       } catch (e) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -198,7 +188,7 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                       style: TextStyle(color: AppColors.error),
                     ),
                     onTap: () {
-                      Navigator.pop(context);
+                      context.pop();
                       ref.read(contactsProvider.notifier).blockUser(contact.id);
                     },
                   )
@@ -213,7 +203,7 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                       style: TextStyle(color: AppColors.online),
                     ),
                     onTap: () {
-                      Navigator.pop(context);
+                      context.pop();
                       ref
                           .read(blockedContactsProvider.notifier)
                           .unblock(contact.id);

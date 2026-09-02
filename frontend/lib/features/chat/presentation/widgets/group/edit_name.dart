@@ -1,7 +1,5 @@
-
-
 import 'dart:ui';
-
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
@@ -93,7 +91,7 @@ class _EditNameDialogState extends State<EditNameDialog> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
             child: Text(
               'Cancel',
               style: TextStyle(
@@ -116,7 +114,7 @@ class _EditNameDialogState extends State<EditNameDialog> {
               if (newName.isNotEmpty && newName != widget.initialName) {
                 widget.onSave(newName);
               }
-              Navigator.pop(context);
+              context.pop();
             },
             child: const Text(
               'Save',

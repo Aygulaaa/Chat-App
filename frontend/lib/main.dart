@@ -1,82 +1,128 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:overlay_support/overlay_support.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 
-import 'package:my_chat_app/core/auth/auth_gate.dart';
 import 'package:my_chat_app/core/constants/api_config.dart';
-import 'package:my_chat_app/core/theme/app_colors.dart';
-import 'package:my_chat_app/features/app_shell/presentation/pages/main__screen.dart';
-import 'package:my_chat_app/features/settings/presentation/providers/settings_provider.dart';
 import 'package:my_chat_app/core/network/fcm_service.dart';
-
-// Top-level background handler
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  print("🔥 Handling background message: ${message.messageId}");
-}
-
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+import 'package:my_chat_app/core/router/app_router.dart';
+import 'package:my_chat_app/core/theme/app_theme.dart';
+import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
+import 'package:my_chat_app/features/notification/presentation/providers/notification_provider.dart';
+import 'package:my_chat_app/features/settings/presentation/providers/settings_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Load .env FIRST so API endpoints are available to services
+  // 1. Local Cache Initialization
+  await Hive.initFlutter();
+  await Hive.openBox<String>('chats_cache');
+  await Hive.openBox<String>('messages_cache');
+  await Hive.openBox<String>('user_profile_cache');
+  await Hive.openBox<String>('contacts_cache');
+
+  // 2. Load Environment Variables
   try {
     await dotenv.load(fileName: ".env");
-    print('✅ .env loaded successfully!');
   } catch (e) {
-    print('⚠️ .env load warning: $e');
+    debugPrint('⚠️ .env load warning: $e');
   }
 
-  // Initialize API Configuration synchronously
   ApiConfig.init();
 
-  // 2. Initialize Firebase
+  // 3. Initialize Firebase & Register Background Handler Isolate
   try {
     await Firebase.initializeApp();
-    print('✅ Firebase initialized successfully!');
+    FcmService.registerBackgroundHandler();
+  } catch (e) {
+    debugPrint('❌ Firebase init error: $e');
+  }
 
-    // 3. Directly bind your top-level handler to Firebase Messaging
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  // 4. Create explicit ProviderContainer to attempt Auto-Login before mounting UI
+  final container = ProviderContainer();
+  await container.read(authProvider.notifier).tryAutoLogin();
 
-    final fcmService = FcmService();
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MyApp(),
+    ),
+  );
+}
 
-    // Non-blocking initialization
-    fcmService.initialize(
+class MyApp extends ConsumerStatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initFcm();
+    });
+  }
+
+  Future<void> _initFcm() async {
+    final fcmService = ref.read(fcmServiceProvider);
+    
+    // Initialize notification channels, permissions, and click listeners
+    await fcmService.initialize(
       onNotificationTap: (data) {
-        print("🔔 Notification tapped with payload: $data");
-
-        if (data.containsKey('chatId') && navigatorKey.currentState != null) {
-          navigatorKey.currentState!.pushNamed(
-            '/chat',
-            arguments: data['chatId'],
-          );
+        if (!mounted) return;
+        final chatId = data['chatId']?.toString();
+        if (chatId != null && chatId.isNotEmpty) {
+          ref.read(routerProvider).push('/chat/conversation/$chatId');
         }
       },
     );
 
-    final token = await fcmService.getToken();
-    print('🔥 MY_FCM_TOKEN: $token');
-  } catch (e) {
-    print('❌ Firebase/FCM init Error: $e');
+    // Initial token sync on launch if already authenticated via auto-login
+    final user = ref.read(authProvider).user;
+    if (user != null) {
+      await _syncCurrentToken();
+    }
+
+    // Single continuous subscription to token refreshes throughout app lifecycle
+    fcmService.onTokenRefresh.listen((newToken) {
+      final currentUser = ref.read(authProvider).user;
+      if (currentUser != null) {
+        ref.read(syncFcmTokenUseCaseProvider).call(newToken);
+      }
+    });
   }
 
-  runApp(const ProviderScope(child: MyApp()));
-}
-
-class MyApp extends ConsumerWidget {
-  const MyApp({super.key});
+  Future<void> _syncCurrentToken() async {
+    try {
+      final token = await ref.read(fcmServiceProvider).getToken();
+      if (token != null && token.isNotEmpty) {
+        await ref.read(syncFcmTokenUseCaseProvider).call(token);
+        debugPrint('✅ FCM Token synced on startup');
+      }
+    } catch (e) {
+      debugPrint('❌ Startup FCM token sync error: $e');
+    }
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    // Listen for authentication changes (e.g., transition from login screen to active user)
+    ref.listen(authProvider, (previous, next) {
+      if (previous?.user == null && next.user != null) {
+        _syncCurrentToken();
+      }
+    });
+
     final settingsAsync = ref.watch(settingsProvider);
-    final themeStr = settingsAsync.valueOrNull?.theme ?? 'dark';
+    final themeStr = settingsAsync.value?.theme ?? 'dark';
     final themeMode = themeStr == 'light' ? ThemeMode.light : ThemeMode.dark;
+    final router = ref.watch(routerProvider);
 
     return ScreenUtilInit(
       designSize: const Size(375, 812),
@@ -84,89 +130,13 @@ class MyApp extends ConsumerWidget {
       splitScreenMode: true,
       builder: (context, child) {
         return OverlaySupport.global(
-          child: MaterialApp(
-            navigatorKey: navigatorKey,
+          child: MaterialApp.router(
+            routerConfig: router,
             debugShowCheckedModeBanner: false,
-            title: 'Chat App',
+            title: 'Navihat Chat',
             themeMode: themeMode,
-            theme: ThemeData(
-              useMaterial3: true,
-              brightness: Brightness.light,
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: AppColors.primary,
-                brightness: Brightness.light,
-              ),
-              scaffoldBackgroundColor: AppColors.lightBg,
-              appBarTheme: const AppBarTheme(
-                centerTitle: true,
-                elevation: 0,
-                backgroundColor: AppColors.lightBg,
-                foregroundColor: AppColors.lightTextPrimary,
-              ),
-              textTheme: const TextTheme(
-                titleMedium: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.lightTextPrimary,
-                ),
-                bodyMedium: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.lightTextPrimary,
-                ),
-                bodySmall: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.lightTextSecondary,
-                ),
-              ),
-              elevatedButtonTheme: ElevatedButtonThemeData(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            darkTheme: ThemeData(
-              useMaterial3: true,
-              brightness: Brightness.dark,
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: AppColors.primary,
-                brightness: Brightness.dark,
-              ),
-              scaffoldBackgroundColor: AppColors.darkBg,
-              appBarTheme: const AppBarTheme(
-                centerTitle: true,
-                elevation: 0,
-                backgroundColor: AppColors.darkBg,
-                foregroundColor: AppColors.darkTextPrimary,
-              ),
-              textTheme: const TextTheme(
-                titleMedium: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.darkTextPrimary,
-                ),
-                bodyMedium: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.darkTextPrimary,
-                ),
-                bodySmall: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.darkTextSecondary,
-                ),
-              ),
-              elevatedButtonTheme: ElevatedButtonThemeData(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            home: const AuthGate(),
-            routes: {'/home': (_) => const MainScreen()},
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
           ),
         );
       },

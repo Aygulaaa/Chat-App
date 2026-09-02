@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
-import 'package:my_chat_app/features/chat/presentation/pages/chat_screen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
+import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.dart';
 import 'package:my_chat_app/features/contacts/domain/entities/contact.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/contacts_search_bar.dart';
@@ -70,13 +71,11 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
 
       if (!mounted) return;
 
-      Navigator.pop(context);
+      context.pop(); // Close bottom sheet modal
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ChatScreen(chatId: chatId, username: groupName),
-        ),
+      context.push(
+        '/chat/conversation/$chatId',
+        extra: groupName,
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

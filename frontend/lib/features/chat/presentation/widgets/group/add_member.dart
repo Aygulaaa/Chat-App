@@ -1,5 +1,5 @@
 import 'dart:ui';
-
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -77,8 +77,9 @@ class AddMembersBottomSheet extends ConsumerWidget {
                           ),
                         ),
                         data: (contacts) {
-                          final currentMemberIds =
-                              currentMembers.map((m) => m.id).toSet();
+                          final currentMemberIds = currentMembers
+                              .map((m) => m.id)
+                              .toSet();
                           final addableContacts = contacts
                               .where((c) => !currentMemberIds.contains(c.id))
                               .toList();
@@ -87,9 +88,7 @@ class AddMembersBottomSheet extends ConsumerWidget {
                             return Center(
                               child: Text(
                                 'No contacts available to add.',
-                                style: TextStyle(
-                                  color: context.textTertiary,
-                                ),
+                                style: TextStyle(color: context.textTertiary),
                               ),
                             );
                           }
@@ -151,7 +150,7 @@ class AddMembersBottomSheet extends ConsumerWidget {
                                       size: 26,
                                     ),
                                     onPressed: () async {
-                                      Navigator.pop(ctx);
+                                      ctx.pop();
                                       await ref
                                           .read(chatProvider.notifier)
                                           .addMember(chatId, contact.id);

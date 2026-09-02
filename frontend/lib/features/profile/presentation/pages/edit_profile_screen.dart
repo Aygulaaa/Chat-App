@@ -6,6 +6,7 @@ import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
 import 'package:my_chat_app/features/profile/presentation/widgets/profile_avatar.dart';
+import 'package:go_router/go_router.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   final UserEntity user;
@@ -65,7 +66,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         if (_selectedDate != null)
           'birthDate': _selectedDate!.toIso8601String(),
       });
-      if (mounted) Navigator.pop(context);
+      if (mounted) context.pop();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(

@@ -216,41 +216,49 @@ export const chatSocket = (io: Server) => {
           console.error("send_message FAILED:", e);
         }
       });
+socket.on("message_received", async ({ messageId }: MessageReceivedPayload) => {
+  try {
+    const msgId = Number(messageId);
+    if (!msgId || !socket.user) return;
 
-      socket.on("message_received", async ({ messageId }: MessageReceivedPayload) => {
-        try {
-          const msgId = Number(messageId);
-          if (!msgId || !socket.user) return;
+    const result = await db.query(
+      `UPDATE messages m
+       SET delivered_at = COALESCE(m.delivered_at, NOW())
+       WHERE m.id = $1 
+         AND m.sender_id != $2
+         -- 1. Ensure the user acknowledging receipt is actually in the chat
+         AND EXISTS (
+           SELECT 1 
+           FROM chat_members cm 
+           WHERE cm.chat_id = m.chat_id 
+             AND cm.user_id = $2
+         )
+         -- 2. Ensure neither user has blocked the other
+         AND NOT EXISTS (
+           SELECT 1 
+           FROM contacts c 
+           WHERE (
+               (c.user_id = $2 AND c.contact_user_id = m.sender_id) 
+               OR (c.user_id = m.sender_id AND c.contact_user_id = $2)
+             )
+             AND c.status = 'blocked'
+         )
+       RETURNING m.chat_id, m.sender_id, m.delivered_at`,
+      [msgId, socket.user.id]
+    );
 
-          const result = await db.query(
-            `UPDATE messages m
-             SET delivered_at = COALESCE(m.delivered_at, NOW())
-             FROM chat_members cm
-             LEFT JOIN contacts c ON 
-               ((c.user_id = $2 AND c.contact_user_id = m.sender_id) 
-                OR (c.user_id = m.sender_id AND c.contact_user_id = $2))
-               AND c.status = 'blocked'
-             WHERE m.id = $1 
-               AND cm.chat_id = m.chat_id 
-               AND cm.user_id = $2
-               AND m.sender_id != $2
-               AND c.user_id IS NULL
-             RETURNING m.chat_id, m.sender_id, m.delivered_at`,
-            [msgId, socket.user.id]
-          );
+    if (result.rowCount === 0) return;
+    const { chat_id, sender_id, delivered_at } = result.rows[0];
 
-          if (result.rowCount === 0) return;
-          const { chat_id, sender_id, delivered_at } = result.rows[0];
-
-          io.to(`user_${sender_id}`).emit("messages_delivered", {
-            chatId: chat_id,
-            messageIds: [msgId],
-            deliveredAt: delivered_at,
-          });
-        } catch (error) {
-          console.error("message_received error:", error);
-        }
-      });
+    io.to(`user_${sender_id}`).emit("messages_delivered", {
+      chatId: chat_id,
+      messageIds: [msgId],
+      deliveredAt: delivered_at,
+    });
+  } catch (error) {
+    console.error("message_received error:", error);
+  }
+});
 
 socket.on("read_messages", async ({ chatId }: ReadMessagesPayload) => {
   if (!socket.user || !chatId) return;

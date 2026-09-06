@@ -74,6 +74,7 @@ io.use(async (socket, next) => {
     }
 
     (socket as any).user = { id: session.userId };
+    socket.data = { sessionId: session.sessionId };
 
     next();
   } catch (err) {

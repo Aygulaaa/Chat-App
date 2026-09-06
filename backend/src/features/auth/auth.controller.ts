@@ -165,7 +165,13 @@ export const revokeSession = async (req: AuthRequest, res: Response) => {
     // Notify the revoked device to log out immediately
     if (revokedUserId != null) {
       const io = getIo();
-      io.to(`user_${revokedUserId}`).emit("session_revoked");
+      const socketsInRoom = await io.in(`user_${revokedUserId}`).fetchSockets();
+      for (const s of socketsInRoom) {
+        if (s.data?.sessionId === sessionId) {
+          s.emit("session_revoked");
+          s.disconnect(true);
+        }
+      }
       // Also tell the requesting user's other tabs/devices the session list changed
       io.to(`user_${userId}`).emit("sessions_updated");
     }
@@ -190,16 +196,23 @@ export const terminateOtherSessions = async (req: AuthRequest, res: Response) =>
     // Kick all other connected sockets of this user off (they'll fail next API call and auto-logout)
     if (count > 0) {
       const io = getIo();
-      const requestingSocketId = req.headers['x-socket-id'] as string | undefined;
+      
+      // We need to figure out which sessionId belongs to the current token so we don't kick ourselves
+      // Wait, we don't have the current token's sessionId readily available here.
+      // But we can fetch it, OR we can just rely on the existing x-socket-id logic if the client sends it.
+      // Actually, since we now have socket.data.sessionId, we can fetch the current sessionId:
+      const { authService } = require('./auth.service');
+      const currentSession = await authService.validateSessionToken(currentToken);
+      const currentSessionId = currentSession?.sessionId;
 
-      // Emit session_revoked to every socket in the user room EXCEPT the requesting socket
-      const room = io.to(`user_${userId}`);
       const socketsInRoom = await io.in(`user_${userId}`).fetchSockets();
       for (const s of socketsInRoom) {
-        if (s.id !== requestingSocketId) {
-          s.emit('session_revoked');
+        if (s.data?.sessionId !== currentSessionId) {
+          s.emit("session_revoked");
+          s.disconnect(true);
         }
       }
+      
       // Tell the requesting device its sessions list changed
       io.to(`user_${userId}`).emit('sessions_updated');
     }

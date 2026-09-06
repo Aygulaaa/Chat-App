@@ -7,7 +7,7 @@ export const userController = {
   async getMe(req: AuthRequest, res: Response) {
     try {
       const userId = req.user!.id;
-      const user = await userService.getProfile(userId);
+      const user = await userService.getProfile(userId, userId);
       res.json(user);
     } catch (err) {
       res.status(500).json({ error: 'Failed to fetch profile. Error:', err });
@@ -17,10 +17,11 @@ export const userController = {
   async getUserById(req: AuthRequest, res: Response) {
     try {
       const userId = Number(req.params.userId);
+      const requestingUserId = req.user!.id;
       if (!userId || isNaN(userId)) {
         return res.status(400).json({ error: 'Invalid userId' });
       }
-      const user = await userService.getProfile(userId);
+      const user = await userService.getProfile(userId, requestingUserId);
       if (!user) return res.status(404).json({ error: 'User not found' });
       res.json(user);
     } catch (err) {

@@ -8,8 +8,8 @@ cloudinary.config({
 });
 
 export const userService = {
-  async getProfile(userId: number) {
-    const result = await userRepository.getUserById(userId);
+  async getProfile(userId: number, requestingUserId: number) {
+    const result = await userRepository.getUserById(userId, requestingUserId);
     return result.rows[0];
   },
 

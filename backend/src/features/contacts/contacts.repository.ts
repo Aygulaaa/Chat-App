@@ -8,33 +8,43 @@ export const contactsRepository = {
         u.username,
         u.avatar,
         u.bio,
-        u.last_seen AS "lastSeen",
+        CASE 
+          WHEN COALESCE(us_me.hide_last_seen, false) = true OR COALESCE(us_them.hide_last_seen, false) = true THEN null
+          ELSE u.last_seen
+        END AS "lastSeen",
         c.status,
         c.created_at AS "createdAt",
         true AS "isContact",
         false AS "isBlocked"
       FROM contacts c
       JOIN users u ON u.id = c.contact_user_id
+      LEFT JOIN user_settings us_me ON us_me.user_id = $1
+      LEFT JOIN user_settings us_them ON us_them.user_id = u.id
       WHERE c.user_id = $1
         AND c.status = 'active'
       ORDER BY u.username ASC
     `, [userId]);
   },
 
-    async getBlockedContacts(userId: number) {
+  async getBlockedContacts(userId: number) {
     return await db.query(`
       SELECT 
         u.id,
         u.username,
         u.avatar,
         u.bio,
-        u.last_seen AS "lastSeen",
+        CASE 
+          WHEN COALESCE(us_me.hide_last_seen, false) = true OR COALESCE(us_them.hide_last_seen, false) = true THEN null
+          ELSE u.last_seen
+        END AS "lastSeen",
         c.status,
         c.created_at AS "createdAt",
         false AS "isContact",
         true AS "isBlocked"
       FROM contacts c
       JOIN users u ON u.id = c.contact_user_id
+      LEFT JOIN user_settings us_me ON us_me.user_id = $1
+      LEFT JOIN user_settings us_them ON us_them.user_id = u.id
       WHERE c.user_id = $1
         AND c.status = 'blocked'
       ORDER BY u.username ASC

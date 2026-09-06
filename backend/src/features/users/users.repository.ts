@@ -1,19 +1,25 @@
 import { db } from "../../db";
 
 export const userRepository = {
-  async getUserById(userId: number) {
+  async getUserById(userId: number, requestingUserId: number) {
   try {
     return await db.query(
       `SELECT 
-        id, 
-        username, 
-        avatar, 
-        bio,
-        status,
-        last_seen    AS "lastSeen",
-        birth_date   AS "birthDate"
-       FROM users WHERE id = $1`,
-      [userId]
+        u.id, 
+        u.username, 
+        u.avatar, 
+        u.bio,
+        u.status,
+        CASE 
+          WHEN COALESCE(us_me.hide_last_seen, false) = true OR COALESCE(us_them.hide_last_seen, false) = true THEN null
+          ELSE u.last_seen
+        END AS "lastSeen",
+        u.birth_date   AS "birthDate"
+       FROM users u
+       LEFT JOIN user_settings us_me ON us_me.user_id = $2
+       LEFT JOIN user_settings us_them ON us_them.user_id = $1
+       WHERE u.id = $1`,
+      [userId, requestingUserId]
     );
   } catch (err) {
     console.error("DB ERROR (getUserById):", err);

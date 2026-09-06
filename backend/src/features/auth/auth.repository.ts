@@ -167,7 +167,7 @@ export const authRepository = {
       db.query(
         `UPDATE user_sessions SET last_active_at = NOW() WHERE id = $1`,
         [row.id]
-      ).catch(() => {}); // Prevent unhandled promise rejections on network blips
+      ).catch(() => { }); // Prevent unhandled promise rejections on network blips
     }
 
     return sessionData;
@@ -198,30 +198,32 @@ export const authRepository = {
     );
     return (result.rowCount ?? 0) > 0;
   },
-
-  async revokeSessionById(sessionId: number, userId: number): Promise<{ revoked: boolean; revokedUserId: number | null }> {
-    // Clear matches from local RAM cache and capture the user_id
-    let revokedUserId: number | null = null;
-    for (const [hash, entry] of sessionCache.entries()) {
-      if (entry.session.sessionId === sessionId) {
-        revokedUserId = entry.session.userId;
-        sessionCache.delete(hash);
-      }
+async revokeSessionById(
+  sessionId: number, 
+  requestingUserId: number
+): Promise<{ revoked: boolean; revokedUserId: number | null }> {
+  // 1. Clear session from local RAM cache
+  for (const [hash, entry] of sessionCache.entries()) {
+    if (entry.session.sessionId === sessionId) {
+      sessionCache.delete(hash);
     }
+  }
 
-    const result = await db.query<{ user_id: number }>(
-      `DELETE FROM user_sessions WHERE id = $1 AND user_id = $2 RETURNING user_id`,
-      [sessionId, userId]
-    );
+  // 2. Delete strictly by sessionId AND requestingUserId
+  const result = await db.query<{ user_id: number }>(
+    `DELETE FROM user_sessions WHERE id = $1 AND user_id = $2 RETURNING user_id`,
+    [sessionId, requestingUserId]
+  );
 
-    if ((result.rowCount ?? 0) === 0) {
-      return { revoked: false, revokedUserId: null };
-    }
+  if ((result.rowCount ?? 0) === 0) {
+    return { revoked: false, revokedUserId: null };
+  }
 
-    // Use DB result as authoritative source if cache missed
-    revokedUserId = revokedUserId ?? result.rows[0]?.user_id ?? null;
-    return { revoked: true, revokedUserId };
-  },
+  return {
+    revoked: true,
+    revokedUserId: result.rows[0]?.user_id ?? null,
+  };
+},
 
   async revokeOtherSessions(userId: number, currentRawToken: string): Promise<number> {
     if (!currentRawToken || typeof currentRawToken !== "string" || currentRawToken.trim() === "") {

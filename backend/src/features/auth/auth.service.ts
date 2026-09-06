@@ -190,19 +190,21 @@ export const authService = {
     return await authRepository.revokeSession(currentToken);
   },
 
-  async getActiveSessions(userId: number, currentToken: string): Promise<SessionFormatted[]> {
-    const sessions = await authRepository.getUserSessions(userId);
-    const currentHash = authRepository.hashToken(currentToken);
+// auth.service.ts
+async getActiveSessions(userId: number, currentRawToken: string) {
+  const currentSession = await authRepository.validateSession(currentRawToken);
+  const currentSessionId = currentSession?.sessionId;
 
-    return sessions.map((s) => ({
-      id: s.id,
-      deviceName: s.device_name,
-      ipAddress: s.ip_address || undefined,
-      lastActiveAt: s.last_active_at,
-      createdAt: s.created_at,
-      isCurrentDevice: s.token_hash === currentHash,
-    }));
-  },
+  const sessions = await authRepository.getUserSessions(userId);
+
+  return sessions.map((s) => ({
+    id: s.id,
+    deviceName: s.device_name,
+    ipAddress: s.ip_address,
+    lastActiveAt: s.last_active_at,
+    isCurrentDevice: s.id === currentSessionId, // Guaranteed strict check
+  }));
+},
 
   async revokeSessionById(userId: number, sessionId: number): Promise<{ revoked: boolean; revokedUserId: number | null }> {
     return await authRepository.revokeSessionById(sessionId, userId);

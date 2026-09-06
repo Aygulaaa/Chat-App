@@ -199,19 +199,28 @@ export const authRepository = {
     return (result.rowCount ?? 0) > 0;
   },
 
-  async revokeSessionById(sessionId: number, userId: number): Promise<boolean> {
-    // Clear matches from local RAM cache
+  async revokeSessionById(sessionId: number, userId: number): Promise<{ revoked: boolean; revokedUserId: number | null }> {
+    // Clear matches from local RAM cache and capture the user_id
+    let revokedUserId: number | null = null;
     for (const [hash, entry] of sessionCache.entries()) {
       if (entry.session.sessionId === sessionId) {
+        revokedUserId = entry.session.userId;
         sessionCache.delete(hash);
       }
     }
 
-    const result = await db.query(
-      `DELETE FROM user_sessions WHERE id = $1 AND user_id = $2`,
+    const result = await db.query<{ user_id: number }>(
+      `DELETE FROM user_sessions WHERE id = $1 AND user_id = $2 RETURNING user_id`,
       [sessionId, userId]
     );
-    return (result.rowCount ?? 0) > 0;
+
+    if ((result.rowCount ?? 0) === 0) {
+      return { revoked: false, revokedUserId: null };
+    }
+
+    // Use DB result as authoritative source if cache missed
+    revokedUserId = revokedUserId ?? result.rows[0]?.user_id ?? null;
+    return { revoked: true, revokedUserId };
   },
 
   async revokeOtherSessions(userId: number, currentRawToken: string): Promise<number> {
@@ -228,8 +237,8 @@ export const authRepository = {
       }
     }
 
-    const result = await db.query(
-      `DELETE FROM user_sessions WHERE user_id = $1 AND token_hash != $2`,
+    const result = await db.query<{ user_id: number }>(
+      `DELETE FROM user_sessions WHERE user_id = $1 AND token_hash != $2 RETURNING user_id`,
       [userId, currentHash]
     );
     return result.rowCount ?? 0;

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { authService } from "./auth.service";
 import { AuthRequest } from "../../middleware/auth.middleware";
+import { getIo } from "../../config/io";
 
 /**
  * Helper to extract client device name and IP address safely behind Render/Cloudflare proxies
@@ -156,9 +157,17 @@ export const revokeSession = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: "Invalid session ID" });
     }
 
-    const revoked = await authService.revokeSessionById(userId, sessionId);
+    const { revoked, revokedUserId } = await authService.revokeSessionById(userId, sessionId);
     if (!revoked) {
       return res.status(404).json({ error: "Session not found or already terminated" });
+    }
+
+    // Notify the revoked device to log out immediately
+    if (revokedUserId != null) {
+      const io = getIo();
+      io.to(`user_${revokedUserId}`).emit("session_revoked");
+      // Also tell the requesting user's other tabs/devices the session list changed
+      io.to(`user_${userId}`).emit("sessions_updated");
     }
 
     res.json({ message: "Session revoked successfully" });
@@ -177,6 +186,24 @@ export const terminateOtherSessions = async (req: AuthRequest, res: Response) =>
     }
 
     const count = await authService.terminateOtherSessions(userId, currentToken);
+
+    // Kick all other connected sockets of this user off (they'll fail next API call and auto-logout)
+    if (count > 0) {
+      const io = getIo();
+      const requestingSocketId = req.headers['x-socket-id'] as string | undefined;
+
+      // Emit session_revoked to every socket in the user room EXCEPT the requesting socket
+      const room = io.to(`user_${userId}`);
+      const socketsInRoom = await io.in(`user_${userId}`).fetchSockets();
+      for (const s of socketsInRoom) {
+        if (s.id !== requestingSocketId) {
+          s.emit('session_revoked');
+        }
+      }
+      // Tell the requesting device its sessions list changed
+      io.to(`user_${userId}`).emit('sessions_updated');
+    }
+
     res.json({ message: `Terminated ${count} other active session(s)` });
   } catch (error: any) {
     res.status(500).json({ error: error.message || "Failed to terminate sessions" });

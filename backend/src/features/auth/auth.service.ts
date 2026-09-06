@@ -204,7 +204,7 @@ export const authService = {
     }));
   },
 
-  async revokeSessionById(userId: number, sessionId: number): Promise<boolean> {
+  async revokeSessionById(userId: number, sessionId: number): Promise<{ revoked: boolean; revokedUserId: number | null }> {
     return await authRepository.revokeSessionById(sessionId, userId);
   },
 

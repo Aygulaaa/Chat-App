@@ -16,6 +16,7 @@ import { authService } from './features/auth/auth.service';
 import authRouter from "./features/auth/auth.routes";
 import chatRouter from "./features/chat/chat.routes";
 import { chatSocket } from "./features/chat/chat.socket";
+import { setIo } from "./config/io";
 import userRouter from "./features/users/users.routes";
 import contactsRoutes from "./features/contacts/contacts.routes";
 import settingsRoutes from "./features/settings/settings.routes";
@@ -81,6 +82,8 @@ io.use(async (socket, next) => {
 });
 
 chatSocket(io);
+setIo(io); // Make io accessible to controllers via singleton
+
 
 app.use("/api/auth", authLimiter, authRouter);
 

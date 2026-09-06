@@ -47,35 +47,29 @@ function isHiddenFor(userId: number): boolean {
 }
 
 /**
- * Filter list of online users against a specific user's blocked contacts AND privacy settings
+ * Filter list of users currently online for a given viewer, respecting blocked list.
+ * hideLastSeen only hides the TIMESTAMP — online presence is always visible.
  */
-function getVisibleOnlineUsers(userId: number, blockedIds: Set<number>): number[] {
-  // Check if current requesting user hid their own last seen
-  const requestingUserIsHidden = userSettingsCache.get(userId) ?? false;
-
-  console.log("requestingUserIsHidden", requestingUserIsHidden);
-
-  // Reciprocity Rule: If I hide my last seen, I can't see anyone else's
-  if (requestingUserIsHidden) {
-    return [];
-  }
-
+function getVisibleOnlineUsers(viewerId: number, blockedIds: Set<number>): number[] {
   const filtered: number[] = [];
   for (const id of onlineUsers.keys()) {
-    if (id === userId) {
+    // Always include yourself
+    if (id === viewerId) {
       filtered.push(id);
       continue;
     }
-
-    if (!blockedIds.has(id)) {
-      const isHidden = userSettingsCache.get(id) ?? false;
-      if (!isHidden) {
-        filtered.push(id);
-      }
-    }
+    // Skip blocked users
+    if (blockedIds.has(id)) continue;
+    // Online status is visible regardless of hideLastSeen
+    filtered.push(id);
   }
   return filtered;
 }
+
+/**
+ * Emit an offline presence event to a recipient.
+ * hideLastSeen only hides the timestamp, the offline event is always sent.
+ */
 function emitPresence(
   io: Server,
   recipientId: number,
@@ -88,6 +82,7 @@ function emitPresence(
   const payload: Record<string, unknown> = { userId: subjectUserId, status };
 
   if (status === "offline") {
+    // Hide the timestamp if either party hides last seen
     const shouldHideTimestamp = subjectHidden || viewerHidden;
     payload.lastSeen = shouldHideTimestamp ? null : new Date().toISOString();
     payload.lastSeenFuzzy = shouldHideTimestamp ? "recently" : null;
@@ -181,9 +176,11 @@ export const chatSocket = (io: Server) => {
       //   }
       // }
 
+      // --- BROADCAST ONLINE PRESENCE TO ALL NON-BLOCKED USERS ---
+      // Online status is ALWAYS visible regardless of hideLastSeen.
+      // hideLastSeen only affects the last seen timestamp shown when offline.
       for (const [onlineId] of onlineUsers.entries()) {
         if (onlineId === userId || blockedIds.has(onlineId)) continue;
-        if (isHiddenFor(onlineId)) continue; // reciprocity: hidden viewers see nothing
         io.to(`user_${onlineId}`).emit("user_status", { userId, status: "online" });
       }
 

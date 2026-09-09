@@ -167,7 +167,7 @@ export const revokeSession = async (req: AuthRequest, res: Response) => {
       const io = getIo();
       const socketsInRoom = await io.in(`user_${revokedUserId}`).fetchSockets();
       for (const s of socketsInRoom) {
-        if (s.data?.sessionId === sessionId) {
+        if (Number(s.data?.sessionId) === Number(sessionId)) {
           s.emit("session_revoked");
           s.disconnect(true);
         }
@@ -207,7 +207,7 @@ export const terminateOtherSessions = async (req: AuthRequest, res: Response) =>
 
       const socketsInRoom = await io.in(`user_${userId}`).fetchSockets();
       for (const s of socketsInRoom) {
-        if (s.data?.sessionId !== currentSessionId) {
+        if (Number(s.data?.sessionId) !== Number(currentSessionId)) {
           s.emit("session_revoked");
           s.disconnect(true);
         }

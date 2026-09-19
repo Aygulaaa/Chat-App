@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { contactsService } from './contacts.service';
-import { chatRepository } from '../chat/chat.repository';
+import { receipts } from '../chat/chat.receipts';
 import { AuthRequest } from '../../middleware/auth.middleware';
 
 export const contactsController = {
@@ -88,8 +88,8 @@ export const contactsController = {
 
       // Mark undelivered messages as delivered for both users after unblocking
       const io = req.app.get('io');
-      await chatRepository.markUndeliveredMessagesForUser(req.user!.id, io);
-      await chatRepository.markUndeliveredMessagesForUser(contactId, io);
+      receipts.emitDelivered(io, await receipts.recordDelivered(req.user!.id));
+      receipts.emitDelivered(io, await receipts.recordDelivered(contactId));
 
       res.json({ success: true });
     } catch (err) {

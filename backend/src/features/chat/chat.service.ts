@@ -91,14 +91,6 @@ export const chatService = {
     return message;
   },
 
-  async markMessagesDelivered(chatId: number, recipientId: number) {
-    return await chatRepository.markMessagesDelivered(chatId, recipientId);
-  },
-
-  async markMessagesRead(chatId: number, readerId: number) {
-    return await chatRepository.markMessagesRead(chatId, readerId);
-  },
-
   async sendFileMessage(
     chatId: number,
     senderId: number,

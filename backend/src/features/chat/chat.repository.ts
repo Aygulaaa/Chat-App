@@ -11,9 +11,9 @@ export class ChatError extends Error {
 /**
  * Column list for a message row aliased `m`, including the quoted message
  * (`replyTo`) when the row is a reply. Must be used together with
- * `replyJoins()`.
+ * `replyJoins()`. `viewerParam` is the SQL placeholder of the requesting user.
  */
-const MESSAGE_COLUMNS = `
+const messageColumns = (viewerParam: string) => `
         m.id,
         m.chat_id       AS "chatId",
         m.sender_id     AS "senderId",
@@ -25,7 +25,13 @@ const MESSAGE_COLUMNS = `
         m.file_size     AS "fileSize",
         m.created_at    AS "createdAt",
         m.delivered_at  AS "deliveredAt",
-        m.read_at       AS "readAt",
+        -- "read by everyone". Hidden from a sender who turned read receipts
+        -- off: the setting is reciprocal, and must hold for fetched history
+        -- too, not just for live socket events.
+        CASE WHEN m.sender_id = ${viewerParam} AND EXISTS (
+               SELECT 1 FROM user_settings vs
+                WHERE vs.user_id = ${viewerParam} AND vs.hide_read_receipts = true)
+             THEN NULL ELSE m.read_at END AS "readAt",
         m.reply_to_id   AS "replyToId",
         CASE WHEN r.id IS NULL THEN NULL ELSE json_build_object(
           'id', r.id,
@@ -74,55 +80,6 @@ export const chatRepository = {
       [chatId, userId]
     );
     return (result.rowCount ?? 0) > 0;
-  },
-
-  async markUndeliveredMessagesForUser(userId: number, io?: any) {
-    try {
-      const result = await db.query(
-        `
-        UPDATE messages m
-        SET delivered_at = COALESCE(m.delivered_at, NOW())
-        FROM chat_members cm
-        WHERE cm.chat_id = m.chat_id
-          AND cm.user_id = $1
-          AND m.sender_id != $1
-          AND m.delivered_at IS NULL
-          AND NOT EXISTS (
-            SELECT 1 FROM contacts block_c
-            WHERE ((block_c.user_id = $1 AND block_c.contact_user_id = m.sender_id)
-               OR (block_c.user_id = m.sender_id AND block_c.contact_user_id = $1))
-              AND block_c.status = 'blocked'
-          )
-        RETURNING m.id, m.chat_id, m.sender_id, m.delivered_at
-        `,
-        [userId]
-      );
-
-      if (result.rows.length > 0 && io) {
-        const senderMap = new Map<number, { chatId: number; messageIds: number[]; deliveredAt: Date }>();
-        for (const row of result.rows) {
-          const senderId = Number(row.sender_id);
-          const chatId = Number(row.chat_id);
-          const msgId = Number(row.id);
-          if (!senderMap.has(senderId)) {
-            senderMap.set(senderId, { chatId, messageIds: [], deliveredAt: row.delivered_at });
-          }
-          senderMap.get(senderId)!.messageIds.push(msgId);
-        }
-
-        for (const [senderId, payload] of senderMap.entries()) {
-          io.to(`user_${senderId}`).emit("messages_delivered", {
-            chatId: payload.chatId,
-            messageIds: payload.messageIds,
-            deliveredAt: payload.deliveredAt,
-          });
-        }
-      }
-      return result.rows;
-    } catch (err) {
-      console.error("markUndeliveredMessagesForUser DB ERROR:", err);
-      return [];
-    }
   },
 
   async getChats(userId: number) {
@@ -177,7 +134,10 @@ export const chatRepository = {
             'fileSize', m.file_size,
             'createdAt', m.created_at,
             'deliveredAt', m.delivered_at,
-            'readAt', m.read_at
+            'readAt', CASE WHEN m.sender_id = $1 AND EXISTS (
+                        SELECT 1 FROM user_settings vs
+                         WHERE vs.user_id = $1 AND vs.hide_read_receipts = true)
+                      THEN NULL ELSE m.read_at END
           ) AS last_message,
           m.created_at
         FROM messages m
@@ -196,7 +156,10 @@ export const chatRepository = {
         FROM messages m
         WHERE m.chat_id = c.id
           AND m.sender_id != $1
-          AND m.read_at IS NULL
+          -- unread FOR THIS USER (not "unread by anyone", which broke groups)
+          AND m.id > COALESCE((
+            SELECT me.last_read_message_id FROM chat_members me
+             WHERE me.chat_id = c.id AND me.user_id = $1), 0)
           AND NOT EXISTS (
             SELECT 1 FROM contacts block_c
             WHERE ((block_c.user_id = $1 AND block_c.contact_user_id = m.sender_id)
@@ -256,7 +219,10 @@ export const chatRepository = {
           'fileSize', m.file_size,
           'createdAt', m.created_at,
           'deliveredAt', m.delivered_at,
-          'readAt', m.read_at
+          'readAt', CASE WHEN m.sender_id = $2 AND EXISTS (
+                      SELECT 1 FROM user_settings vs
+                       WHERE vs.user_id = $2 AND vs.hide_read_receipts = true)
+                    THEN NULL ELSE m.read_at END
         ) AS last_message
         FROM messages m
         WHERE m.chat_id = c.id
@@ -274,7 +240,10 @@ export const chatRepository = {
         FROM messages m
         WHERE m.chat_id = c.id
           AND m.sender_id != $2
-          AND m.read_at IS NULL
+          -- unread FOR THIS USER (not "unread by anyone", which broke groups)
+          AND m.id > COALESCE((
+            SELECT me.last_read_message_id FROM chat_members me
+             WHERE me.chat_id = c.id AND me.user_id = $2), 0)
           AND NOT EXISTS (
             SELECT 1 FROM contacts block_c
             WHERE ((block_c.user_id = $2 AND block_c.contact_user_id = m.sender_id)
@@ -296,7 +265,7 @@ export const chatRepository = {
     const safeLimit = Math.min(Math.max(Math.trunc(limit) || 50, 1), 100);
     const result = await db.query(
       `
-      SELECT ${MESSAGE_COLUMNS}
+      SELECT ${messageColumns('$2')}
       FROM messages m
       ${replyJoins('$2')}
       WHERE m.chat_id = $1 
@@ -322,7 +291,7 @@ export const chatRepository = {
   async getMessageById(messageId: number, userId: number) {
     const result = await db.query(
       `
-      SELECT ${MESSAGE_COLUMNS}
+      SELECT ${messageColumns('$2')}
       FROM messages m
       ${replyJoins('$2')}
       WHERE m.id = $1
@@ -352,7 +321,7 @@ export const chatRepository = {
         )
         RETURNING *
       )
-      SELECT ${MESSAGE_COLUMNS}
+      SELECT ${messageColumns('$2')}
       FROM m
       ${replyJoins('$2')}
     `,
@@ -385,77 +354,13 @@ export const chatRepository = {
         )
         RETURNING *
       )
-      SELECT ${MESSAGE_COLUMNS}
+      SELECT ${messageColumns('$2')}
       FROM m
       ${replyJoins('$2')}
     `,
       [chatId, senderId, fileUrl, fileType, originalName, mimeType, fileSize, replyToId ?? null]
     );
     return result.rows[0] ?? null;
-  },
-
-  async markMessagesDelivered(chatId: number, recipientId: number) {
-    const result = await db.query(
-      `
-      UPDATE messages
-      SET delivered_at = NOW()
-      WHERE chat_id = $1
-        AND sender_id != $2
-        AND delivered_at IS NULL
-        AND EXISTS (
-          SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2
-        )
-        AND NOT EXISTS (
-            SELECT 1 FROM contacts block_c
-            WHERE ((block_c.user_id = $2 AND block_c.contact_user_id = messages.sender_id)
-               OR (block_c.user_id = messages.sender_id AND block_c.contact_user_id = $2))
-              AND block_c.status = 'blocked'
-        )
-      RETURNING
-        id,
-        chat_id       AS "chatId",
-        sender_id     AS "senderId",
-        text,
-        created_at    AS "createdAt",
-        delivered_at  AS "deliveredAt",
-        read_at       AS "readAt"
-      `,
-      [chatId, recipientId]
-    );
-    return result.rows;
-  },
-
-  async markMessagesRead(chatId: number, readerId: number) {
-    const result = await db.query(
-      `
-      UPDATE messages
-      SET 
-        delivered_at = COALESCE(delivered_at, NOW()),
-        read_at = NOW()
-      WHERE chat_id = $1
-        AND sender_id != $2
-        AND read_at IS NULL
-        AND EXISTS (
-          SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2
-        )
-        AND NOT EXISTS (
-            SELECT 1 FROM contacts block_c
-            WHERE ((block_c.user_id = $2 AND block_c.contact_user_id = messages.sender_id)
-               OR (block_c.user_id = messages.sender_id AND block_c.contact_user_id = $2))
-              AND block_c.status = 'blocked'
-        )
-      RETURNING
-        id,
-        chat_id       AS "chatId",
-        sender_id     AS "senderId",
-        text,
-        created_at    AS "createdAt",
-        delivered_at  AS "deliveredAt",
-        read_at       AS "readAt"
-      `,
-      [chatId, readerId]
-    );
-    return result.rows;
   },
 
   async createChat(userId: number, contactId: number) {
@@ -613,8 +518,8 @@ export const chatRepository = {
 
     const result = await db.query(
       `
-      INSERT INTO chat_members (chat_id, user_id)
-      SELECT $1, $2
+      INSERT INTO chat_members (chat_id, user_id, last_read_message_id)
+      SELECT $1, $2, (SELECT MAX(id) FROM messages WHERE chat_id = $1)
       WHERE NOT EXISTS (
         SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2
       )

@@ -44,6 +44,7 @@ router.post(
 router.post('/:chatId/members', validateChatId, chatController.addMember);
 router.delete('/:chatId/members/:userId', validateChatAndUser, chatController.removeMember);
 router.patch('/:chatId/group', validateChatId, avatarUpload.single('avatar'), chatController.updateGroupInfo);
+router.get('/:chatId/messages/:messageId/receipts', validateChatAndMessage, chatController.getMessageReceipts);
 router.delete('/:chatId/messages/:messageId', validateChatAndMessage, chatController.deleteMessage);
 router.delete('/:chatId/group', validateChatId, chatController.deleteGroup);
 router.delete('/:chatId', validateChatId, chatController.deleteChat);

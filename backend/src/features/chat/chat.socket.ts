@@ -6,6 +6,7 @@ import { settingsService } from "../settings/settings.service";
 import db from "../../db";
 import { sendPushToMembers } from "../../services/notificationService";
 import { MAX_MESSAGE_LENGTH, parseId } from "./chat.controller";
+import { receipts } from "./chat.receipts";
 
 interface SendMessagePayload {
   chatId: number;
@@ -245,41 +246,12 @@ export const chatSocket = (io: Server) => {
         try {
           const msgId = parseId(payload?.messageId);
           if (!msgId || !socket.user) return;
-
-          const result = await db.query(
-            `UPDATE messages m
-       SET delivered_at = COALESCE(m.delivered_at, NOW())
-       WHERE m.id = $1 
-         AND m.sender_id != $2
-         -- 1. Ensure the user acknowledging receipt is actually in the chat
-         AND EXISTS (
-           SELECT 1 
-           FROM chat_members cm 
-           WHERE cm.chat_id = m.chat_id 
-             AND cm.user_id = $2
-         )
-         -- 2. Ensure neither user has blocked the other
-         AND NOT EXISTS (
-           SELECT 1 
-           FROM contacts c 
-           WHERE (
-               (c.user_id = $2 AND c.contact_user_id = m.sender_id) 
-               OR (c.user_id = m.sender_id AND c.contact_user_id = $2)
-             )
-             AND c.status = 'blocked'
-         )
-       RETURNING m.chat_id, m.sender_id, m.delivered_at`,
-            [msgId, socket.user.id]
+          // Records THIS user's receipt. The sender is only told once every
+          // recipient has the message (in a 1-to-1 chat: immediately).
+          receipts.emitDelivered(
+            io,
+            await receipts.recordDelivered(socket.user.id, { messageId: msgId })
           );
-
-          if (result.rowCount === 0) return;
-          const { chat_id, sender_id, delivered_at } = result.rows[0];
-
-          io.to(`user_${sender_id}`).emit("messages_delivered", {
-            chatId: chat_id,
-            messageIds: [msgId],
-            deliveredAt: delivered_at,
-          });
         } catch (error) {
           console.error("message_received error:", error);
         }
@@ -289,44 +261,13 @@ export const chatSocket = (io: Server) => {
         try {
           const chatId = parseId(payload?.chatId);
           if (!socket.user || !chatId) return;
-
           const readerId = socket.user.id;
 
-          // Always record the read in the DB — that's what clears the reader's
-          // own unread badge. Privacy only decides whether OTHERS are told.
-          const readMessages = await chatService.markMessagesRead(chatId, readerId);
-          if (!readMessages || !readMessages.length) return;
-
-          // 1. Reciprocity: a user who hides receipts doesn't send them either
-          const readerSettings = await settingsService.getSettings(readerId);
-          if (readerSettings.hideReadReceipts) return;
-
-          // 2. One query: non-blocked members who haven't hidden receipts themselves
-          const membersResult = await db.query(
-            `SELECT cm.user_id 
-             FROM chat_members cm
-             LEFT JOIN contacts c ON 
-               ((c.user_id = $1 AND c.contact_user_id = cm.user_id) 
-                OR (c.user_id = cm.user_id AND c.contact_user_id = $1))
-               AND c.status = 'blocked'
-             LEFT JOIN user_settings us ON us.user_id = cm.user_id
-             WHERE cm.chat_id = $2
-               AND c.user_id IS NULL
-               AND COALESCE(us.hide_read_receipts, false) = false`,
-            [readerId, chatId]
-          );
-
-          const readMsgIds = readMessages.map((m) => m.id);
-          const readAt = readMessages[0]?.readAt ?? new Date();
-
-          for (const row of membersResult.rows) {
-            io.to(`user_${Number(row.user_id)}`).emit("chat_read", {
-              chatId,
-              readBy: readerId,
-              messageIds: readMsgIds,
-              readAt,
-            });
-          }
+          // Always recorded — it is what clears the READER's own unread badge.
+          // Whether anybody else is told is decided per person inside
+          // receipts (hidden receipts, reciprocity, blocks).
+          const outcome = await receipts.recordRead(readerId, chatId);
+          await receipts.emitRead(io, readerId, chatId, outcome);
         } catch (error) {
           console.error("read_messages error:", error);
         }
@@ -405,9 +346,10 @@ export const chatSocket = (io: Server) => {
       const settings = await settingsService.getSettings(userId);
       userSettingsCache.set(userId, settings.hideLastSeen);
 
-      chatRepository.markUndeliveredMessagesForUser(userId, io).catch((err) =>
-        console.error("markUndeliveredMessagesForUser error on connect:", err)
-      );
+      receipts
+        .recordDelivered(userId)
+        .then((flipped) => receipts.emitDelivered(io, flipped))
+        .catch((err) => console.error("recordDelivered error on connect:", err));
 
       const blockedIds = await getBlockedUserIds(userId);
 

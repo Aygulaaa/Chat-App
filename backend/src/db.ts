@@ -46,6 +46,8 @@ db.on("error", (err) => {
  */
 const REQUIRED_COLUMNS: Array<{ table: string; column: string; migration: string }> = [
   { table: 'messages', column: 'reply_to_id', migration: 'backend/migrations/001_message_replies.sql' },
+  { table: 'message_receipts', column: 'message_id', migration: 'backend/migrations/003_message_receipts.sql' },
+  { table: 'chat_members', column: 'last_read_message_id', migration: 'backend/migrations/003_message_receipts.sql' },
 ];
 
 const verifySchema = async (client: PoolClient) => {

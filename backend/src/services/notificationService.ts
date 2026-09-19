@@ -2,6 +2,7 @@
 import { Server } from 'socket.io';
 import db from '../db';
 import { messaging } from '../config/firebase';
+import { receipts } from '../features/chat/chat.receipts';
 
 interface SendChatPushPayload {
   fcmToken: string;
@@ -121,18 +122,13 @@ export async function sendPushToMembers(
         senderId,
       });
 
-      // Mark delivered in db if messageId is provided
+      // A push was handed to THIS member's device → record their receipt.
+      // (It used to stamp the whole message as delivered, for everybody.)
       if (messageId) {
-        await db.query(
-          `UPDATE messages SET delivered_at = COALESCE(delivered_at, NOW()) WHERE id = $1`,
-          [messageId]
+        receipts.emitDelivered(
+          io,
+          await receipts.recordDelivered(memberId, { messageId })
         );
-        if (io) {
-          io.to(`user_${senderId}`).emit("messages_delivered", {
-            chatId,
-            messageIds: [messageId],
-          });
-        }
       }
     } catch (e) {
       console.error('Error sending push notification for member:', e);

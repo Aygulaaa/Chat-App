@@ -5,10 +5,12 @@ import { userService } from "../users/user.service";
 import { settingsService } from "../settings/settings.service";
 import db from "../../db";
 import { sendPushToMembers } from "../../services/notificationService";
+import { MAX_MESSAGE_LENGTH, parseId } from "./chat.controller";
 
 interface SendMessagePayload {
   chatId: number;
   text: string;
+  replyToId?: number | null;
 }
 
 interface MessageReceivedPayload {
@@ -152,43 +154,7 @@ export const chatSocket = (io: Server) => {
 
       await socket.join(`user_${userId}`);
 
-      // --- FETCH AND CACHE PRIVACY SETTINGS ON CONNECT ---
-      const settings = await settingsService.getSettings(userId);
-      userSettingsCache.set(userId, settings.hideLastSeen);
-
-      chatRepository.markUndeliveredMessagesForUser(userId, io).catch((err) =>
-        console.error("markUndeliveredMessagesForUser error on connect:", err)
-      );
-
-      const blockedIds = await getBlockedUserIds(userId);
-
-      // --- BROADCAST PRESENCE ONLY IF PRIVACY SETTINGS ALLOW IT ---
-      // if (!settings.hideLastSeen) {
-      //   for (const [onlineId] of onlineUsers.entries()) {
-      //     if (onlineId === userId || blockedIds.has(onlineId)) continue;
-      //     const viewerHidden = userSettingsCache.get(onlineId) ?? false;
-      //     io.to(`user_${onlineId}`).emit("user_status", {
-      //       userId,
-      //       status: "offline",
-      //       lastSeen: viewerHidden ? null : (new Date().toISOString()),
-      //       lastSeenFuzzy: viewerHidden ? null : ("last seen recently"),
-      //     });
-      //   }
-      // }
-
-      // --- BROADCAST ONLINE PRESENCE TO ALL NON-BLOCKED USERS ---
-      // Online status is ALWAYS visible regardless of hideLastSeen.
-      // hideLastSeen only affects the last seen timestamp shown when offline.
-      for (const [onlineId] of onlineUsers.entries()) {
-        if (onlineId === userId || blockedIds.has(onlineId)) continue;
-        io.to(`user_${onlineId}`).emit("user_status", { userId, status: "online" });
-      }
-
-      const initialOnline = getVisibleOnlineUsers(userId, blockedIds);
-      socket.emit("initial_online_users", initialOnline);
-
       // --- EVENT HANDLERS ---
-
       socket.on("update_settings", (payload: { hideLastSeen?: boolean }) => {
         if (!socket.user || typeof payload?.hideLastSeen !== "boolean") return;
         userSettingsCache.set(socket.user.id, payload.hideLastSeen);
@@ -198,33 +164,51 @@ export const chatSocket = (io: Server) => {
         // go stale for the rest of the session.
       });
   
-      socket.on("join_chat", ({ chatId }: { chatId: number }) => {
-        if (!socket.user || !chatId) return;
-        socket.join(`chat_${chatId}`);
-        socket.data.activeChatId = Number(chatId);
+      // Every payload below comes straight from the client: it may be null,
+      // a string, or have any shape. Never destructure it in the signature —
+      // a `null` payload would throw before our try/catch even starts.
+      socket.on("join_chat", async (payload: { chatId?: unknown } | null) => {
+        try {
+          const chatId = parseId(payload?.chatId);
+          if (!socket.user || !chatId) return;
+          // Only members may mark a chat as "open" (it suppresses their pushes)
+          if (!(await chatRepository.isMember(chatId, socket.user.id))) return;
+          socket.join(`chat_${chatId}`);
+          socket.data.activeChatId = chatId;
+        } catch (error) {
+          console.error("join_chat error:", error);
+        }
       });
 
-      socket.on("leave_chat", ({ chatId }: { chatId?: number }) => {
+      socket.on("leave_chat", (payload: { chatId?: unknown } | null) => {
+        const chatId = parseId(payload?.chatId);
         if (chatId) socket.leave(`chat_${chatId}`);
         socket.data.activeChatId = null;
       });
 
-      socket.on("typing", ({ chatId }: { chatId: number }) => {
-        handleTypingStatus(socket, io, chatId, true);
+      socket.on("typing", (payload: { chatId?: unknown } | null) => {
+        const chatId = parseId(payload?.chatId);
+        if (chatId) handleTypingStatus(socket, io, chatId, true);
       });
 
-      socket.on("stop_typing", ({ chatId }: { chatId: number }) => {
-        handleTypingStatus(socket, io, chatId, false);
+      socket.on("stop_typing", (payload: { chatId?: unknown } | null) => {
+        const chatId = parseId(payload?.chatId);
+        if (chatId) handleTypingStatus(socket, io, chatId, false);
       });
 
-      socket.on("send_message", async (data: SendMessagePayload) => {
+      socket.on("send_message", async (data: SendMessagePayload | null) => {
         try {
-          const { chatId, text } = data;
+          const chatId = parseId(data?.chatId);
+          const text = typeof data?.text === "string" ? data.text.trim() : "";
           const senderId = Number(socket.user?.id);
 
-          if (!chatId || !text?.trim() || !senderId) return;
+          if (!chatId || !text || !senderId) return;
+          if (text.length > MAX_MESSAGE_LENGTH) {
+            socket.emit("error_message", `Message is too long (max ${MAX_MESSAGE_LENGTH} characters)`);
+            return;
+          }
 
-          const message = await chatService.sendMessage(chatId, senderId, text.trim());
+          const message = await chatService.sendMessage(chatId, senderId, text, parseId(data?.replyToId));
           if (!message) return;
 
           const membersResult = await db.query(
@@ -250,16 +234,16 @@ export const chatSocket = (io: Server) => {
             io.to(`user_${memberId}`).emit("message", message);
           }
 
-          sendPushToMembers(io, chatId, senderId, senderName, text.trim(), message.id).catch((err) =>
+          sendPushToMembers(io, chatId, senderId, senderName, text, message.id).catch((err) =>
             console.error("Async Push Notification Error:", err)
           );
         } catch (e) {
           console.error("send_message FAILED:", e);
         }
       });
-      socket.on("message_received", async ({ messageId }: MessageReceivedPayload) => {
+      socket.on("message_received", async (payload: MessageReceivedPayload | null) => {
         try {
-          const msgId = Number(messageId);
+          const msgId = parseId(payload?.messageId);
           if (!msgId || !socket.user) return;
 
           const result = await db.query(
@@ -301,54 +285,62 @@ export const chatSocket = (io: Server) => {
         }
       });
 
-      socket.on("read_messages", async ({ chatId }: ReadMessagesPayload) => {
-        if (!socket.user || !chatId) return;
+      socket.on("read_messages", async (payload: ReadMessagesPayload | null) => {
+        try {
+          const chatId = parseId(payload?.chatId);
+          if (!socket.user || !chatId) return;
 
-        const readerId = socket.user.id;
+          const readerId = socket.user.id;
 
-        // 1. Check if the reader hid their read receipts
-        const readerSettings = await settingsService.getSettings(readerId);
-        if (readerSettings.hideReadReceipts) {
-          // Reciprocity: The user who hid receipts doesn't send read status to others
-          return;
-        }
+          // Always record the read in the DB — that's what clears the reader's
+          // own unread badge. Privacy only decides whether OTHERS are told.
+          const readMessages = await chatService.markMessagesRead(chatId, readerId);
+          if (!readMessages || !readMessages.length) return;
 
-        const readMessages = await chatService.markMessagesRead(chatId, readerId);
-        if (!readMessages || !readMessages.length) return;
+          // 1. Reciprocity: a user who hides receipts doesn't send them either
+          const readerSettings = await settingsService.getSettings(readerId);
+          if (readerSettings.hideReadReceipts) return;
 
-        const membersResult = await db.query(
-          `SELECT cm.user_id 
-     FROM chat_members cm
-     LEFT JOIN contacts c ON 
-       ((c.user_id = $1 AND c.contact_user_id = cm.user_id) 
-        OR (c.user_id = cm.user_id AND c.contact_user_id = $1))
-       AND c.status = 'blocked'
-     WHERE cm.chat_id = $2 AND c.user_id IS NULL`,
-          [readerId, chatId]
-        );
+          // 2. One query: non-blocked members who haven't hidden receipts themselves
+          const membersResult = await db.query(
+            `SELECT cm.user_id 
+             FROM chat_members cm
+             LEFT JOIN contacts c ON 
+               ((c.user_id = $1 AND c.contact_user_id = cm.user_id) 
+                OR (c.user_id = cm.user_id AND c.contact_user_id = $1))
+               AND c.status = 'blocked'
+             LEFT JOIN user_settings us ON us.user_id = cm.user_id
+             WHERE cm.chat_id = $2
+               AND c.user_id IS NULL
+               AND COALESCE(us.hide_read_receipts, false) = false`,
+            [readerId, chatId]
+          );
 
-        const readMsgIds = readMessages.map((m) => m.id);
+          const readMsgIds = readMessages.map((m) => m.id);
+          const readAt = readMessages[0]?.readAt ?? new Date();
 
-        for (const row of membersResult.rows) {
-          const memberId = Number(row.user_id);
-
-          // 2. Also check if the recipient hid their read receipts
-          const recipientSettings = await settingsService.getSettings(memberId);
-          if (!recipientSettings.hideReadReceipts) {
-            io.to(`user_${memberId}`).emit("chat_read", {
+          for (const row of membersResult.rows) {
+            io.to(`user_${Number(row.user_id)}`).emit("chat_read", {
               chatId,
               readBy: readerId,
               messageIds: readMsgIds,
+              readAt,
             });
           }
+        } catch (error) {
+          console.error("read_messages error:", error);
         }
       });
 
       socket.on("request_online_users", async () => {
-        if (!socket.user) return;
-        const currentBlocked = await getBlockedUserIds(socket.user.id);
-        const onlineList = getVisibleOnlineUsers(socket.user.id, currentBlocked);
-        socket.emit("initial_online_users", onlineList);
+        try {
+          if (!socket.user) return;
+          const currentBlocked = await getBlockedUserIds(socket.user.id);
+          const onlineList = getVisibleOnlineUsers(socket.user.id, currentBlocked);
+          socket.emit("initial_online_users", onlineList);
+        } catch (error) {
+          console.error("request_online_users error:", error);
+        }
       });
 
       socket.on("disconnect", () => {
@@ -361,12 +353,12 @@ export const chatSocket = (io: Server) => {
 
           if (userConnections.size === 0) {
             const timer = setTimeout(async () => {
+             try {
               const currentConnections = onlineUsers.get(userId);
               if (!currentConnections || currentConnections.size === 0) {
                 onlineUsers.delete(userId);
                 await userService.updateLastSeen(userId);
 
-                const isHidden = userSettingsCache.get(userId) ?? false;
                 const subjectHidden = isHiddenFor(userId);
                 const disconnectBlockedIds = await getBlockedUserIds(userId);
 
@@ -390,7 +382,11 @@ export const chatSocket = (io: Server) => {
                 }
                 userSettingsCache.delete(userId); // Cleanup
               }
+             } catch (error) {
+              console.error("offline broadcast error:", error);
+             } finally {
               disconnectTimers.delete(userId);
+             }
             }, 3000);
 
             disconnectTimers.set(userId, timer);
@@ -399,8 +395,38 @@ export const chatSocket = (io: Server) => {
           console.error("disconnect error:", error);
         }
       });
+
+      // --- ASYNC SETUP ---
+      // Runs AFTER every handler above is attached. Socket.IO does not buffer
+      // events for handlers registered later, so awaiting the DB first would
+      // drop whatever the client emits right after connecting (join_chat on
+      // reconnect) and miss a fast disconnect (leaving the user "online").
+      // --- FETCH AND CACHE PRIVACY SETTINGS ON CONNECT ---
+      const settings = await settingsService.getSettings(userId);
+      userSettingsCache.set(userId, settings.hideLastSeen);
+
+      chatRepository.markUndeliveredMessagesForUser(userId, io).catch((err) =>
+        console.error("markUndeliveredMessagesForUser error on connect:", err)
+      );
+
+      const blockedIds = await getBlockedUserIds(userId);
+
+      // --- BROADCAST ONLINE PRESENCE TO ALL NON-BLOCKED USERS ---
+      // Online status is ALWAYS visible regardless of hideLastSeen.
+      // hideLastSeen only affects the last seen timestamp shown when offline.
+      for (const [onlineId] of onlineUsers.entries()) {
+        if (onlineId === userId || blockedIds.has(onlineId)) continue;
+        io.to(`user_${onlineId}`).emit("user_status", { userId, status: "online" });
+      }
+
+      const initialOnline = getVisibleOnlineUsers(userId, blockedIds);
+      socket.emit("initial_online_users", initialOnline);
     } catch (error) {
+      // Setup failed half way (usually a DB blip). Drop the socket so the
+      // client's auto-reconnect retries with a clean slate instead of
+      // sitting on a connection that has no event handlers attached.
       console.error("connection error:", error);
+      socket.disconnect(true);
     }
   });
 };

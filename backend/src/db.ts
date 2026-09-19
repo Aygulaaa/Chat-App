@@ -6,10 +6,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// DEBUG: Print actual value
-console.log('DEBUG - DATABASE_URL value:');
-console.log(process.env.DATABASE_URL);
-console.log('');
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
@@ -17,6 +13,8 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
+// NOTE: never log DATABASE_URL itself — it contains the database password and
+// anything written to stdout ends up in the hosting provider's log storage.
 // Check what port it's using (Port 5432 is Session Pooler, 6543 is Transaction Pooler)
 if (databaseUrl.includes(':5432')) {
   console.log('✅ Using port 5432 (Session Pooler)');
@@ -41,15 +39,43 @@ db.on("error", (err) => {
   console.error("❌ Unexpected DB error:", err.message);
 });
 
+/**
+ * Columns the code depends on that were added after the initial schema.
+ * If one is missing we log exactly which migration to run instead of
+ * letting every chat query fail with a cryptic "column does not exist".
+ */
+const REQUIRED_COLUMNS: Array<{ table: string; column: string; migration: string }> = [
+  { table: 'messages', column: 'reply_to_id', migration: 'backend/migrations/001_message_replies.sql' },
+];
+
+const verifySchema = async (client: PoolClient) => {
+  for (const { table, column, migration } of REQUIRED_COLUMNS) {
+    const result = await client.query(
+      `SELECT 1 FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2`,
+      [table, column]
+    );
+    if (result.rowCount === 0) {
+      console.error(
+        `❌ SCHEMA OUT OF DATE: column "${table}.${column}" is missing. ` +
+        `Run ${migration} in the Supabase SQL editor — chat queries will fail until you do.`
+      );
+    }
+  }
+};
+
 const connectDB = async () => {
   try {
     const client: PoolClient = await db.connect();
     console.log("✅ PostgreSQL Connected to Supabase via Pooler");
-    client.release();
+    try {
+      await verifySchema(client);
+    } finally {
+      client.release();
+    }
     return true;
   } catch (err: any) {
     console.error("❌ DB ERROR:", err.message);
-    console.error("Details:", err);
     return false;
   }
 };

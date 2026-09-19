@@ -5,7 +5,14 @@ import multer from 'multer';
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
+  limits: { fileSize: 50 * 1024 * 1024, files: 1 }, // 50MB max
+});
+
+// Avatars are buffered in RAM too — no reason to accept 50MB for one
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => cb(null, file.mimetype.startsWith('image/')),
 });
 
 const router = Router();
@@ -36,7 +43,7 @@ router.post(
 
 router.post('/:chatId/members', validateChatId, chatController.addMember);
 router.delete('/:chatId/members/:userId', validateChatAndUser, chatController.removeMember);
-router.patch('/:chatId/group', validateChatId, upload.single('avatar'), chatController.updateGroupInfo);
+router.patch('/:chatId/group', validateChatId, avatarUpload.single('avatar'), chatController.updateGroupInfo);
 router.delete('/:chatId/messages/:messageId', validateChatAndMessage, chatController.deleteMessage);
 router.delete('/:chatId/group', validateChatId, chatController.deleteGroup);
 router.delete('/:chatId', validateChatId, chatController.deleteChat);

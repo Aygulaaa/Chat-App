@@ -73,8 +73,16 @@ export const contactsRepository = {
       FROM users u
       WHERE u.username ILIKE $1
         AND u.id != $2
+        -- People who blocked you shouldn't be discoverable by you
+        AND NOT EXISTS (
+          SELECT 1 FROM contacts b
+          WHERE b.user_id = u.id
+            AND b.contact_user_id = $2
+            AND b.status = 'blocked'
+        )
+      ORDER BY u.username ASC
       LIMIT 20
-    `, [`%${query}%`, currentUserId]);
+    `, [`%${query.replace(/[\\%_]/g, '\\$&')}%`, currentUserId]);
   },
 
 

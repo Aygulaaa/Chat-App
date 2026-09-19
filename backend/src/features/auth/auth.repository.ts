@@ -35,6 +35,17 @@ interface CachedSession {
 const sessionCache = new Map<string, CachedSession>();
 const CACHE_TTL_MS = 60 * 1000;              // 1 minute local RAM cache
 const DB_UPDATE_THROTTLE_MS = 15 * 60 * 1000; // Update Supabase at most every 15 mins
+// A stolen token should not work forever: sessions unused for this long are dead.
+const SESSION_IDLE_DAYS = 60;
+
+// Entries are only removed on revocation, so without a sweep the map grows
+// by one entry per token ever seen until the process restarts.
+setInterval(() => {
+  const now = Date.now();
+  for (const [hash, entry] of sessionCache.entries()) {
+    if (now - entry.cachedAt >= CACHE_TTL_MS) sessionCache.delete(hash);
+  }
+}, 5 * 60 * 1000).unref();
 
 export const authRepository = {
   hashToken(token: string): string {
@@ -138,8 +149,9 @@ export const authRepository = {
     }>(
       `SELECT id, user_id, last_active_at
        FROM user_sessions
-       WHERE token_hash = $1`,
-      [tokenHash]
+       WHERE token_hash = $1
+         AND COALESCE(last_active_at, created_at) > NOW() - make_interval(days => $2)`,
+      [tokenHash, SESSION_IDLE_DAYS]
     );
 
     if (result.rowCount === 0 || !result.rows[0]) {
@@ -178,8 +190,9 @@ export const authRepository = {
       `SELECT id, user_id, token_hash, device_name, ip_address, last_active_at, created_at
        FROM user_sessions
        WHERE user_id = $1
+         AND COALESCE(last_active_at, created_at) > NOW() - make_interval(days => $2)
        ORDER BY last_active_at DESC`,
-      [userId]
+      [userId, SESSION_IDLE_DAYS]
     );
     return result.rows;
   },

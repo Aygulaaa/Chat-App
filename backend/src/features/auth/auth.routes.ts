@@ -36,6 +36,5 @@ router.get("/sessions", auth, getSessions);
 router.delete("/sessions/others", auth, terminateOtherSessions);
 router.delete("/sessions/:id", auth, revokeSession);
 
-console.log("AUTH ROUTES FILE EXECUTED");
 
 export default router;

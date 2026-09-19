@@ -8,20 +8,26 @@ import { getIo } from "../../config/io";
  */
 const getClientInfo = (req: Request) => {
   const rawDevice = req.headers["x-device-name"] || req.headers["user-agent"];
-  const rawIp = req.headers["x-forwarded-for"] || req.ip;
 
-  const deviceName = Array.isArray(rawDevice)
+  const deviceName = (Array.isArray(rawDevice)
     ? rawDevice[0] ?? "Unknown Device"
-    : rawDevice || "Unknown Device";
+    : rawDevice || "Unknown Device"
+  )
+    // Header is client controlled: strip control chars and cap the length
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .trim()
+    .slice(0, 120) || "Unknown Device";
 
-  let ipStr = Array.isArray(rawIp) ? rawIp[0] : rawIp;
+  // `req.ip` already honours the `trust proxy` setting. Reading the raw
+  // X-Forwarded-For header instead would let any client spoof its address.
+  return { deviceName, ipAddress: req.ip || undefined };
+};
 
-  if (typeof ipStr === "string" && ipStr.includes(",")) {
-    const firstIp = ipStr.split(",")[0];
-    ipStr = firstIp ? firstIp.trim() : undefined;
-  }
-
-  return { deviceName, ipAddress: ipStr || undefined };
+/** Only surface messages we threw on purpose; hide DB/driver internals. */
+const safeMessage = (error: any, fallback: string): string => {
+  const msg = typeof error?.message === "string" ? error.message : "";
+  const looksInternal = !msg || error?.code || /relation|column|syntax|ECONN|timeout|pg_|duplicate key/i.test(msg);
+  return looksInternal ? fallback : msg;
 };
 
 export const register = async (req: Request, res: Response) => {
@@ -37,7 +43,14 @@ export const register = async (req: Request, res: Response) => {
 
     res.status(201).json(result);
   } catch (error: any) {
-    res.status(400).json({ error: error.message || "Registration failed" });
+    // Two simultaneous sign-ups can both pass the "is it taken" check;
+    // the UNIQUE constraint on users.username is the real guard.
+    if (error?.code === "23505") {
+      return res.status(400).json({ error: "Username is already taken" });
+    }
+    const isInternal = Boolean(error?.code);
+    if (isInternal) console.error("register error:", error);
+    res.status(isInternal ? 500 : 400).json({ error: safeMessage(error, "Registration failed") });
   }
 };
 
@@ -54,7 +67,13 @@ export const login = async (req: Request, res: Response) => {
 
     res.json(result);
   } catch (error: any) {
-    res.status(401).json({ error: error.message || "Invalid credentials" });
+    // Only a real credential mismatch is a 401. A DB outage must not look
+    // like "wrong password" to the client.
+    if (error?.message === "Invalid username or password") {
+      return res.status(401).json({ error: error.message });
+    }
+    console.error("login error:", error);
+    res.status(500).json({ error: "Login is temporarily unavailable, please try again" });
   }
 };
 
@@ -63,7 +82,12 @@ export const me = async (req: AuthRequest, res: Response) => {
     const user = await authService.getCurrentUser(req.user?.id);
     res.json(user);
   } catch (error: any) {
-    res.status(401).json({ error: error.message || "Unauthorized" });
+    // The client logs out on 401, so reserve it for genuine auth failures.
+    if (error?.message === "Not authenticated" || error?.message === "User not found") {
+      return res.status(401).json({ error: error.message });
+    }
+    console.error("me error:", error);
+    res.status(500).json({ error: "Failed to load profile" });
   }
 };
 
@@ -74,7 +98,7 @@ export const logout = async (req: AuthRequest, res: Response) => {
     }
     res.json({ message: "Logged out successfully" });
   } catch (error: any) {
-    res.status(500).json({ error: error.message || "Logout failed" });
+    res.status(500).json({ error: safeMessage(error, "Logout failed") });
   }
 };
 
@@ -96,9 +120,25 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
       newPassword,
       req.token
     );
+
+    // Changing the password revokes every other session in the DB — also
+    // drop their live sockets so those devices are signed out right away.
+    try {
+      const io = getIo();
+      const sockets = await io.in(`user_${userId}`).fetchSockets();
+      for (const s of sockets) {
+        if (Number(s.data?.sessionId) !== Number(req.user?.sessionId)) {
+          s.emit("session_revoked");
+          s.disconnect(true);
+        }
+      }
+    } catch (socketErr) {
+      console.error("changePassword socket cleanup error:", socketErr);
+    }
+
     res.json(result);
   } catch (error: any) {
-    res.status(400).json({ error: error.message || "Password change failed" });
+    res.status(400).json({ error: safeMessage(error, "Password change failed") });
   }
 };
 
@@ -117,7 +157,7 @@ export const verifyPassword = async (req: AuthRequest, res: Response) => {
     const isValid = await authService.verifyPassword(userId, currentPassword);
     res.json({ valid: isValid });
   } catch (error: any) {
-    res.status(400).json({ valid: false, error: error.message || "Password verification failed" });
+    res.status(400).json({ valid: false, error: safeMessage(error, "Password verification failed") });
   }
 };
 
@@ -135,7 +175,7 @@ export const getSessions = async (req: AuthRequest, res: Response) => {
     const sessions = await authService.getActiveSessions(userId, currentToken);
     res.json({ sessions });
   } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to retrieve sessions" });
+    res.status(500).json({ error: safeMessage(error, "Failed to retrieve sessions") });
   }
 };
 
@@ -178,7 +218,7 @@ export const revokeSession = async (req: AuthRequest, res: Response) => {
 
     res.json({ message: "Session revoked successfully" });
   } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to revoke session" });
+    res.status(500).json({ error: safeMessage(error, "Failed to revoke session") });
   }
 };
 
@@ -196,14 +236,8 @@ export const terminateOtherSessions = async (req: AuthRequest, res: Response) =>
     // Kick all other connected sockets of this user off (they'll fail next API call and auto-logout)
     if (count > 0) {
       const io = getIo();
-      
-      // We need to figure out which sessionId belongs to the current token so we don't kick ourselves
-      // Wait, we don't have the current token's sessionId readily available here.
-      // But we can fetch it, OR we can just rely on the existing x-socket-id logic if the client sends it.
-      // Actually, since we now have socket.data.sessionId, we can fetch the current sessionId:
-      const { authService } = require('./auth.service');
-      const currentSession = await authService.validateSessionToken(currentToken);
-      const currentSessionId = currentSession?.sessionId;
+      // The auth middleware already resolved which session this request belongs to
+      const currentSessionId = req.user?.sessionId;
 
       const socketsInRoom = await io.in(`user_${userId}`).fetchSockets();
       for (const s of socketsInRoom) {
@@ -219,6 +253,6 @@ export const terminateOtherSessions = async (req: AuthRequest, res: Response) =>
 
     res.json({ message: `Terminated ${count} other active session(s)` });
   } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to terminate sessions" });
+    res.status(500).json({ error: safeMessage(error, "Failed to terminate sessions") });
   }
 };

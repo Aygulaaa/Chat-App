@@ -2,7 +2,6 @@
 import { Server } from 'socket.io';
 import db from '../db';
 import { messaging } from '../config/firebase';
-import { log } from 'console';
 
 interface SendChatPushPayload {
   fcmToken: string;
@@ -13,8 +12,6 @@ interface SendChatPushPayload {
 }
 
 export async function sendChatPushNotification(payload: SendChatPushPayload): Promise<void> {
-  console.log("🚀 ~ notificationService.ts:15 ~ sendChatPushNotification ~ payload:", payload)
-
   if (!messaging || !payload.fcmToken) return;
 
   try {
@@ -55,20 +52,9 @@ export async function sendChatPushNotification(payload: SendChatPushPayload): Pr
       error?.code === 'messaging/registration-token-not-registered'
     ) {
       await db.query('UPDATE users SET fcm_token = NULL WHERE fcm_token = $1', [payload.fcmToken]);
-      console.log(`Cleaned up invalid FCM token from database: ${payload.fcmToken}`);
+      console.log('Cleaned up an invalid FCM token from the database');
     }
   }
-}
-
-async function isBlocked(userId1: number, userId2: number): Promise<boolean> {
-  const result = await db.query(
-    `SELECT 1 FROM contacts
-     WHERE ((user_id = $1 AND contact_user_id = $2)
-        OR  (user_id = $2 AND contact_user_id = $1))
-       AND status = 'blocked'`,
-    [userId1, userId2]
-  );
-  return (result.rowCount !== null && result.rowCount > 0) || result.rows.length > 0;
 }
 
 /**
@@ -89,31 +75,31 @@ export async function sendPushToMembers(
   body: string,
   messageId?: number
 ): Promise<void> {
-  // Fetch all members with their FCM tokens and notification settings in one query
+  // One query: every pushable member — has a token, notifications on, is not
+  // the sender, and has no block with the sender in either direction.
   const membersResult = await db.query(
-    `SELECT cm.user_id, u.fcm_token, COALESCE(us.notifications_enabled, true) AS notifications_enabled
+    `SELECT cm.user_id, u.fcm_token
      FROM chat_members cm
      JOIN users u ON u.id = cm.user_id
      LEFT JOIN user_settings us ON us.user_id = cm.user_id
-     WHERE cm.chat_id = $1`,
-    [chatId]
+     WHERE cm.chat_id = $1
+       AND cm.user_id != $2
+       AND u.fcm_token IS NOT NULL
+       AND COALESCE(us.notifications_enabled, true) = true
+       AND NOT EXISTS (
+         SELECT 1 FROM contacts c
+         WHERE ((c.user_id = cm.user_id AND c.contact_user_id = $2)
+            OR  (c.user_id = $2 AND c.contact_user_id = cm.user_id))
+           AND c.status = 'blocked'
+       )`,
+    [chatId, senderId]
   );
+
+  // Lock-screen previews shouldn't carry a whole essay
+  const preview = body.length > 140 ? `${body.slice(0, 137)}…` : body;
 
   for (const member of membersResult.rows) {
     const memberId = Number(member.user_id);
-
-    // Never push to the sender themselves
-    if (memberId === senderId) continue;
-
-    // Skip if recipient has notifications disabled in their settings
-    if (member.notifications_enabled === false) continue;
-
-    // Skip blocked pairs
-    const blocked = await isBlocked(memberId, senderId);
-    if (blocked) continue;
-
-    // Skip if the recipient has no FCM token stored
-    if (!member.fcm_token) continue;
 
     // If we have a live socket server, check whether the recipient
     // currently has this chat open — if so, no push needed.
@@ -126,13 +112,11 @@ export async function sendPushToMembers(
     }
     // If io is null (no active socket), the user is definitely outside
     // the app, so we always send the push.
-    console.log('socket is not active sendin gpush notifcation:', `${senderName} : ${body}`, member.fcm_token);
-
     try {
       await sendChatPushNotification({
         fcmToken: member.fcm_token,
         title: senderName,
-        body,
+        body: preview,
         chatId,
         senderId,
       });

@@ -24,7 +24,9 @@ export const contactsController = {
 
   async searchUsers(req: AuthRequest, res: Response) {
     try {
-      const query = req.query.q as string ?? '';
+      // ?q=a&q=b arrives as an array; cap length so ILIKE can't be abused
+      const raw = req.query.q;
+      const query = (typeof raw === 'string' ? raw : '').trim().slice(0, 50);
       const users = await contactsService.searchUsers(query, req.user!.id);
       res.json(users);
     } catch (err) {
@@ -38,6 +40,11 @@ export const contactsController = {
       const result = await contactsService.addContact(req.user!.id, contactId);
       res.json(result);
     } catch (err: any) {
+      if (err?.code === '23503') return res.status(404).json({ error: 'User not found' });
+      if (err?.code) {
+        console.error('addContact error:', err);
+        return res.status(500).json({ error: 'Failed to add contact' });
+      }
       res.status(400).json({ error: err.message ?? 'Failed to add contact' });
     }
   },
@@ -65,6 +72,11 @@ export const contactsController = {
 
       res.json(result);
     } catch (err: any) {
+      if (err?.code === '23503') return res.status(404).json({ error: 'User not found' });
+      if (err?.code) {
+        console.error('blockUser error:', err);
+        return res.status(500).json({ error: 'Failed to block user' });
+      }
       res.status(400).json({ error: err.message ?? 'Failed to block user' });
     }
   },

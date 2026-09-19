@@ -1,4 +1,4 @@
-import { chatRepository } from '../chat/chat.repository';
+import { chatRepository, ChatError } from '../chat/chat.repository';
 import { v2 as cloudinary } from 'cloudinary';
 
 cloudinary.config({
@@ -63,7 +63,7 @@ export const chatService = {
   async getChat(chatId: number, userId: number) {
     const chat = await chatRepository.getChat(chatId, userId);
     if (!chat) {
-      throw new Error('Chat not found or access denied');
+      throw new ChatError(404, 'Chat not found');
     }
     return chat;
   },
@@ -78,15 +78,15 @@ export const chatService = {
 
   async createChat(userId: number, contactId: number) {
     if (userId === contactId) {
-      throw new Error('Cannot create a chat with yourself');
+      throw new ChatError(400, 'Cannot create a chat with yourself');
     }
     return await chatRepository.createChat(userId, contactId);
   },
 
-  async sendMessage(chatId: number, senderId: number, text: string) {
-    const message = await chatRepository.sendMessage(chatId, senderId, text);
+  async sendMessage(chatId: number, senderId: number, text: string, replyToId?: number | null) {
+    const message = await chatRepository.sendMessage(chatId, senderId, text, replyToId);
     if (!message) {
-      throw new Error('Access denied: You are not a member of this chat');
+      throw new ChatError(403, 'Access denied: You are not a member of this chat');
     }
     return message;
   },
@@ -105,11 +105,17 @@ export const chatService = {
     fileBuffer: Buffer,
     originalName: string,
     mimeType: string,
-    fileSize: number
+    fileSize: number,
+    replyToId?: number | null
   ) {
+    // Check membership BEFORE uploading, otherwise anyone can fill the
+    // Cloudinary account by posting files at chats they don't belong to.
+    if (!(await chatRepository.isMember(chatId, senderId))) {
+      throw new ChatError(403, 'Access denied: You are not a member of this chat');
+    }
+
     const fileType = getFileType(mimeType);
 
-    // Upload to Cloudinary after validation
     const fileUrl = await uploadToCloudinary(fileBuffer, 'chat_files', originalName, mimeType);
 
     const message = await chatRepository.sendFileMessage(
@@ -119,46 +125,51 @@ export const chatService = {
       fileType,
       originalName,
       mimeType,
-      fileSize
+      fileSize,
+      replyToId
     );
 
     if (!message) {
-      throw new Error('Access denied: You are not a member of this chat');
+      throw new ChatError(403, 'Access denied: You are not a member of this chat');
     }
 
     return message;
   },
 
-  async createGroupChat(creatorId: number, name: string, memberIds: number[], avatar?: string) {
-    const uniqueMembers = Array.from(new Set([...memberIds, creatorId]));
+  async createGroupChat(creatorId: number, name: string, memberIds: number[], avatar?: string | null) {
+    const uniqueMembers = Array.from(new Set(memberIds)).filter((id) => id !== creatorId);
     return await chatRepository.createGroupChat(creatorId, name, uniqueMembers, avatar);
   },
 
-  async addMember(chatId: number, userId: number) {
-    return await chatRepository.addMemberToGroup(chatId, userId);
+  async addMember(chatId: number, requesterId: number, userId: number) {
+    return await chatRepository.addMemberToGroup(chatId, requesterId, userId);
   },
 
-  async removeMember(chatId: number, userId: number) {
-    return await chatRepository.removeMemberFromGroup(chatId, userId);
+  async removeMember(chatId: number, requesterId: number, userId: number) {
+    return await chatRepository.removeMemberFromGroup(chatId, requesterId, userId);
   },
 
   async uploadGroupAvatar(fileBuffer: Buffer, originalName: string, mimeType: string) {
     if (!mimeType.startsWith('image/')) {
-      throw new Error('Group avatar must be an image file');
+      throw new ChatError(400, 'Group avatar must be an image file');
     }
     return await uploadToCloudinary(fileBuffer, 'group_avatars', originalName, mimeType);
   },
 
-  async updateGroupInfo(chatId: number, name?: string, avatar?: string) {
-    return await chatRepository.updateGroupInfo(chatId, name, avatar);
+  async updateGroupInfo(chatId: number, requesterId: number, name?: string, avatar?: string) {
+    return await chatRepository.updateGroupInfo(chatId, requesterId, name, avatar);
+  },
+
+  async isMember(chatId: number, userId: number) {
+    return await chatRepository.isMember(chatId, userId);
   },
 
   async deleteMessage(messageId: number, senderId: number) {
     return await chatRepository.deleteMessage(messageId, senderId);
   },
 
-  async deleteChat(chatId: number) {
-    return await chatRepository.deleteChat(chatId);
+  async deleteChat(chatId: number, requesterId: number) {
+    return await chatRepository.deleteChat(chatId, requesterId);
   },
 
   async deleteGroup(chatId: number, requesterId: number) {

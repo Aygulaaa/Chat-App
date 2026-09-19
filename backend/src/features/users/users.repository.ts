@@ -27,7 +27,7 @@ export const userRepository = {
   }
 },
 
-  async updateProfile(userId: number, username: string, bio: string, birthDate: string) {
+  async updateProfile(userId: number, username: string, bio: string | null, birthDate: string | null) {
     try {
       return await db.query(
         `UPDATE users 

@@ -13,7 +13,7 @@ export const userService = {
     return result.rows[0];
   },
 
-  async updateProfile(userId: number, username: string, bio: string, birthDate: string) {
+  async updateProfile(userId: number, username: string, bio: string | null, birthDate: string | null) {
     const result = await userRepository.updateProfile(userId, username, bio, birthDate);
     return result.rows[0];
   },

@@ -33,6 +33,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
 
     await showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => AvatarPickerSheet(

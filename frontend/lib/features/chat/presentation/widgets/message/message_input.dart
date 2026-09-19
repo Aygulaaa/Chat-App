@@ -109,43 +109,39 @@ class _MessageInputState extends ConsumerState<MessageInput> {
     }
   }
 
-Future<void> _pickAndSendFile() async {
-  // 1. Pick a single file using the updated 12.x API
-  final PlatformFile? file = await FilePicker.pickFile(
-    type: FileType.any,
-  );
+  Future<void> _pickAndSendFile() async {
+    final PlatformFile? file = await FilePicker.pickFile(
+      type: FileType.any,
+    );
 
-  // 2. Return early if the user canceled the picker
-  if (file == null) return;
+    if (file == null) return;
 
-  // 3. Read the file bytes asynchronously (works across Mobile & Web)
-  final Uint8List bytes = await file.readAsBytes();
+    final Uint8List bytes = await file.readAsBytes();
 
-  setState(() => _isSendingFile = true);
+    setState(() => _isSendingFile = true);
 
-  try {
-    // 4. Resolve MIME type and notify your Riverpod state provider
-    final mimeType = MimeUtils.getMimeType(file.extension ?? '');
-    await ref
-        .read(messageProvider(widget.chatId).notifier)
-        .sendFileMessage(
-          bytes,
-          file.name,
-          mimeType,
-          localPath: file.path,
+    try {
+      final mimeType = MimeUtils.getMimeType(file.extension ?? '');
+      await ref
+          .read(messageProvider(widget.chatId).notifier)
+          .sendFileMessage(
+            bytes,
+            file.name,
+            mimeType,
+            localPath: file.path,
+          );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_getCleanErrorMessage(e))),
         );
-  } catch (e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_getCleanErrorMessage(e))),
-      );
-    }
-  } finally {
-    if (mounted) {
-      setState(() => _isSendingFile = false);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingFile = false);
+      }
     }
   }
-}
 
   Future<void> _startRecording() async {
     if (!_isRecorderInitialized) return;
@@ -294,186 +290,184 @@ Future<void> _pickAndSendFile() async {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          border: Border(
-            top: BorderSide(color: context.glassBorder, width: 0.8),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: context.isLight
-                  ? Colors.black.withValues(alpha: 0.04)
-                  : Colors.black.withValues(alpha: 0.08),
-              blurRadius: 12,
-              offset: const Offset(0, -3),
-            ),
-          ],
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 20.h),
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        border: Border(
+          top: BorderSide(color: context.glassBorder, width: 0.8),
         ),
-        child: Row(
-          children: [
-            if (_isRecording)
-              IconButton(
-                icon: Icon(Icons.close, color: AppColors.error, size: 22.sp),
-                onPressed: _cancelRecording,
-              )
-            else if (_recordedPath != null)
-              IconButton(
-                icon: Icon(Icons.delete, color: AppColors.error, size: 22.sp),
-                onPressed: _deleteRecording,
-              )
-            else
-              _isSendingFile
-                  ? Padding(
-                      padding: EdgeInsets.all(12.r),
-                      child: SizedBox(
-                        width: 20.r,
-                        height: 20.r,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: context.textTertiary,
-                        ),
+        boxShadow: [
+          BoxShadow(
+            color: context.isLight
+                ? Colors.black.withValues(alpha: 0.04)
+                : Colors.black.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, -3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          if (_isRecording)
+            IconButton(
+              icon: Icon(Icons.close, color: AppColors.error, size: 22.sp),
+              onPressed: _cancelRecording,
+            )
+          else if (_recordedPath != null)
+            IconButton(
+              icon: Icon(Icons.delete, color: AppColors.error, size: 22.sp),
+              onPressed: _deleteRecording,
+            )
+          else
+            _isSendingFile
+                ? Padding(
+                    padding: EdgeInsets.all(12.r),
+                    child: SizedBox(
+                      width: 20.r,
+                      height: 20.r,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: context.textTertiary,
                       ),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            Icons.camera_alt,
-                            color: context.textTertiary,
-                            size: 22.sp,
-                          ),
-                          onPressed: _takePhotoAndSend,
-                          padding: EdgeInsets.symmetric(horizontal: 4.w),
-                          constraints: const BoxConstraints(),
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            Icons.attach_file,
-                            color: context.textTertiary,
-                            size: 22.sp,
-                          ),
-                          onPressed: _pickAndSendFile,
-                          padding: EdgeInsets.symmetric(horizontal: 4.w),
-                          constraints: const BoxConstraints(),
-                        ),
-                        SizedBox(width: 8.w),
-                      ],
                     ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          Icons.camera_alt,
+                          color: context.textTertiary,
+                          size: 22.sp,
+                        ),
+                        onPressed: _takePhotoAndSend,
+                        padding: EdgeInsets.symmetric(horizontal: 4.w),
+                        constraints: const BoxConstraints(),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.attach_file,
+                          color: context.textTertiary,
+                          size: 22.sp,
+                        ),
+                        onPressed: _pickAndSendFile,
+                        padding: EdgeInsets.symmetric(horizontal: 4.w),
+                        constraints: const BoxConstraints(),
+                      ),
+                      SizedBox(width: 8.w),
+                    ],
+                  ),
 
-            Expanded(
-              child: _isRecording
-                  ? _RecordingIndicator(duration: _recordDuration)
-                  : _recordedPath != null
-                      ? Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 14.w),
-                          child: Text(
-                            'Audio recorded: ${_recordDuration ~/ 60}:${(_recordDuration % 60).toString().padLeft(2, '0')}',
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: 15.sp,
-                            ),
-                          ),
-                        )
-                      : TextField(
-                          controller: _controller,
-                          onChanged: (val) => ref
-                              .read(messageProvider(widget.chatId).notifier)
-                              .sendTypingEvent(val.isNotEmpty),
+          Expanded(
+            child: _isRecording
+                ? _RecordingIndicator(duration: _recordDuration)
+                : _recordedPath != null
+                    ? Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 14.w),
+                        child: Text(
+                          'Audio recorded: ${_recordDuration ~/ 60}:${(_recordDuration % 60).toString().padLeft(2, '0')}',
                           style: TextStyle(
                             color: context.textPrimary,
                             fontSize: 15.sp,
                           ),
-                          decoration: InputDecoration(
-                            hintText: 'Message...',
-                            hintStyle: TextStyle(
-                              color: context.textTertiary,
-                              fontSize: 15.sp,
+                        ),
+                      )
+                    : TextField(
+                        controller: _controller,
+                        onChanged: (val) => ref
+                            .read(messageProvider(widget.chatId).notifier)
+                            .sendTypingEvent(val.isNotEmpty),
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 15.sp,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Message...',
+                          hintStyle: TextStyle(
+                            color: context.textTertiary,
+                            fontSize: 15.sp,
+                          ),
+                          filled: true,
+                          fillColor: context.cardBg,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 14.w,
+                            vertical: 10.h,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22.r),
+                            borderSide: BorderSide(
+                              color: context.glassBorder,
+                              width: 0.8,
                             ),
-                            filled: true,
-                            fillColor: context.cardBg,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 14.w,
-                              vertical: 10.h,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22.r),
+                            borderSide: BorderSide(
+                              color: context.glassBorder,
+                              width: 0.8,
                             ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(22.r),
-                              borderSide: BorderSide(
-                                color: context.glassBorder,
-                                width: 0.8,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(22.r),
-                              borderSide: BorderSide(
-                                color: context.glassBorder,
-                                width: 0.8,
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(22.r),
-                              borderSide: const BorderSide(
-                                color: AppColors.primary,
-                                width: 1.5,
-                              ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22.r),
+                            borderSide: const BorderSide(
+                              color: AppColors.primary,
+                              width: 1.5,
                             ),
                           ),
                         ),
-            ),
+                      ),
+          ),
 
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: _controller,
-              builder: (_, value, __) {
-                final hasText = value.text.trim().isNotEmpty;
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _controller,
+            builder: (_, value, __) {
+              final hasText = value.text.trim().isNotEmpty;
 
-                if (_isRecording) {
-                  return IconButton(
-                    icon: Icon(
-                      Icons.stop_circle,
-                      color: AppColors.primary,
-                      size: 30.sp,
-                    ),
-                    onPressed: _stopRecording,
-                  );
-                }
-
-                if (_recordedPath != null) {
-                  return IconButton(
-                    icon: Icon(
-                      Icons.send_rounded,
-                      color: AppColors.primary,
-                      size: 22.sp,
-                    ),
-                    onPressed: _sendRecording,
-                  );
-                }
-
-                if (hasText) {
-                  return IconButton(
-                    icon: Icon(
-                      Icons.send_rounded,
-                      color: AppColors.primary,
-                      size: 22.sp,
-                    ),
-                    onPressed: _onSend,
-                  );
-                }
-
+              if (_isRecording) {
                 return IconButton(
                   icon: Icon(
-                    Icons.mic_rounded,
-                    color: context.textTertiary,
+                    Icons.stop_circle,
+                    color: AppColors.primary,
+                    size: 30.sp,
+                  ),
+                  onPressed: _stopRecording,
+                );
+              }
+
+              if (_recordedPath != null) {
+                return IconButton(
+                  icon: Icon(
+                    Icons.send_rounded,
+                    color: AppColors.primary,
                     size: 22.sp,
                   ),
-                  onPressed: _startRecording,
+                  onPressed: _sendRecording,
                 );
-              },
-            ),
-          ],
-        ),
+              }
+
+              if (hasText) {
+                return IconButton(
+                  icon: Icon(
+                    Icons.send_rounded,
+                    color: AppColors.primary,
+                    size: 22.sp,
+                  ),
+                  onPressed: _onSend,
+                );
+              }
+
+              return IconButton(
+                icon: Icon(
+                  Icons.mic_rounded,
+                  color: context.textTertiary,
+                  size: 22.sp,
+                ),
+                onPressed: _startRecording,
+              );
+            },
+          ),
+        ],
       ),
     );
   }

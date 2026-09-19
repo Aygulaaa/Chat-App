@@ -38,126 +38,124 @@ class ChatTile extends ConsumerWidget {
     final userStatusState = ref.watch(userStatusProvider);
     final bool isOnline = userStatusState.onlineUsers[userId] == true;
 
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18.r),
-        child: InkWell(
-          onTap: onTap,
-          onLongPress: onLongPress != null
-              ? () {
-                  HapticFeedback.mediumImpact();
-                  onLongPress!();
-                }
-              : null,
-          borderRadius: BorderRadius.circular(18.r),
-          splashColor: AppColors.primary.withValues(alpha: 0.10),
-          highlightColor: Colors.transparent,
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 13.h),
-            decoration: BoxDecoration(
-              color: context.cardBg,
-              borderRadius: BorderRadius.circular(18.r),
-              border: Border.all(
-                color: unread
-                    ? AppColors.primary.withValues(
-                        alpha: context.isLight ? 0.45 : 0.35,
-                      )
-                    : context.glassBorder,
-                width: unread ? 1.5 : 1,
-              ),
-              boxShadow: [
-                if (unread)
-                  BoxShadow(
-                    color: AppColors.primary.withValues(
-                      alpha: context.isLight ? 0.18 : 0.12,
-                    ),
-                    blurRadius: 20,
-                    spreadRadius: 0,
-                  ),
-                BoxShadow(
-                  color: context.isLight
-                      ? Colors.black.withValues(alpha: 0.04)
-                      : const Color(0x10000000),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                UserAvatar(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress != null
+            ? () {
+                HapticFeedback.mediumImpact();
+                onLongPress!();
+              }
+            : null,
+        splashColor: (context.isLight ? Colors.black : Colors.white)
+            .withValues(alpha: 0.05),
+        highlightColor: (context.isLight ? Colors.black : Colors.white)
+            .withValues(alpha: 0.03),
+        child: Container(
+          padding: EdgeInsets.only(left: 16.w),
+          child: Row(
+            children: [
+              Padding(
+                padding: EdgeInsets.only(top: 9.h, bottom: 9.h),
+                child: UserAvatar(
                   name: name,
                   imageUrl: avatarUrl,
                   isOnline: isOnline,
                 ),
-                SizedBox(width: 13.w),
-                Expanded(
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.only(right: 16.w, top: 9.h, bottom: 20.h),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: (context.isLight
+                                ? Colors.black
+                                : Colors.white)
+                            .withValues(alpha: 0.08),
+                        width: 0.6,
+                      ),
+                    ),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        name,
-                        style: TextStyle(
-                          fontSize: 15.sp,
-                          fontWeight: FontWeight.w600,
-                          color: context.textPrimary,
-                          letterSpacing: -0.1,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              style: TextStyle(
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.w600,
+                                color: context.textPrimary,
+                                letterSpacing: -0.2,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isMuted) ...[
+                                Icon(
+                                  Icons.notifications_off_rounded,
+                                  size: 13.sp,
+                                  color: context.textTertiary,
+                                ),
+                                SizedBox(width: 4.w),
+                              ],
+                              Text(
+                                time,
+                                style: TextStyle(
+                                  fontSize: 12.sp,
+                                  color: unread
+                                      ? (isMuted
+                                          ? context.textTertiary
+                                          : AppColors.primary)
+                                      : context.textTertiary,
+                                  fontWeight: unread && !isMuted
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                       SizedBox(height: 3.h),
-                      Text(
-                        message,
-                        style: TextStyle(
-                          fontSize: 13.sp,
-                          color: unread
-                              ? context.textSecondary
-                              : context.textTertiary,
-                          fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              message,
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                color: context.textSecondary,
+                                fontWeight: FontWeight.w400,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (unread) ...[
+                            SizedBox(width: 8.w),
+                            _UnreadBadge(
+                              count: unreadCount,
+                              isMuted: isMuted,
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
                 ),
-                SizedBox(width: 10.w),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        if (isMuted) ...[
-                          Icon(
-                            Icons.volume_off,
-                            size: 14.sp,
-                            color: context.textTertiary,
-                          ),
-                          SizedBox(width: 4.w),
-                        ],
-                        Text(
-                          time,
-                          style: TextStyle(
-                            fontSize: 11.5.sp,
-                            color: unread
-                                ? (context.isLight
-                                    ? AppColors.primary
-                                    : AppColors.accent)
-                                : context.textTertiary,
-                            fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 6.h),
-                    if (unread) _UnreadBadge(count: unreadCount),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -167,34 +165,37 @@ class ChatTile extends ConsumerWidget {
 
 class _UnreadBadge extends StatelessWidget {
   final int count;
+  final bool isMuted;
 
-  const _UnreadBadge({required this.count});
+  const _UnreadBadge({
+    required this.count,
+    required this.isMuted,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final Color badgeColor = isMuted
+        ? (context.isLight ? const Color(0xFFC4C9CC) : const Color(0xFF5A636D))
+        : AppColors.primary;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-      constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+      constraints: BoxConstraints(minWidth: 20.w, minHeight: 20.h),
       decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.4),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: badgeColor,
+        borderRadius: BorderRadius.circular(10.r),
       ),
-      child: Text(
-        count > 99 ? '99+' : '$count',
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
+      child: Center(
+        child: Text(
+          count > 99 ? '99+' : '$count',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 11.sp,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.1,
+          ),
+          textAlign: TextAlign.center,
         ),
-        textAlign: TextAlign.center,
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:my_chat_app/core/di/global_provider.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
@@ -16,23 +17,24 @@ import 'package:my_chat_app/features/contacts/domain/usecases/get_contacts.dart'
 import 'package:my_chat_app/features/contacts/domain/usecases/remove_contact.dart';
 import 'package:my_chat_app/features/contacts/domain/usecases/search_users.dart';
 
+part 'contacts_provider.g.dart';
+
 // ─── Infrastructure providers ─────────────────────────────────────────────────
 
-final contactsDatasourceProvider = Provider(
-  (ref) => ContactsRemoteDatasource(ref.read(apiClientProvider)),
-);
+@Riverpod(keepAlive: true)
+ContactsRemoteDatasource contactsDatasource(Ref ref) {
+  return ContactsRemoteDatasource(ref.watch(apiClientProvider));
+}
 
-final contactsRepositoryProvider = Provider<ContactsRepository>(
-  (ref) => ContactsRepositoryImpl(ref.read(contactsDatasourceProvider)),
-);
+@Riverpod(keepAlive: true)
+ContactsRepository contactsRepository(Ref ref) {
+  return ContactsRepositoryImpl(ref.watch(contactsDatasourceProvider));
+}
 
 // ─── Contacts list ────────────────────────────────────────────────────────────
 
-final contactsProvider = AsyncNotifierProvider<ContactsNotifier, List<Contact>>(
-  ContactsNotifier.new,
-);
-
-class ContactsNotifier extends AsyncNotifier<List<Contact>> {
+@Riverpod(keepAlive: true)
+class ContactsNotifier extends _$ContactsNotifier {
   GetContacts? _getContacts;
 
   @override
@@ -101,7 +103,7 @@ class ContactsNotifier extends AsyncNotifier<List<Contact>> {
     final repo = ref.read(contactsRepositoryProvider);
     await AddContact(repo)(contactId);
     ref.invalidateSelf();
-    ref.invalidate(blockedContactsProvider);
+      ref.invalidate(blockedContactsProvider);
     ref.invalidate(searchUsersProvider);
   }
 
@@ -130,12 +132,8 @@ class ContactsNotifier extends AsyncNotifier<List<Contact>> {
 
 // ─── Blocked contacts ─────────────────────────────────────────────────────────
 
-final blockedContactsProvider =
-    AsyncNotifierProvider<BlockedContactsNotifier, List<Contact>>(
-      BlockedContactsNotifier.new,
-    );
-
-class BlockedContactsNotifier extends AsyncNotifier<List<Contact>> {
+@Riverpod(keepAlive: true)
+class BlockedContactsNotifier extends _$BlockedContactsNotifier {
   GetBlockedContacts? _getBlocked;
 
   @override
@@ -155,31 +153,31 @@ class BlockedContactsNotifier extends AsyncNotifier<List<Contact>> {
   }
 
   Future<void> unblock(int contactId) async {
-  final repo = ref.read(contactsRepositoryProvider);
-  
-  // Set state to loading so the UI shows activity
-  state = const AsyncValue.loading();
-  
-  try {
-    await BlockUser(repo)(contactId, block: false);
+    final repo = ref.read(contactsRepositoryProvider);
     
-    final newList = await _getBlocked!();
-    state = AsyncValue.data(newList);
+    // Set state to loading so the UI shows activity
+    state = const AsyncValue.loading();
     
-    ref.invalidate(contactsProvider);
-    ref.invalidate(searchUsersProvider);
-  } catch (e, st) {
-    state = AsyncValue.error(e, st);
+    try {
+      await BlockUser(repo)(contactId, block: false);
+      
+      final newList = await _getBlocked!();
+      state = AsyncValue.data(newList);
+      
+      ref.invalidate(contactsProvider);
+      ref.invalidate(searchUsersProvider);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
   }
 }
-}
 
-final searchUsersProvider =
-    FutureProvider.family<List<Contact>, String>((ref, query) async {
+@Riverpod(keepAlive: true)
+Future<List<Contact>> searchUsers(Ref ref, String query) async {
   if (query.trim().isEmpty) return [];
 
   final searchUsers = SearchUsers(ref.read(contactsRepositoryProvider));
   await Future.delayed(const Duration(milliseconds: 300));
 
   return await searchUsers(query.trim());
-});
+}

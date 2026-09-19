@@ -13,6 +13,7 @@ import 'package:my_chat_app/features/profile/presentation/providers/user_provide
 import 'package:my_chat_app/features/profile/presentation/widgets/info_card.dart';
 import 'package:my_chat_app/features/profile/presentation/widgets/my_profile.dart';
 import 'package:my_chat_app/features/profile/presentation/widgets/profile_delegate.dart';
+import 'package:my_chat_app/features/settings/presentation/providers/settings_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   final UserEntity? user;
@@ -27,61 +28,75 @@ class ProfileScreen extends ConsumerWidget {
 
     if (authState.isLoading) {
       return Scaffold(
-        backgroundColor: context.appBg,
-        body: const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
+        backgroundColor: Colors.transparent,
+        body: Container(
+          decoration: BoxDecoration(gradient: context.appBgGradient),
+          child: const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
         ),
       );
     }
     if (authState.user == null) {
       return Scaffold(
-        backgroundColor: context.appBg,
-        body: Center(
-          child: Text(
-            'Please log in',
-            style: TextStyle(color: context.textSecondary),
+        backgroundColor: Colors.transparent,
+        body: Container(
+          decoration: BoxDecoration(gradient: context.appBgGradient),
+          child: Center(
+            child: Text(
+              'Please log in',
+              style: TextStyle(color: context.textSecondary),
+            ),
           ),
         ),
       );
     }
     return profileAsync.when(
       loading: () => Scaffold(
-        backgroundColor: context.appBg,
-        body: const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
+        backgroundColor: Colors.transparent,
+        body: Container(
+          decoration: BoxDecoration(gradient: context.appBgGradient),
+          child: const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
         ),
       ),
       error: (e, _) => Scaffold(
-        backgroundColor: context.appBg,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline, color: AppColors.error, size: 48.sp),
-              SizedBox(height: 16.h),
-              Text(
-                '$e',
-                style: TextStyle(color: context.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 16.h),
-              TextButton(
-                onPressed: () =>
-                    ref.read(userProfileProvider.notifier).fetchProfile(),
-                child: const Text(
-                  'Retry',
-                  style: TextStyle(color: AppColors.primary),
+        backgroundColor: Colors.transparent,
+        body: Container(
+          decoration: BoxDecoration(gradient: context.appBgGradient),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline, color: AppColors.error, size: 48.sp),
+                SizedBox(height: 16.h),
+                Text(
+                  '$e',
+                  style: TextStyle(color: context.textSecondary),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-            ],
+                SizedBox(height: 16.h),
+                TextButton(
+                  onPressed: () =>
+                      ref.read(userProfileProvider.notifier).fetchProfile(),
+                  child: const Text(
+                    'Retry',
+                    style: TextStyle(color: AppColors.primary),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
       data: (me) {
         if (me == null) {
           return Scaffold(
-            backgroundColor: context.appBg,
-            body: const Center(child: CircularProgressIndicator()),
+            backgroundColor: Colors.transparent,
+            body: Container(
+              decoration: BoxDecoration(gradient: context.appBgGradient),
+              child: const Center(child: CircularProgressIndicator())),
           );
         }
         return MyProfile(user: me);
@@ -97,12 +112,21 @@ class _OtherProfile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fullUserAsync = ref.watch(userByIdProvider(user.id));
-    final effectiveUser = fullUserAsync.maybeWhen(
-      data: (fetchedUser) => fetchedUser ?? user,
+    final fetchedUser = fullUserAsync.maybeWhen(
+      data: (u) => u ?? user,
       orElse: () => user,
     );
 
-    // Watch contacts list to know state (isContact, isBlocked)
+    final settingsAsync = ref.watch(settingsProvider);
+    final hideLastSeen = settingsAsync.maybeWhen(
+      data: (settings) => settings?.hideLastSeen ?? false,
+      orElse: () => false,
+    );
+
+    final effectiveUser = hideLastSeen
+        ? fetchedUser.copyWith(lastSeen: null)
+        : fetchedUser;
+
     final contactsAsync = ref.watch(contactsProvider);
     final blockedContactsAsync = ref.watch(blockedContactsProvider);
 
@@ -121,136 +145,162 @@ class _OtherProfile extends ConsumerWidget {
     final minHeaderHeight = kToolbarHeight + topPadding;
 
     return Scaffold(
-      backgroundColor: context.appBg,
-      body: CustomScrollView(
-        slivers: [
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: ProfileHeaderDelegate(
-              user: effectiveUser,
-              isMe: false,
-              maxExtentHeight: maxHeaderHeight,
-              minExtentHeight: minHeaderHeight,
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(gradient: context.appBgGradient),
+        child: CustomScrollView(
+          slivers: [
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: ProfileHeaderDelegate(
+                user: effectiveUser,
+                isMe: false,
+                maxExtentHeight: maxHeaderHeight,
+                minExtentHeight: minHeaderHeight,
+              ),
             ),
-          ),
-          SliverToBoxAdapter(
-            child: Column(
-              children: [
-                SizedBox(height: 20.h),
-                InfoCard(user: effectiveUser),
-                SizedBox(height: 16.h),
-
-                // Action Card matching InfoCard style
-                Container(
-                  margin: EdgeInsets.symmetric(horizontal: 16.w),
-                  decoration: BoxDecoration(
-                    color: context.cardBg,
-                    borderRadius: BorderRadius.circular(18.r),
-                    border: Border.all(color: context.glassBorder),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      // Send Message Row
-                      if (!isBlocked) ...[
-                        _ActionCardRow(
-                          icon: Icons.chat_bubble_outline_rounded,
-                          iconColor: AppColors.accent,
-                          iconBgColor: AppColors.primary.withValues(alpha: 0.12),
-                          title: 'Send message',
-                          onTap: () async {
-                            try {
-                              final chatRepo = ref.read(chatRepositoryProvider);
-                              final chatId = await chatRepo.createChat(effectiveUser.id);
-
-                              await ref.read(chatProvider.notifier).loadChats();
-
-                              if (!context.mounted) return;
-
-                              context.push(
-                                '/chat/conversation/$chatId',
-                                extra: effectiveUser.username,
-                              );
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Failed to open chat: $e')),
-                                );
-                              }
-                            }
-                          },
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  SizedBox(height: 20.h),
+                  InfoCard(user: effectiveUser),
+                  SizedBox(height: 16.h),
+        
+                  // Completely borderless glass container
+                  Container(
+                    margin: EdgeInsets.symmetric(horizontal: 16.w),
+                    decoration: BoxDecoration(
+                      color: context.cardBg,
+                      borderRadius: BorderRadius.circular(22.r),
+                      // No border property here - clean floating glass look
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: context.isLight ? 0.05 : 0.22),
+                          blurRadius: 28,
+                          offset: const Offset(0, 10),
                         ),
-                        Divider(color: context.glassBorder, height: 1, indent: 52.w),
                       ],
-
-                      // Add / Remove from Contacts Row
-                      if (!isBlocked) ...[
-                        if (!isContact)
+                    ),
+                    child: Column(
+                      children: [
+                        if (!isBlocked) ...[
                           _ActionCardRow(
-                            icon: Icons.person_add_outlined,
-                            iconColor: AppColors.online,
-                            iconBgColor: AppColors.online.withValues(alpha: 0.12),
-                            title: 'Add to contacts',
+                            icon: Icons.chat_bubble_outline_rounded,
+                            iconColor: AppColors.accent,
+                            iconBgColor: AppColors.primary.withValues(
+                              alpha: 0.12,
+                            ),
+                            title: 'Send message',
+                            onTap: () async {
+                              try {
+                                final chatRepo = ref.read(chatRepositoryProvider);
+                                final chatId = await chatRepo.createChat(
+                                  effectiveUser.id,
+                                );
+        
+                                await ref.read(chatProvider.notifier).loadChats();
+        
+                                if (!context.mounted) return;
+        
+                                context.push(
+                                  '/chat/conversation/$chatId',
+                                  extra: effectiveUser.username,
+                                );
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Failed to open chat: $e'),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                          Divider(
+                            color: context.isLight 
+                                ? Colors.black.withValues(alpha: 0.04) 
+                                : Colors.white.withValues(alpha: 0.05),
+                            height: 1,
+                            thickness: 1,
+                            indent: 52.w,
+                          ),
+                        ],
+        
+                        if (!isBlocked) ...[
+                          if (!isContact)
+                            _ActionCardRow(
+                              icon: Icons.person_add_outlined,
+                              iconColor: AppColors.online,
+                              iconBgColor: AppColors.online.withValues(
+                                alpha: 0.12,
+                              ),
+                              title: 'Add to contacts',
+                              onTap: () {
+                                ref
+                                    .read(contactsProvider.notifier)
+                                    .addContact(effectiveUser.id);
+                              },
+                            )
+                          else
+                            _ActionCardRow(
+                              icon: Icons.person_remove_outlined,
+                              iconColor: Colors.orangeAccent,
+                              iconBgColor: Colors.orangeAccent.withValues(
+                                alpha: 0.12,
+                              ),
+                              title: 'Remove from contacts',
+                              onTap: () {
+                                ref
+                                    .read(contactsProvider.notifier)
+                                    .removeContact(effectiveUser.id);
+                              },
+                            ),
+                          Divider(
+                            color: context.isLight 
+                                ? Colors.black.withValues(alpha: 0.04) 
+                                : Colors.white.withValues(alpha: 0.05),
+                            height: 1,
+                            thickness: 1,
+                            indent: 52.w,
+                          ),
+                        ],
+        
+                        if (!isBlocked)
+                          _ActionCardRow(
+                            icon: Icons.block_rounded,
+                            iconColor: AppColors.error,
+                            iconBgColor: AppColors.error.withValues(alpha: 0.12),
+                            title: 'Block user',
+                            titleColor: AppColors.error,
                             onTap: () {
                               ref
                                   .read(contactsProvider.notifier)
-                                  .addContact(effectiveUser.id);
+                                  .blockUser(effectiveUser.id);
                             },
                           )
                         else
                           _ActionCardRow(
-                            icon: Icons.person_remove_outlined,
-                            iconColor: Colors.orangeAccent,
-                            iconBgColor: Colors.orangeAccent.withValues(alpha: 0.12),
-                            title: 'Remove from contacts',
+                            icon: Icons.lock_open_rounded,
+                            iconColor: AppColors.online,
+                            iconBgColor: AppColors.online.withValues(alpha: 0.12),
+                            title: 'Unblock user',
+                            titleColor: AppColors.online,
                             onTap: () {
                               ref
-                                  .read(contactsProvider.notifier)
-                                  .removeContact(effectiveUser.id);
+                                  .read(blockedContactsProvider.notifier)
+                                  .unblock(effectiveUser.id);
                             },
                           ),
-                        Divider(color: context.glassBorder, height: 1, indent: 52.w),
                       ],
-
-                      // Block / Unblock User Row
-                      if (!isBlocked)
-                        _ActionCardRow(
-                          icon: Icons.block_rounded,
-                          iconColor: AppColors.error,
-                          iconBgColor: AppColors.error.withValues(alpha: 0.12),
-                          title: 'Block user',
-                          titleColor: AppColors.error,
-                          onTap: () {
-                            ref.read(contactsProvider.notifier).blockUser(effectiveUser.id);
-                          },
-                        )
-                      else
-                        _ActionCardRow(
-                          icon: Icons.lock_open_rounded,
-                          iconColor: AppColors.online,
-                          iconBgColor: AppColors.online.withValues(alpha: 0.12),
-                          title: 'Unblock user',
-                          titleColor: AppColors.online,
-                          onTap: () {
-                            ref
-                                .read(blockedContactsProvider.notifier)
-                                .unblock(effectiveUser.id);
-                          },
-                        ),
-                    ],
+                    ),
                   ),
-                ),
-                SizedBox(height: 100.h),
-              ],
+                  SizedBox(height: 100.h),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -277,7 +327,7 @@ class _ActionCardRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18.r),
+      borderRadius: BorderRadius.circular(22.r),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
         child: Row(
@@ -303,7 +353,7 @@ class _ActionCardRow extends StatelessWidget {
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w500,
                     ),
-                  )
+                  ),
                 ],
               ),
             ),

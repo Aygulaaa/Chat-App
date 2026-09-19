@@ -51,7 +51,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         onTap: () {
           if (isGroup) {
             context.push('/group-profile/$chatId');
-          } else {
+          } else if (otherUser != null) {
             context.push('/user-profile', extra: otherUser);
           }
         },

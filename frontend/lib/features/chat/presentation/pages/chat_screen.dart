@@ -36,6 +36,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _socketDataSource.setActiveChat(widget.chatId);
       await _socketDataSource.joinChat(widget.chatId);
       await _socketDataSource.markChatAsRead(widget.chatId);
+      ref.read(chatProvider.notifier).resetUnreadCount(widget.chatId);
     });
   }
 

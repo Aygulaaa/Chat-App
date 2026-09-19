@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -11,6 +12,7 @@ import 'package:my_chat_app/core/network/fcm_service.dart';
 import 'package:my_chat_app/core/router/app_router.dart';
 import 'package:my_chat_app/core/theme/app_theme.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
+import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.dart';
 import 'package:my_chat_app/features/notification/presentation/providers/notification_provider.dart';
 import 'package:my_chat_app/features/settings/presentation/providers/settings_provider.dart';
 
@@ -23,6 +25,7 @@ void main() async {
   await Hive.openBox<String>('messages_cache');
   await Hive.openBox<String>('user_profile_cache');
   await Hive.openBox<String>('contacts_cache');
+  await Hive.openBox<String>('local_auth_cache');
 
   // 2. Load Environment Variables
   try {
@@ -61,12 +64,35 @@ class MyApp extends ConsumerStatefulWidget {
 }
 
 class _MyAppState extends ConsumerState<MyApp> {
+  StreamSubscription<void>? _sessionRevokedSub;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initFcm();
+      _listenForSessionRevocation();
     });
+  }
+
+  void _listenForSessionRevocation() {
+    // Cancel any previous subscription to avoid duplicates on hot restart
+    _sessionRevokedSub?.cancel();
+    _sessionRevokedSub = ref
+        .read(chatSocketDataSourceProvider)
+        .onSessionRevoked()
+        .listen((_) {
+      if (!mounted) return;
+      // This device's session was revoked remotely — force logout.
+      debugPrint('🚫 session_revoked received — logging out');
+      ref.read(authProvider.notifier).logout();
+    });
+  }
+
+  @override
+  void dispose() {
+    _sessionRevokedSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _initFcm() async {

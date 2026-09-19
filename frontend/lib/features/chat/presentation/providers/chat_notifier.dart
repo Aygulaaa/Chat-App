@@ -85,7 +85,7 @@ class ChatNotifier extends _$ChatNotifier {
     } catch (_) {}
   }
 
-Future<void> _initBlocked() async {
+  Future<void> _initBlocked() async {
     try {
       final blocked = await ref.read(blockedContactsProvider.future);
       if (!ref.mounted) return;
@@ -98,9 +98,11 @@ Future<void> _initBlocked() async {
       if (!ref.mounted) return;
       next.whenData((blocked) {
         final newBlockedIds = blocked.map((c) => c.id as int).toSet();
-        
+
         // Check if any user was unblocked (was in old set, absent in new set)
-        final bool someoneWasUnblocked = _blockedUserIds.any((id) => !newBlockedIds.contains(id));
+        final bool someoneWasUnblocked = _blockedUserIds.any(
+          (id) => !newBlockedIds.contains(id),
+        );
 
         _blockedUserIds
           ..clear()

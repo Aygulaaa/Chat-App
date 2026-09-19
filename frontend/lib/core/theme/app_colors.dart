@@ -1,32 +1,29 @@
 import 'package:flutter/material.dart';
 
 /// Single access point for theme-aware tokens.
-/// Resolves colors dynamically while retaining identical variable names.
 abstract final class AppColors {
-  // Static Brand Colors
-  static const Color primary = Color(0xFF6366F1);
-  static const Color accent = Color(0xFF818CF8);
-  static const Color online = Color(0xFF10B981);
-  static const Color error = Colors.redAccent;
+  // Static Brand Colors (Warm, vibrant, pastel-friendly palette)
+  static const Color primary = Color(0xFFFF8A80); // Soft pastel coral/pink
+  static const Color accent = Color(0xFFFFD180);  // Soft pastel amber/peach
+  static const Color online = Color(0xFFA7FFEB);  // Soft pastel mint green
+  static const Color error = Color(0xFFFF8A80);
 
   // Static Dark-theme convenience aliases
-  // (used by widgets that can't reach BuildContext, e.g. inside const/static contexts)
-  static const Color darkCard = Color(0xFF171326);
-  static const Color darkCardAlt = Color(0xFF1F1A33);
-  static const Color darkBorder = Color(0x2B818CF8);
-  static const Color darkGlassBorder = Color(0x33818CF8);
-  static const Color darkInputFill = Color(0xFF19142B);
-  static const Color darkTextPrimary = Colors.white;
-  static const Color darkTextSecondary = Color(0xFFCBD5E1);
-  static const Color darkTextTertiary = Color(0xFF5A585A);
+  static const Color darkCard = Color(0x1FFFFFFF); // ~12% translucent white
+  static const Color darkCardAlt = Color(0x0FFFFFFF); // ~6% translucent white
+  static const Color darkBorder = Color(0x26FFFFFF); // 15% translucent white
+  static const Color darkGlassBorder = Color(0x38FFFFFF); // ~22% translucent white
+  static const Color darkInputFill = Color(0xFF24232C); // Deep rich gray with warm undertone
+  static const Color darkTextPrimary = Color(0xFFFFF1F2); // Warm soft white
+  static const Color darkTextSecondary = Color(0xFFD7CCC8); // Warm taupe-gray
+  static const Color darkTextTertiary = Color(0xFF8D8381); // Muted warm gray
 
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [primary, accent],
+    colors: [Color(0xFFFF8A80), Color(0xFFFFD180)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
-  /// Resolves theme-dependent colors based on [Brightness]
   static AppColorScheme of(BuildContext context) {
     return Theme.of(context).brightness == Brightness.dark
         ? const DarkColors()
@@ -58,113 +55,122 @@ abstract interface class AppColorScheme {
   LinearGradient get headerGradient;
 }
 
-/// Light Theme Color Palette (Glassmorphic Sky Blue)
+/// Light Theme Color Palette (Cozy, Airy Pastel Peach & Lavender)
 final class LightColors implements AppColorScheme {
   const LightColors();
 
   @override
-  Color get bg => const Color(0xFFF0F6FF);
+  Color get bg => const Color(0xFFFFF8F6);
   @override
-  Color get authBg => const Color(0xFFF0F6FF);
+  Color get authBg => const Color(0xFFFFF8F6);
   @override
-  Color get card => const Color(0xCCFFFFFF);
+  Color get card => const Color(0xE6FFFFFF);
   @override
-  Color get cardAlt => const Color(0xB8F0F7FF);
+  Color get cardAlt => const Color(0xB8FFF0EC);
   @override
-  Color get surface => const Color(0xE6FAFCFF);
+  Color get surface => const Color(0xE6FFF5F2);
   @override
-  Color get appBar => const Color(0xD9EBF3FE);
+  Color get appBar => const Color(0xD9FFEBE5);
   @override
-  Color get inputFill => const Color(0x99E2EEFF);
+  Color get inputFill => const Color(0xFFFFE0D9);
   @override
-  Color get modalBg => const Color(0xFFF4F8FE);
+  Color get modalBg => const Color(0xFFFFF4F2);
   @override
   Color get modalSurface => const Color(0xE6FFFFFF);
 
   @override
-  Color get textPrimary => const Color(0xFF0F172A);
+  Color get textPrimary => const Color(0xFF3E2723);
   @override
-  Color get textSecondary => const Color(0xFF334155);
+  Color get textSecondary => const Color(0xFF6D4C41);
   @override
-  Color get textTertiary => const Color(0xFF64748B);
+  Color get textTertiary => const Color(0xFFA1887F);
 
   @override
-  Color get border => const Color(0x3B3B82F6);
+  Color get border => const Color(0x3BFF8A80);
   @override
-  Color get glassBorder => const Color(0x66FFFFFF);
+  Color get glassBorder => const Color(0x80FFFFFF);
 
   @override
   LinearGradient get bgGradient => const LinearGradient(
-        colors: [Color(0xFFEBF3FE), Color(0xFFF8FAFC)],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      );
+    colors: [Color(0xFFFFEBE5), Color(0xFFFFF9F8)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+  @override
+  LinearGradient get authGradient => bgGradient;
+  @override
+  LinearGradient get headerGradient => const LinearGradient(
+    colors: [Color(0xE6FFE0D9), Color(0xCCFFF0EC)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+}
 
+/// Dark Theme Color Palette (Rich Midnight Velvet & Warm Pastels)
+final class DarkColors implements AppColorScheme {
+  const DarkColors();
+
+  // Cozy deep dark purple-gray instead of dead pitch-black.
+  @override
+  Color get bg => const Color(0xFF16141A);
+  @override
+  Color get authBg => const Color(0xFF16141A);
+
+  // Soft translucent surfaces with warm undertones.
+  @override
+  Color get card => const Color(0x1AFFFFFF); // ~10% White
+  @override
+  Color get cardAlt => const Color(0x0DFFFFFF); // ~5% White
+  @override
+  Color get surface => const Color(0x14FFFFFF);
+  @override
+  Color get appBar => const Color(0x1A16141A);
+
+  // Inputs feel comfortably layered.
+  @override
+  Color get inputFill => const Color(0xFF232029);
+
+  // Elevated modal backgrounds
+  @override
+  Color get modalBg => const Color(0xFF1E1B24);
+  @override
+  Color get modalSurface => const Color(0x24FFFFFF);
+
+  // Soft high-contrast warm text
+  @override
+  Color get textPrimary => const Color(0xFFFCE4EC);
+  @override
+  Color get textSecondary => const Color(0xFFD7CCC8);
+  @override
+  Color get textTertiary => const Color(0xFF9E9290);
+
+  // Subtle warm glowing borders
+  @override
+  Color get border => const Color(0x26FF8A80);
+  @override
+  Color get glassBorder => const Color(0x38FFFFFF);
+
+  @override
+  LinearGradient get bgGradient => const LinearGradient(
+    colors: [
+      Color(0xFF231F2E), 
+      Color(0xFF1A1721), 
+      Color(0xFF16141A), 
+    ],
+    begin: Alignment.bottomCenter,
+    end: Alignment.topCenter,
+    stops: [0.0, 0.5, 1.0],
+  );
   @override
   LinearGradient get authGradient => bgGradient;
 
   @override
   LinearGradient get headerGradient => const LinearGradient(
-        colors: [Color(0xE6E2EEFF), Color(0xCCF0F7FF)],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      );
-}
-
-/// Dark Theme Color Palette (Deep Void Purple)
-final class DarkColors implements AppColorScheme {
-  const DarkColors();
-
-  @override
-  Color get bg => const Color(0xFF0B0914);
-  @override
-  Color get authBg => const Color(0xFF0B0B0E);
-  @override
-  Color get card => const Color(0xFF171326);
-  @override
-  Color get cardAlt => const Color(0xFF1F1A33);
-  @override
-  Color get surface => const Color(0xFF0B0914);
-  @override
-  Color get appBar => const Color(0xFF120E21);
-  @override
-  Color get inputFill => const Color(0xFF19142B);
-  @override
-  Color get modalBg => const Color(0xFF0B0914);
-  @override
-  Color get modalSurface => const Color(0xFF1C1733);
-
-  @override
-  Color get textPrimary => Colors.white;
-  @override
-  Color get textSecondary => const Color(0xFFCBD5E1);
-  @override
-  Color get textTertiary => const Color.fromARGB(255, 90, 88, 90);
-
-  @override
-  Color get border => const Color(0x2B818CF8);
-  @override
-  Color get glassBorder => const Color(0x33818CF8);
-
-  @override
-  LinearGradient get bgGradient => const LinearGradient(
-        colors: [Color(0xFF0B0914), Color(0xFF1A132C)],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      );
-
-  @override
-  LinearGradient get authGradient => const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Color(0xFF0B0B0E), Color(0xFF1A1525), Color(0xFF2D1B4E)],
-        stops: [0.0, 0.5, 1.0],
-      );
-
-  @override
-  LinearGradient get headerGradient => const LinearGradient(
-        colors: [Color(0xFF120E21), Color(0xFF221A3B)],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      );
+    colors: [
+      Color(0x662B2533),
+      Color(0x0016141A),
+    ],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
 }

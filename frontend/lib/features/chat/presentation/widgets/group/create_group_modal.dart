@@ -71,7 +71,7 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
 
       if (!mounted) return;
 
-      context.pop(); // Close bottom sheet modal
+      context.pop();
 
       context.push(
         '/chat/conversation/$chatId',
@@ -95,7 +95,7 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
     return Container(
       height: MediaQuery.of(context).size.height * 0.88,
       decoration: BoxDecoration(
-        color: context.cardBg,
+        color: context.appBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: SafeArea(
@@ -217,9 +217,10 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
                         return Column(
                           children: [
                             Stack(
+                              clipBehavior: Clip.none,
                               children: [
                                 CircleAvatar(
-                                  radius: 28,
+                                  radius: 26,
                                   backgroundColor: AppColors.primary,
                                   backgroundImage: contact.avatar != null
                                       ? NetworkImage(contact.avatar!)
@@ -235,8 +236,8 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
                                       : null,
                                 ),
                                 Positioned(
-                                  right: -4,
-                                  top: -4,
+                                  top: -2,
+                                  right: -2,
                                   child: GestureDetector(
                                     onTap: () {
                                       setState(() {
@@ -244,14 +245,26 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
                                       });
                                     },
                                     child: Container(
-                                      decoration: const BoxDecoration(
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        color: AppColors.error,
+                                        color: context.textPrimary.withValues(alpha: 0.85),
+                                        border: Border.all(
+                                          color: context.appBg,
+                                          width: 2,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.12),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
                                       ),
-                                      child: const Icon(
-                                        Icons.close,
-                                        size: 16,
-                                        color: Colors.white,
+                                      child: Icon(
+                                        Icons.close_rounded,
+                                        size: 12,
+                                        color: context.appBg,
                                       ),
                                     ),
                                   ),
@@ -260,7 +273,7 @@ class _CreateGroupModalState extends ConsumerState<CreateGroupModal> {
                             ),
                             const SizedBox(height: 6),
                             SizedBox(
-                              width: 64,
+                              width: 60,
                               child: Text(
                                 contact.username,
                                 maxLines: 1,

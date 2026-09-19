@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 
 const List<String> kStickers = ['😂', '❤️', '👍', '😮', '😢', '🔥', '🎉', '👏', '😍'];
 
@@ -22,14 +22,14 @@ class StickerStrip extends StatelessWidget {
         maxWidth: MediaQuery.of(context).size.width * 0.82,
       ),
       decoration: BoxDecoration(
-        color: AppColors.darkCard.withValues(alpha: 0.88),
+        color: context.cardBg,
         borderRadius: BorderRadius.circular(24.r),
         border: Border.all(
-          color: AppColors.darkBorder.withValues(alpha: 0.5),
+          color: context.glassBorder,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: Colors.black.withValues(alpha: context.isLight ? 0.08 : 0.25),
             blurRadius: 18.r,
             offset: Offset(0, 6.h),
           ),

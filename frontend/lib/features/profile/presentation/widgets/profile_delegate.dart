@@ -8,6 +8,7 @@ import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/core/utils/format_last_seen.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
 import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
+import 'package:my_chat_app/features/settings/presentation/providers/settings_provider.dart';
 
 class ProfileHeaderDelegate extends SliverPersistentHeaderDelegate {
   final UserEntity user;
@@ -43,7 +44,15 @@ class ProfileHeaderDelegate extends SliverPersistentHeaderDelegate {
         final isOnline =
             ref.watch(userStatusProvider).onlineUsers[user.id] ?? false;
         final socketLastSeen = ref.watch(userStatusProvider).lastSeen[user.id];
+        
+        final currentUserSettings = ref.watch(settingsProvider).value;
+        final myHideLastSeen = currentUserSettings?.hideLastSeen ?? false;
 
+        // hideLastSeen only hides the last seen TIMESTAMP, NOT the online dot.
+        // We still always fetch and show "Online" if user is currently online.
+        final shouldHideLastSeenTimestamp = !isMe && myHideLastSeen;
+
+        // Always fetch user data regardless of privacy settings
         if (!isMe) {
           final userAsync = ref.watch(userByIdProvider(user.id));
           userAsync.whenData((fetchedUser) {
@@ -58,7 +67,8 @@ class ProfileHeaderDelegate extends SliverPersistentHeaderDelegate {
           });
         }
 
-        final effectiveLastSeen = socketLastSeen ?? user.lastSeen;
+        // Only hide the timestamp, never hide the online status
+        final effectiveLastSeen = shouldHideLastSeenTimestamp ? null : (socketLastSeen ?? user.lastSeen);
 
         final titleLeft = Tween<double>(begin: 20.w, end: isMe ? 20.w : 56.w)
             .transform(progress);
@@ -150,9 +160,10 @@ class ProfileHeaderDelegate extends SliverPersistentHeaderDelegate {
                         Opacity(
                           opacity: (1.0 - (progress * 2)).clamp(0.0, 1.0),
                           child: _StatusLabel(
+                            // Online status always visible, hideLastSeen only hides the timestamp
                             isOnline: isOnline,
                             lastSeen: effectiveLastSeen,
-                            lastSeenFuzzy: ref.watch(userStatusProvider).lastSeenFuzzy[user.id] ?? user.lastSeenFuzzy,
+                            lastSeenFuzzy: shouldHideLastSeenTimestamp ? null : (ref.watch(userStatusProvider).lastSeenFuzzy[user.id] ?? user.lastSeenFuzzy),
                           ),
                         ),
                       ],

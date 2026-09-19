@@ -17,7 +17,7 @@ class ActionCard extends ConsumerWidget {
       context: context,
       backgroundColor: context.appBg,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (modalContext) {
         return SafeArea(
@@ -30,7 +30,7 @@ class ActionCard extends ConsumerWidget {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: modalContext.glassBorder,
+                    color: modalContext.textTertiary.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -72,10 +72,13 @@ class ActionCard extends ConsumerWidget {
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: modalContext.glassBorder),
+                          side: BorderSide.none,
+                          backgroundColor: modalContext.isLight
+                              ? Colors.black.withValues(alpha: 0.05)
+                              : Colors.white.withValues(alpha: 0.08),
                           padding: EdgeInsets.symmetric(vertical: 12.h),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12.r),
+                            borderRadius: BorderRadius.circular(14.r),
                           ),
                         ),
                         onPressed: () => modalContext.pop(),
@@ -96,13 +99,12 @@ class ActionCard extends ConsumerWidget {
                           backgroundColor: AppColors.error,
                           padding: EdgeInsets.symmetric(vertical: 12.h),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12.r),
+                            borderRadius: BorderRadius.circular(14.r),
                           ),
                           elevation: 0,
                         ),
                         onPressed: () {
-                          modalContext.pop(); // Close bottom sheet modal
-                          // State change triggers GoRouter redirect to /auth automatically
+                          modalContext.pop();
                           ref.read(authProvider.notifier).logout();
                         },
                         child: Text(
@@ -131,13 +133,14 @@ class ActionCard extends ConsumerWidget {
       margin: EdgeInsets.symmetric(horizontal: 16.w),
       decoration: BoxDecoration(
         color: context.cardBg,
-        borderRadius: BorderRadius.circular(18.r),
-        border: Border.all(color: context.glassBorder),
+        borderRadius: BorderRadius.circular(22.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(
+              alpha: context.isLight ? 0.05 : 0.22,
+            ),
+            blurRadius: 28,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -145,21 +148,35 @@ class ActionCard extends ConsumerWidget {
         children: [
           ActionRow(
             icon: Icons.settings_outlined,
-            iconColor: AppColors.primary,
+            iconColor: const Color(0xFFB39DDB), // Soft pastel purple
             label: 'Settings',
             onTap: () => context.push('/settings'),
           ),
-          Divider(color: context.glassBorder, height: 1, indent: 52.w),
+          Divider(
+            color: context.isLight
+                ? Colors.black.withValues(alpha: 0.04)
+                : Colors.white.withValues(alpha: 0.05),
+            height: 1,
+            thickness: 1,
+            indent: 52.w,
+          ),
           ActionRow(
             icon: Icons.edit_outlined,
-            iconColor: Colors.blueAccent,
+            iconColor: const Color(0xFF90CAF9), // Soft pastel blue
             label: 'Edit Profile',
             onTap: () => context.push('/edit-profile', extra: user),
           ),
-          Divider(color: context.glassBorder, height: 1, indent: 52.w),
+          Divider(
+            color: context.isLight
+                ? Colors.black.withValues(alpha: 0.04)
+                : Colors.white.withValues(alpha: 0.05),
+            height: 1,
+            thickness: 1,
+            indent: 52.w,
+          ),
           ActionRow(
             icon: Icons.logout_rounded,
-            iconColor: AppColors.error,
+            iconColor: const Color(0xFFEF9A9A), // Soft pastel red/coral
             label: 'Log Out',
             labelColor: AppColors.error,
             onTap: () => _showLogoutConfirmation(context, ref),
@@ -174,14 +191,15 @@ class ActionRow extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String label;
-  final Color labelColor;
+  final Color? labelColor;
   final VoidCallback onTap;
+
   const ActionRow({
     super.key,
     required this.icon,
     required this.iconColor,
     required this.label,
-    this.labelColor = Colors.white,
+    this.labelColor,
     required this.onTap,
   });
 
@@ -189,7 +207,7 @@ class ActionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18.r),
+      borderRadius: BorderRadius.circular(22.r),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
         child: Row(
@@ -208,9 +226,7 @@ class ActionRow extends StatelessWidget {
               child: Text(
                 label,
                 style: TextStyle(
-                  color: labelColor == Colors.white
-                      ? context.textPrimary
-                      : labelColor,
+                  color: labelColor ?? context.textPrimary,
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w500,
                 ),
@@ -219,7 +235,7 @@ class ActionRow extends StatelessWidget {
             Icon(
               Icons.chevron_right_rounded,
               color: context.textTertiary,
-              size: 18,
+              size: 20,
             ),
           ],
         ),

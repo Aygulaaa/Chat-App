@@ -19,6 +19,7 @@ class MessageBubble extends StatelessWidget {
   final VoidCallback? onAvatarTap;
   final VoidCallback? onDelete;
   final void Function(String emoji)? onStickerSend;
+  final bool? showAvatar;
 
   const MessageBubble({
     super.key,
@@ -31,6 +32,7 @@ class MessageBubble extends StatelessWidget {
     this.onAvatarTap,
     this.onDelete,
     this.onStickerSend,
+    this.showAvatar,
   });
 
   void _openContextMenu(BuildContext context) {
@@ -56,36 +58,39 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showAvatar = isGroup && !isMe;
+    final reservesAvatarSlot = isGroup && !isMe;
+    final rendersAvatarImage = reservesAvatarSlot && (showAvatar ?? true);
 
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 5.h, horizontal: 12.w),
+      padding: EdgeInsets.symmetric(vertical: 2.5.h, horizontal: 12.w),
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            if (showAvatar)
+            if (reservesAvatarSlot)
               Padding(
-                padding: EdgeInsets.only(right: 8.w),
-                child: GestureDetector(
-                  onTap: onAvatarTap,
-                  child: CircleAvatar(
-                    radius: 12.r,
-                    backgroundColor: AppColors.darkCard,
-                    backgroundImage: senderAvatar != null
-                        ? CachedNetworkImageProvider(senderAvatar!)
-                        : null,
-                    child: senderAvatar == null
-                        ? Icon(
-                            Icons.person,
-                            size: 16.r,
-                            color: AppColors.darkTextTertiary,
-                          )
-                        : null,
-                  ),
-                ),
+                padding: EdgeInsets.only(right: 6.w),
+                child: rendersAvatarImage
+                    ? GestureDetector(
+                        onTap: onAvatarTap,
+                        child: CircleAvatar(
+                          radius: 13.r,
+                          backgroundColor: AppColors.darkCard,
+                          backgroundImage: senderAvatar != null
+                              ? CachedNetworkImageProvider(senderAvatar!)
+                              : null,
+                          child: senderAvatar == null
+                              ? Icon(
+                                  Icons.person,
+                                  size: 16.r,
+                                  color: AppColors.darkTextTertiary,
+                                )
+                              : null,
+                        ),
+                      )
+                    : SizedBox(width: 26.r),
               ),
             Flexible(
               child: Column(
@@ -95,7 +100,6 @@ class MessageBubble extends StatelessWidget {
                 children: [
                   SelectionArea(
                     contextMenuBuilder: (context, selectableRegionState) {
-                      // Triggers your custom Telegram-style context menu on long press/right click
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         selectableRegionState.hideToolbar();
                         _openContextMenu(context);
@@ -109,7 +113,7 @@ class MessageBubble extends StatelessWidget {
                     ),
                   ),
                   if (reactions.isNotEmpty) ...[
-                    SizedBox(height: 4.h),
+                    SizedBox(height: 3.h),
                     ReactionRow(reactions: reactions),
                   ],
                 ],
@@ -135,44 +139,55 @@ class _BubbleBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final isMedia =
+        message.fileType == MessageType.image ||
+        message.fileType == MessageType.video;
     final isImage = message.fileType == MessageType.image;
+    final isVideo = message.fileType == MessageType.video;
+    final showTime = time != null && !isVideo && !isImage;
 
+    const radiusBig = 16.0;
+    const radiusTail = 4.0;
     final borderRadius = BorderRadius.only(
-      topLeft: Radius.circular(13.r),
-      topRight: Radius.circular(13.r),
-      bottomLeft: Radius.circular(isMe ? 13.r : 10.r),
-      bottomRight: Radius.circular(isMe ? 10.r : 13.r),
+      topLeft: Radius.circular(radiusBig.r),
+      topRight: Radius.circular(radiusBig.r),
+      bottomLeft: Radius.circular((isMe ? radiusBig : radiusTail).r),
+      bottomRight: Radius.circular((isMe ? radiusTail : radiusBig).r),
     );
+
+    // Sent messages use a darker translucent white layer over the dark background,
+    // creating a sleek Apple glass aesthetic instead of a flat solid fill.
+    final bubbleColor = isMe
+        ? colors.textPrimary.withValues(alpha: 0.08)
+        : colors.card;
 
     return Container(
       constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.72,
+        maxWidth: MediaQuery.of(context).size.width * 0.76,
       ),
-      padding: isImage
-          ? EdgeInsets.zero
-          : EdgeInsets.symmetric(vertical: 10.h, horizontal: 15.w),
       decoration: BoxDecoration(
-        gradient: isMe ? AppColors.primaryGradient : null,
-        color: isMe ? null : AppColors.darkCard,
+        color: bubbleColor,
         borderRadius: borderRadius,
-        border: isMe ? null : Border.all(color: AppColors.darkBorder),
+        border: Border.all(
+          color: colors.glassBorder,
+          width: 0.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: isMe
-                ? AppColors.primary.withValues(alpha: 0.30)
-                : Colors.black.withValues(alpha: 0.15),
-            blurRadius: isMe ? 20 : 8,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: borderRadius,
-        child: isImage
+        child: isMedia
             ? Stack(
                 children: [
                   MessageContent(message: message, isMe: isMe),
-                  if (time != null)
+                  if (isImage && showTime)
                     Positioned(
                       bottom: 6.h,
                       right: 8.w,
@@ -180,33 +195,45 @@ class _BubbleBody extends StatelessWidget {
                         time: time!,
                         isMe: isMe,
                         message: message,
+                        colors: colors,
                       ),
                     ),
                 ],
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+            : Stack(
                 children: [
-                  MessageContent(message: message, isMe: isMe),
-                  if (time != null) ...[
-                    SizedBox(height: 4.h),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          time!,
-                          style: TextStyle(
-                            fontSize: 10.sp,
-                            color: AppColors.darkTextTertiary,
-                          ),
-                        ),
-                        if (isMe) ...[
-                          SizedBox(width: 3.w),
-                          MessageStatusTick(message: message),
-                        ],
-                      ],
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      4.w,
+                      3.h,
+                      showTime ? (isMe ? 64.w : 52.w) : 14.w,
+                      10.h,
                     ),
-                  ],
+                    child: MessageContent(message: message, isMe: isMe),
+                  ),
+                  if (showTime)
+                    Positioned(
+                      bottom: 6.h,
+                      right: 10.w,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            time!,
+                            style: TextStyle(
+                              fontSize: 10.5.sp,
+                              color: isMe
+                                  ? colors.textPrimary.withValues(alpha: 0.7)
+                                  : colors.textTertiary,
+                            ),
+                          ),
+                          if (isMe) ...[
+                            SizedBox(width: 3.w),
+                            MessageStatusTick(message: message),
+                          ],
+                        ],
+                      ),
+                    ),
                 ],
               ),
       ),
@@ -214,16 +241,17 @@ class _BubbleBody extends StatelessWidget {
   }
 }
 
-/// Floating semi-transparent pill for timestamps over images (Telegram style)
 class _ImageTimeOverlay extends StatelessWidget {
   final String time;
   final bool isMe;
   final dynamic message;
+  final AppColorScheme colors;
 
   const _ImageTimeOverlay({
     required this.time,
     required this.isMe,
     required this.message,
+    required this.colors,
   });
 
   @override
@@ -231,7 +259,7 @@ class _ImageTimeOverlay extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.45),
+        color: Colors.black.withValues(alpha: 0.65),
         borderRadius: BorderRadius.circular(10.r),
       ),
       child: Row(
@@ -241,7 +269,7 @@ class _ImageTimeOverlay extends StatelessWidget {
             time,
             style: TextStyle(
               fontSize: 10.sp,
-              color: Colors.white.withValues(alpha: 0.9),
+              color: colors.textPrimary.withValues(alpha: 0.9),
             ),
           ),
           if (isMe) ...[

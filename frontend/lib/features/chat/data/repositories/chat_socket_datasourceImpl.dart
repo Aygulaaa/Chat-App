@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:my_chat_app/core/constants/api_config.dart';
 import 'package:my_chat_app/features/chat/data/datasources/chat_socket_datasource.dart';
@@ -33,6 +34,12 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
 
   final StreamController<Map<String, dynamic>> _messageDeletedController =
       StreamController<Map<String, dynamic>>.broadcast();
+
+  final StreamController<void> _sessionsUpdatedController =
+      StreamController<void>.broadcast();
+
+  final StreamController<void> _sessionRevokedController =
+      StreamController<void>.broadcast();
 
   Completer<void>? _connectionCompleter;
 
@@ -131,6 +138,7 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
 
     _socket?.on('user_status', (data) {
       try {
+        if (data is String) data = jsonDecode(data);
         if (data is Map) {
           _statusController.add(Map<String, dynamic>.from(data));
         }
@@ -143,6 +151,7 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
 
     _socket?.on('chat_read', (data) {
       try {
+        if (data is String) data = jsonDecode(data);
         if (data is Map) {
           final mapData = Map<String, dynamic>.from(data);
           _chatReadController.add(mapData);
@@ -160,6 +169,7 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
 
     _socket?.on('message', (data) async {
       try {
+        if (data is String) data = jsonDecode(data);
         if (data is! Map) return;
 
         final message = Map<String, dynamic>.from(data);
@@ -181,7 +191,9 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
         // 👀 2. If user is currently viewing this chat, trigger read receipt
         // Use int comparison to avoid dynamic/num type mismatch
         final chatIdInt = int.tryParse(chatId.toString());
-        if (_activeChatId != null && chatIdInt != null && _activeChatId == chatIdInt) {
+        if (_activeChatId != null &&
+            chatIdInt != null &&
+            _activeChatId == chatIdInt) {
           _socket?.emit('read_messages', {'chatId': chatIdInt});
           print('👀 Auto read emitted for chat $chatIdInt');
         }
@@ -192,6 +204,7 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
 
     _socket?.on('user_typing', (data) {
       try {
+        if (data is String) data = jsonDecode(data);
         if (data is Map) {
           _typingController.add(Map<String, dynamic>.from(data));
         }
@@ -213,6 +226,7 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
     // 🚚 Server acknowledges to sender that recipient received the message
     _socket?.on('messages_delivered', (data) {
       try {
+        if (data is String) data = jsonDecode(data);
         if (data is Map) {
           _deliveredController.add(Map<String, dynamic>.from(data));
           print('🚚 Delivered update received: $data');
@@ -222,12 +236,9 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
       }
     });
 
-    _socket?.connect();
-
-    // ───────────────── GROUP / MESSAGE DELETED ─────────────────
-
     _socket?.on('group_deleted', (data) {
       try {
+        if (data is String) data = jsonDecode(data);
         if (data is Map) {
           final chatId = data['chatId'];
           if (chatId != null) {
@@ -242,6 +253,7 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
 
     _socket?.on('message_deleted', (data) {
       try {
+        if (data is String) data = jsonDecode(data);
         if (data is Map) {
           _messageDeletedController.add(Map<String, dynamic>.from(data));
           print('🗑️ message_deleted event: $data');
@@ -250,7 +262,21 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
         print('message_deleted error: $e');
       }
     });
+
+    _socket?.on('sessions_updated', (data) {
+      _sessionsUpdatedController.add(null);
+      print('🔄 sessions_updated event received');
+    });
+
+    _socket?.on('session_revoked', (data) {
+      _sessionRevokedController.add(null);
+      print('🚫 session_revoked event received — forcing logout');
+    });
+
+    _socket?.connect();
   }
+
+  // ───────────────── GROUP / MESSAGE DELETED ─────────────────
 
   Future<void> _waitUntilConnected() async {
     if (_isConnected) return;
@@ -289,23 +315,25 @@ class ChatSocketDatasourceImpl implements ChatSocketDatasource {
   @override
   int? get activeChatId => _activeChatId;
 
-@override
-Future<void> joinChat(int chatId) async {
-  // 1. Optimistic local state update (Immediate)
-  if (_joinedChats.contains(chatId)) return;
-  _joinedChats.add(chatId);
-  print('🚪 Optimistically joined chat_$chatId');
+  @override
+  Future<void> joinChat(int chatId) async {
+    // 1. Optimistic local state update (Immediate)
+    if (_joinedChats.contains(chatId)) return;
+    _joinedChats.add(chatId);
+    print('🚪 Optimistically joined chat_$chatId');
 
-  // 2. Perform connection & socket emit in background without blocking
-  _waitUntilConnected().then((_) {
-    _socket?.emit('join_chat', {'chatId': chatId});
-    print('✅ Confirmed join on socket for chat_$chatId');
-  }).catchError((error) {
-    // 3. Rollback local state if connection fails or times out
-    _joinedChats.remove(chatId);
-    print('❌ Failed to join chat_$chatId: $error');
-  });
-}
+    // 2. Perform connection & socket emit in background without blocking
+    _waitUntilConnected()
+        .then((_) {
+          _socket?.emit('join_chat', {'chatId': chatId});
+          print('✅ Confirmed join on socket for chat_$chatId');
+        })
+        .catchError((error) {
+          // 3. Rollback local state if connection fails or times out
+          _joinedChats.remove(chatId);
+          print('❌ Failed to join chat_$chatId: $error');
+        });
+  }
 
   @override
   Future<void> markChatAsRead(int chatId) async {
@@ -385,6 +413,12 @@ Future<void> joinChat(int chatId) async {
   Stream<Map<String, dynamic>> onMessageDeleted() =>
       _messageDeletedController.stream;
 
+  @override
+  Stream<void> onSessionsUpdated() => _sessionsUpdatedController.stream;
+
+  @override
+  Stream<void> onSessionRevoked() => _sessionRevokedController.stream;
+
   // ───────────────── DISCONNECT ─────────────────
 
   @override
@@ -413,5 +447,7 @@ Future<void> joinChat(int chatId) async {
     _deliveredController.close();
     _groupDeletedController.close();
     _messageDeletedController.close();
+    _sessionsUpdatedController.close();
+    _sessionRevokedController.close();
   }
 }

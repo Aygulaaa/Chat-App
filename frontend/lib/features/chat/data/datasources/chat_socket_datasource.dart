@@ -21,4 +21,6 @@ abstract class ChatSocketDatasource {
   Stream<List<int>> onInitialOnlineUsers();
   Stream<int> onGroupDeleted();
   Stream<Map<String, dynamic>> onMessageDeleted();
+  Stream<void> onSessionsUpdated();
+  Stream<void> onSessionRevoked();
 }

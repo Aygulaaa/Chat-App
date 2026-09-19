@@ -12,16 +12,16 @@ class UserSessionModel extends UserSessionEntity {
 
   factory UserSessionModel.fromJson(Map<String, dynamic> json) {
     return UserSessionModel(
-      id: json['id'] as int,
-      deviceName: (json['deviceName'] ?? json['device_name']) as String? ?? 'Unknown Device',
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      deviceName: (json['deviceName'] ?? json['device_name'] ?? 'Unknown Device') as String,
       ipAddress: (json['ipAddress'] ?? json['ip_address']) as String?,
       lastActiveAt: DateTime.parse(
-        (json['lastActiveAt'] ?? json['last_active_at']) as String,
-      ),
-      createdAt: DateTime.parse(
-        (json['createdAt'] ?? json['created_at']) as String,
+        (json['lastActiveAt'] ?? json['last_active_at'] ?? DateTime.now().toIso8601String()) as String,
       ),
       isCurrentDevice: (json['isCurrentDevice'] ?? json['is_current_device']) as bool? ?? false,
+      createdAt: DateTime.parse(
+        (json['createdAt'] ?? json['created_at'] ?? DateTime.now().toIso8601String()) as String,
+      ),
     );
   }
 

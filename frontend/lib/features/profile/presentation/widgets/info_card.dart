@@ -1,5 +1,3 @@
-
-// ─── Info Card ────────────────────────────────────────────────────────────────
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
@@ -8,7 +6,7 @@ import 'package:my_chat_app/core/theme/theme_ext.dart';
 
 class InfoCard extends StatelessWidget {
   final UserEntity user;
-  const InfoCard({ super.key, required this.user});
+  const InfoCard({super.key, required this.user});
 
   @override
   Widget build(BuildContext context) {
@@ -16,13 +14,14 @@ class InfoCard extends StatelessWidget {
       margin: EdgeInsets.symmetric(horizontal: 16.w),
       decoration: BoxDecoration(
         color: context.cardBg,
-        borderRadius: BorderRadius.circular(18.r),
-        border: Border.all(color: context.glassBorder),
+        borderRadius: BorderRadius.circular(22.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(
+              alpha: context.isLight ? 0.05 : 0.22,
+            ),
+            blurRadius: 28,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -33,14 +32,28 @@ class InfoCard extends StatelessWidget {
             label: 'Bio',
             value: user.bio?.isNotEmpty == true ? user.bio! : 'No bio set',
           ),
-          Divider(color: context.glassBorder, height: 1, indent: 52.w),
+          Divider(
+            color: context.isLight
+                ? Colors.black.withValues(alpha: 0.04)
+                : Colors.white.withValues(alpha: 0.05),
+            height: 1,
+            thickness: 1,
+            indent: 52.w,
+          ),
           _InfoRow(
             icon: Icons.alternate_email_rounded,
             label: 'Username',
             value: '@${user.username}',
           ),
           if (user.birthDate != null) ...[
-            Divider(color: context.glassBorder, height: 1, indent: 52.w),
+            Divider(
+              color: context.isLight
+                  ? Colors.black.withValues(alpha: 0.04)
+                  : Colors.white.withValues(alpha: 0.05),
+              height: 1,
+              thickness: 1,
+              indent: 52.w,
+            ),
             _InfoRow(
               icon: Icons.cake_outlined,
               label: 'Birthday',

@@ -18,6 +18,7 @@ class ChatList extends ConsumerWidget {
   void _showChatOptions(BuildContext context, Chat chat, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: AppColors.darkCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
@@ -38,7 +39,6 @@ class ChatList extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(2.r),
               ),
             ),
-
             const SizedBox(height: 12),
 
             ListTile(
@@ -234,19 +234,18 @@ class ChatList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(chatProvider);
-
     final currentUserId = ref.watch(authProvider).user?.id;
 
+    Widget body;
+
     if (state.isLoading && state.chats.isEmpty) {
-      return const Center(
+      body = const Center(
         child: CircularProgressIndicator(
           color: AppColors.primary,
         ),
       );
-    }
-
-    if (state.error != null) {
-      return Center(
+    } else if (state.error != null) {
+      body = Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -267,10 +266,8 @@ class ChatList extends ConsumerWidget {
           ],
         ),
       );
-    }
-
-    if (state.chats.isEmpty) {
-      return Center(
+    } else if (state.chats.isEmpty) {
+      body = Center(
         child: Text(
           'No conversations yet',
           style: TextStyle(
@@ -279,78 +276,79 @@ class ChatList extends ConsumerWidget {
           ),
         ),
       );
+    } else {
+      body = RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(chatProvider.notifier).loadChats();
+        },
+        color: AppColors.primary,
+        backgroundColor: AppColors.darkCard,
+        child: ListView.builder(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12.w,
+            vertical: 8.h,
+          ),
+          itemCount: state.chats.length,
+          itemBuilder: (context, index) {
+            final chat = state.chats[index];
+            final isGroup = chat.isGroup;
+            final users = chat.participants.whereType<UserModel>().toList();
+
+            UserModel? otherUser;
+            if (!isGroup && users.isNotEmpty) {
+              otherUser = users.firstWhere(
+                (u) => u.id != currentUserId,
+                orElse: () => users.first,
+              );
+            }
+
+            final title = isGroup
+                ? (chat.name ?? 'Group')
+                : (otherUser?.username ?? 'Unknown');
+
+            final avatar = isGroup ? chat.avatar : otherUser?.avatar;
+
+            final lastMsg = chat.lastMessage;
+            String subtitle = 'No messages yet';
+            if (lastMsg != null) {
+              if (lastMsg.fileType == MessageType.audio) {
+                subtitle = 'audio message';
+              } else if (lastMsg.fileType != MessageType.text) {
+                subtitle = lastMsg.originalName ?? 'file';
+              } else {
+                subtitle = lastMsg.text ?? '';
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: 8.h),
+              child: ChatTile(
+                userId: otherUser?.id ?? 0,
+                name: title,
+                avatarUrl: avatar,
+                message: subtitle,
+                time: _formatTime(
+                  chat.lastMessage?.createdAt,
+                ),
+                unread: chat.unreadCount > 0,
+                unreadCount: chat.unreadCount,
+                isMuted: chat.isMuted,
+                onTap: () {
+                  context.push('/chat/conversation/${chat.id}', extra: title);
+                },
+                onLongPress: () => _showChatOptions(context, chat, ref),
+              ),
+            );
+          },
+        ),
+      );
     }
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        await ref.read(chatProvider.notifier).loadChats();
-      },
-      color: AppColors.primary,
-      backgroundColor: AppColors.darkCard,
-      child: ListView.builder(
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
-        ),
-        padding: EdgeInsets.symmetric(
-          horizontal: 12.w,
-          vertical: 8.h,
-        ),
-        itemCount: state.chats.length,
-        itemBuilder: (context, index) {
-          final chat = state.chats[index];
-
-          final isGroup = chat.isGroup;
-
-          final users = chat.participants.whereType<UserModel>().toList();
-
-          UserModel? otherUser;
-
-          if (!isGroup && users.isNotEmpty) {
-            otherUser = users.firstWhere(
-              (u) => u.id != currentUserId,
-              orElse: () => users.first,
-            );
-          }
-
-          final title = isGroup
-              ? (chat.name ?? 'Group')
-              : (otherUser?.username ?? 'Unknown');
-
-          final avatar = isGroup ? chat.avatar : otherUser?.avatar;
-
-          final lastMsg = chat.lastMessage;
-          String subtitle = 'No messages yet';
-          if (lastMsg != null) {
-            if (lastMsg.fileType == MessageType.audio) {
-              subtitle = 'audio message';
-            } else if (lastMsg.fileType != MessageType.text) {
-              subtitle = lastMsg.originalName ?? 'file';
-            } else {
-              subtitle = lastMsg.text ?? '';
-            }
-          }
-
-          return Padding(
-            padding: EdgeInsets.only(bottom: 8.h),
-            child: ChatTile(
-              userId: otherUser?.id ?? 0,
-              name: title,
-              avatarUrl: avatar,
-              message: subtitle,
-              time: _formatTime(
-                chat.lastMessage?.createdAt,
-              ),
-              unread: chat.unreadCount > 0,
-              unreadCount: chat.unreadCount,
-              isMuted: chat.isMuted,
-              onTap: () {
-                context.push('/chat/conversation/${chat.id}', extra: title);
-              },
-              onLongPress: () => _showChatOptions(context, chat, ref),
-            ),
-          );
-        },
-      ),
+    return SafeArea(
+      child: body,
     );
   }
 
@@ -358,7 +356,6 @@ class ChatList extends ConsumerWidget {
     if (dt == null) return '';
 
     final now = DateTime.now();
-
     final diff = now.difference(dt);
 
     if (diff.inMinutes < 1) return 'now';

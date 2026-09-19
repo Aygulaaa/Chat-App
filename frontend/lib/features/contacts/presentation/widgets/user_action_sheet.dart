@@ -42,8 +42,9 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: GestureDetector(
                     onTap: () {
-                      context.pop(); // Dismiss action sheet first
-                      context.push(
+                      final router = GoRouter.of(context);
+                      router.pop(); // Dismiss action sheet first
+                      router.push(
                         '/user-profile',
                         extra: UserEntity(
                           id: contact.id,

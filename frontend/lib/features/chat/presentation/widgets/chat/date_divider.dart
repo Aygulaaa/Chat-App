@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 
 class DateDivider extends StatelessWidget {
@@ -9,19 +10,19 @@ class DateDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: EdgeInsets.symmetric(vertical: 16.h),
       child: Row(
         children: [
           const Expanded(
             child: Divider(color: AppColors.darkCard, thickness: 1),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: EdgeInsets.symmetric(horizontal: 20.w),
             child: Text(
               text,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.darkTextTertiary,
-                fontSize: 11,
+                fontSize: 11.sp,
               ),
             ),
           ),

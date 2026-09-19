@@ -92,7 +92,9 @@ class MessageNotifier extends _$MessageNotifier {
           .whereType<MessageModel>()
           .map((e) => e.toJson())
           .toList();
-      await Hive.box<String>('messages_cache').put('chat_$chatId', jsonEncode(toCache));
+      await Hive.box<String>(
+        'messages_cache',
+      ).put('chat_$chatId', jsonEncode(toCache));
     } catch (_) {}
   }
 
@@ -130,9 +132,9 @@ class MessageNotifier extends _$MessageNotifier {
             (m) =>
                 m.id.toString().length > 10 &&
                 (m.text == newMessage.text ||
-                 (m.fileType != MessageType.text &&
-                  m.originalName == newMessage.originalName &&
-                  m.fileSize == newMessage.fileSize)),
+                    (m.fileType != MessageType.text &&
+                        m.originalName == newMessage.originalName &&
+                        m.fileSize == newMessage.fileSize)),
           );
 
           if (tempIndex != -1) {
@@ -159,7 +161,9 @@ class MessageNotifier extends _$MessageNotifier {
     _deliveredSub = datasource.onMessagesDelivered().listen((data) {
       if (!ref.mounted) return;
 
-      final incomingChatId = int.tryParse(data['chatId']?.toString() ?? data['chat_id']?.toString() ?? '');
+      final incomingChatId = int.tryParse(
+        data['chatId']?.toString() ?? data['chat_id']?.toString() ?? '',
+      );
       if (incomingChatId != null && incomingChatId != chatId) return;
 
       final rawIds = data['messageIds'];
@@ -202,10 +206,12 @@ class MessageNotifier extends _$MessageNotifier {
     _chatReadSub?.cancel();
     _chatReadSub = datasource.onChatRead().listen((data) {
       if (!ref.mounted) return;
-      final incomingChatId = int.tryParse(data['chatId']?.toString() ?? data['chat_id']?.toString() ?? '');
+      final incomingChatId = int.tryParse(
+        data['chatId']?.toString() ?? data['chat_id']?.toString() ?? '',
+      );
       if (incomingChatId == chatId) {
         ref.read(chatProvider.notifier).resetUnreadCount(chatId);
-        
+
         final List<dynamic> rawIds = data['messageIds'] ?? [];
         final ids = rawIds
             .map((e) => int.tryParse(e.toString()))
@@ -238,7 +244,9 @@ class MessageNotifier extends _$MessageNotifier {
 
     _readSub = datasource.onMessagesRead().listen((data) {
       if (!ref.mounted) return;
-      final incomingChatId = int.tryParse(data['chatId']?.toString() ?? data['chat_id']?.toString() ?? '');
+      final incomingChatId = int.tryParse(
+        data['chatId']?.toString() ?? data['chat_id']?.toString() ?? '',
+      );
       if (incomingChatId == null || incomingChatId != chatId) return;
 
       final List<dynamic> rawIds = data['messageIds'] ?? [];
@@ -272,7 +280,9 @@ class MessageNotifier extends _$MessageNotifier {
     _deletedSub = datasource.onMessageDeleted().listen((data) {
       if (!ref.mounted) return;
       try {
-        final incomingChatId = int.tryParse(data['chatId']?.toString() ?? data['chat_id']?.toString() ?? '');
+        final incomingChatId = int.tryParse(
+          data['chatId']?.toString() ?? data['chat_id']?.toString() ?? '',
+        );
         if (incomingChatId == null || incomingChatId != chatId) return;
         final messageId = int.tryParse(data['messageId']?.toString() ?? '');
         if (messageId == null) return;
@@ -289,7 +299,9 @@ class MessageNotifier extends _$MessageNotifier {
 
     _typingSub = datasource.onUserTyping().listen((data) {
       if (!ref.mounted) return;
-      final incomingChatId = int.tryParse(data['chatId']?.toString() ?? data['chat_id']?.toString() ?? '');
+      final incomingChatId = int.tryParse(
+        data['chatId']?.toString() ?? data['chat_id']?.toString() ?? '',
+      );
       if (incomingChatId != chatId) return;
 
       final typingUserId = int.tryParse(data['userId']?.toString() ?? '');
@@ -345,9 +357,14 @@ class MessageNotifier extends _$MessageNotifier {
         final cachedStr = box.get('chat_$chatId');
         if (cachedStr != null) {
           final List<dynamic> decoded = jsonDecode(cachedStr);
-          final cachedMessages = decoded.map((e) => MessageModel.fromJson(e)).toList();
+          final cachedMessages = decoded
+              .map((e) => MessageModel.fromJson(e))
+              .toList();
           cachedMessages.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          state = state.copyWith(messages: cachedMessages, isLoading: cachedMessages.isEmpty);
+          state = state.copyWith(
+            messages: cachedMessages,
+            isLoading: cachedMessages.isEmpty,
+          );
         }
       } catch (_) {}
 
@@ -368,15 +385,17 @@ class MessageNotifier extends _$MessageNotifier {
       final filtered = _blockedUserIds.isEmpty
           ? history
           : history
-              .where(
-                (m) => m.senderId == myId || !_blockedUserIds.contains(m.senderId),
-              )
-              .toList();
+                .where(
+                  (m) =>
+                      m.senderId == myId ||
+                      !_blockedUserIds.contains(m.senderId),
+                )
+                .toList();
 
       // 2. Safe merge to prevent wiping socket messages that arrived during HTTP fetch
       final currentList = List<Message>.from(state.messages);
       final seenIds = currentList.map((m) => m.id).toSet();
-      
+
       for (final msg in filtered) {
         if (seenIds.add(msg.id)) {
           currentList.add(msg);
@@ -389,7 +408,10 @@ class MessageNotifier extends _$MessageNotifier {
       await _persistCache(currentList);
     } catch (e) {
       if (!ref.mounted) return;
-      state = state.copyWith(isLoading: false, error: state.messages.isEmpty ? e.toString() : null);
+      state = state.copyWith(
+        isLoading: false,
+        error: state.messages.isEmpty ? e.toString() : null,
+      );
     }
   }
 
@@ -401,7 +423,9 @@ class MessageNotifier extends _$MessageNotifier {
     _persistCache(updated);
 
     try {
-      await ref.read(chatRepositoryProvider).deleteMessage(chatId: chatId, messageId: messageId);
+      await ref
+          .read(chatRepositoryProvider)
+          .deleteMessage(chatId: chatId, messageId: messageId);
     } catch (_) {
       if (!ref.mounted) return;
       await loadMessages();
@@ -420,16 +444,18 @@ class MessageNotifier extends _$MessageNotifier {
     sendTypingEvent(false);
 
     try {
-      final serverMessage = await ref.read(chatRepositoryProvider).sendMessage(
-            chatId: message.chatId,
-            text: message.text!,
-          );
+      final serverMessage = await ref
+          .read(chatRepositoryProvider)
+          .sendMessage(chatId: message.chatId, text: message.text!);
 
       if (!ref.mounted) return;
 
       // Check if a delivered event already arrived for this message (race condition fix)
-      final isPendingDelivered = _pendingDeliveredIds.contains(serverMessage.id);
-      final finalMessage = isPendingDelivered && serverMessage.status != MessageStatus.read
+      final isPendingDelivered = _pendingDeliveredIds.contains(
+        serverMessage.id,
+      );
+      final finalMessage =
+          isPendingDelivered && serverMessage.status != MessageStatus.read
           ? serverMessage.copyWith(
               status: MessageStatus.delivered,
               deliveredAt: serverMessage.deliveredAt ?? DateTime.now(),
@@ -498,26 +524,29 @@ class MessageNotifier extends _$MessageNotifier {
     state = state.copyWith(messages: [tempMessage, ...state.messages]);
 
     try {
-      final message = await ref.read(chatRepositoryProvider).sendFileMessage(
-        chatId: chatId,
-        bytes: bytes,
-        filename: filename,
-        mimeType: mimeType,
-        onProgress: (sent, total) {
-          if (!ref.mounted) return;
-          final updated = state.messages.map((m) {
-            if (m.id == tempId) return m.copyWith(uploadedBytes: sent);
-            return m;
-          }).toList();
-          state = state.copyWith(messages: updated);
-        },
-      );
+      final message = await ref
+          .read(chatRepositoryProvider)
+          .sendFileMessage(
+            chatId: chatId,
+            bytes: bytes,
+            filename: filename,
+            mimeType: mimeType,
+            onProgress: (sent, total) {
+              if (!ref.mounted) return;
+              final updated = state.messages.map((m) {
+                if (m.id == tempId) return m.copyWith(uploadedBytes: sent);
+                return m;
+              }).toList();
+              state = state.copyWith(messages: updated);
+            },
+          );
 
       if (!ref.mounted) return;
 
       // Check if a delivered event already arrived for this file message (race condition fix)
       final isPendingDelivered = _pendingDeliveredIds.contains(message.id);
-      final finalMessage = isPendingDelivered && message.status != MessageStatus.read
+      final finalMessage =
+          isPendingDelivered && message.status != MessageStatus.read
           ? message.copyWith(
               status: MessageStatus.delivered,
               deliveredAt: message.deliveredAt ?? DateTime.now(),

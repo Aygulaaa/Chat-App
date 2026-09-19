@@ -85,7 +85,9 @@ class UserStatusNotifier extends _$UserStatusNotifier {
         updatedOnline[userId] = isOnline;
 
         final updatedLastSeen = Map<int, DateTime?>.from(state.lastSeen);
-        final updatedLastSeenFuzzy = Map<int, String?>.from(state.lastSeenFuzzy);
+        final updatedLastSeenFuzzy = Map<int, String?>.from(
+          state.lastSeenFuzzy,
+        );
 
         if (!isOnline) {
           updatedLastSeen[userId] = data['lastSeen'] != null
@@ -106,15 +108,20 @@ class UserStatusNotifier extends _$UserStatusNotifier {
     _initialOnlineSub = datasource.onInitialOnlineUsers().listen((userIds) {
       if (!ref.mounted) return;
       try {
-        final updated = Map<int, bool>.from(state.onlineUsers);
-
-        // Reset state against incoming batch
-        final Set<int> activeIds = userIds.map((e) => int.tryParse(e.toString())).whereType<int>().toSet();
+        final Set<int> activeIds = userIds
+            .map((e) => int.tryParse(e.toString()))
+            .whereType<int>()
+            .toSet();
+        final updated = <int, bool>{};
 
         for (final id in activeIds) {
           if (!_blockedUserIds.contains(id)) {
             updated[id] = true;
           }
+        }
+        // anything previously online but absent from this snapshot is now offline
+        for (final id in state.onlineUsers.keys) {
+          updated.putIfAbsent(id, () => false);
         }
 
         state = state.copyWith(onlineUsers: updated);

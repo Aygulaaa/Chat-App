@@ -49,10 +49,17 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   build_runner: ^2.4.8
   riverpod_generator: ^4.0.4
+  flutter_launcher_icons: ^0.14.3
 
 dependency_overrides:
   record_linux: 1.1.0
   record_platform_interface: 1.3.0
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/ic_notification.png"
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true

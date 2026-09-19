@@ -42,7 +42,7 @@ final class UserStatusNotifierProvider
 }
 
 String _$userStatusNotifierHash() =>
-    r'8434dfeb8ae75c41aad099067527a2192e7dfadd';
+    r'3e4edadbd0c2c98f4175d812c2722a6c3d463383';
 
 abstract class _$UserStatusNotifier extends $Notifier<UserStatusState> {
   UserStatusState build();

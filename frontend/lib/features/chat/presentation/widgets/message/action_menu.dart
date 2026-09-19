@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 
 class ActionMenu extends StatelessWidget {
   final bool isMe;
@@ -28,12 +29,13 @@ class ActionMenu extends StatelessWidget {
           icon: Icons.content_copy_rounded,
           label: 'Copy',
           onTap: onCopy,
+          iconColor: context.textSecondary,
         ),
       _TileSpec(
         icon: showingInfo ? Icons.info_rounded : Icons.info_outline_rounded,
         label: 'Message Info',
         onTap: onInfo,
-        iconColor: AppColors.accent,
+        iconColor: const Color(0xFFFFB74D), // Soft pastel amber
       ),
       if (isMe)
         _TileSpec(
@@ -48,14 +50,14 @@ class ActionMenu extends StatelessWidget {
     return Container(
       width: 200.w,
       decoration: BoxDecoration(
-        color: AppColors.darkCard.withValues(alpha: 0.92),
+        color: context.cardBg,
         borderRadius: BorderRadius.circular(16.r),
         border: Border.all(
-          color: AppColors.darkBorder.withValues(alpha: 0.5),
+          color: context.glassBorder,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
+            color: Colors.black.withValues(alpha: context.isLight ? 0.08 : 0.3),
             blurRadius: 22.r,
             offset: Offset(0, 8.h),
           ),
@@ -71,7 +73,7 @@ class ActionMenu extends StatelessWidget {
                 Divider(
                   height: 1.h,
                   thickness: 0.6.h,
-                  color: AppColors.darkBorder.withValues(alpha: 0.5),
+                  color: context.glassBorder,
                 ),
               _ActionTile(spec: tiles[i]),
             ],
@@ -93,7 +95,7 @@ class _TileSpec {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.iconColor = AppColors.darkTextSecondary,
+    required this.iconColor,
     this.labelColor,
   });
 }
@@ -122,7 +124,7 @@ class _ActionTileState extends State<_ActionTile> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 60),
         color: _pressed
-            ? Colors.white.withValues(alpha: 0.08)
+            ? (context.isLight ? Colors.black.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.08))
             : Colors.transparent,
         padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 11.h),
         child: Row(
@@ -137,7 +139,7 @@ class _ActionTileState extends State<_ActionTile> {
               child: Text(
                 widget.spec.label,
                 style: TextStyle(
-                  color: widget.spec.labelColor ?? AppColors.darkTextPrimary,
+                  color: widget.spec.labelColor ?? context.textPrimary,
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w400,
                   letterSpacing: -0.1,

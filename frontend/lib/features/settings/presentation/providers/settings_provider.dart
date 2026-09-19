@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_chat_app/core/di/global_provider.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
@@ -9,21 +10,23 @@ import 'package:my_chat_app/features/settings/domain/repositories/settings_repos
 import 'package:my_chat_app/features/settings/domain/usecases/get_settings.dart';
 import 'package:my_chat_app/features/settings/domain/usecases/update_settings.dart';
 
-final settingsDatasourceProvider = Provider(
-  (ref) => SettingsRemoteDatasource(ref.read(apiClientProvider)),
-);
+part 'settings_provider.g.dart';
 
-final settingsRepositoryProvider = Provider<SettingsRepository>(
-  (ref) => SettingsRepositoryImpl(ref.read(settingsDatasourceProvider)),
-);
+@Riverpod(keepAlive: true)
+SettingsRemoteDatasource settingsDatasource(Ref ref) {
+  return SettingsRemoteDatasource(ref.watch(apiClientProvider));
+}
 
-final settingsProvider = AsyncNotifierProvider<SettingsNotifier, UserSettings?>(
-  SettingsNotifier.new,
-);
-class SettingsNotifier extends AsyncNotifier<UserSettings?> {
+@Riverpod(keepAlive: true)
+SettingsRepository settingsRepository(Ref ref) {
+  return SettingsRepositoryImpl(ref.watch(settingsDatasourceProvider));
+}
+
+@Riverpod(keepAlive: true)
+class SettingsNotifier extends _$SettingsNotifier {
   @override
   Future<UserSettings?> build() async {
-    final auth = ref.read(authProvider);
+    final auth = ref.watch(authProvider);
     if (auth.isLoading || auth.user == null) return null;
 
     // Load cached settings immediately from SharedPreferences

@@ -47,7 +47,7 @@ class MessageList extends StatelessWidget {
     return ListView.builder(
       reverse: true,
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: itemCount,
       itemBuilder: (context, index) {
         if (isTyping && index == 0) {
@@ -59,34 +59,53 @@ class MessageList extends StatelessWidget {
 
         final msgIndex = isTyping ? index - 1 : index;
         final msg = messages[msgIndex];
-        
+
         final sender = participants.firstWhereOrNull((p) => p.id == msg.senderId);
 
+        final isLastOfList = msgIndex == messages.length - 1;
+        final nextMsg = isLastOfList ? null : messages[msgIndex + 1];
+        final prevMsg = msgIndex == 0 ? null : messages[msgIndex - 1];
+
         final showDateHeader =
-            msgIndex == messages.length - 1 ||
-            msg.createdAt.day != messages[msgIndex + 1].createdAt.day;
+            isLastOfList || msg.createdAt.day != nextMsg!.createdAt.day;
+
+        // Telegram tucks consecutive messages from the same sender close
+        // together and only opens up extra space where the sender changes
+        // (or a day boundary/typing indicator breaks the run).
+        final isSameSenderAsNext = !isLastOfList &&
+            !showDateHeader &&
+            nextMsg.senderId == msg.senderId;
+        final isSameSenderAsPrev = prevMsg != null &&
+            prevMsg.senderId == msg.senderId &&
+            prevMsg.createdAt.day == msg.createdAt.day;
+
+        final showAvatarOnThisRow = !isSameSenderAsNext;
 
         return Column(
           key: ValueKey(msg.id),
           children: [
             if (showDateHeader)
               DateDivider(text: DateFormatter.formatHeaderDate(msg.createdAt)),
-            MessageBubble(
-              message: msg,
-              isMe: msg.senderId == userId,
-              time: DateFormatter.formatTime(msg.createdAt),
-              isGroup: isGroup,
-              senderAvatar: sender?.avatar,
-              onAvatarTap: sender != null
-                  ? () => context.pushNamed(
-                        'profile',
-                        extra: sender,
-                      )
-                  : null,
-              onDelete: msg.senderId == userId
-                  ? () => onDelete?.call(msg)
-                  : null,
-              onStickerSend: onStickerSend,
+            Padding(
+              padding: EdgeInsets.only(top: isSameSenderAsPrev ? 0 : 6),
+              child: MessageBubble(
+                message: msg,
+                isMe: msg.senderId == userId,
+                time: DateFormatter.formatTime(msg.createdAt),
+                isGroup: isGroup,
+                showAvatar: showAvatarOnThisRow,
+                senderAvatar: sender?.avatar,
+                onAvatarTap: sender != null
+                    ? () => context.push(
+                          '/user-profile',
+                          extra: sender,
+                        )
+                    : null,
+                onDelete: msg.senderId == userId
+                    ? () => onDelete?.call(msg)
+                    : null,
+                onStickerSend: onStickerSend,
+              ),
             ),
           ],
         );

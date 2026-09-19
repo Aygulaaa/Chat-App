@@ -33,5 +33,6 @@ abstract final class AppTheme {
           backgroundColor: const DarkColors().appBar,
           foregroundColor: const DarkColors().textPrimary,
         ),
+        
       );
 }

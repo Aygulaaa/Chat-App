@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:my_chat_app/core/di/global_provider.dart';
@@ -11,27 +12,27 @@ import '../../domain/repository/user_repository.dart';
 import '../../data/repository/user_remote_datasourceImpl.dart';
 import '../../data/datasources/user_remote_datasource.dart';
 
-final userRemoteDatasourceProvider = Provider((ref) {
-  final api = ref.read(apiClientProvider);
+part 'user_provider.g.dart';
+
+@Riverpod(keepAlive: true)
+UserRemoteDatasource userRemoteDatasource(Ref ref) {
+  final api = ref.watch(apiClientProvider);
   return UserRemoteDatasource(api);
-});
+}
 
-final userRepositoryProvider = Provider<UserRepository>((ref) {
-  final remote = ref.read(userRemoteDatasourceProvider);
+@Riverpod(keepAlive: true)
+UserRepository userRepository(Ref ref) {
+  final remote = ref.watch(userRemoteDatasourceProvider);
   return UserRepositoryImpl(remote);
-});
+}
 
-final userProfileProvider =
-    AsyncNotifierProvider<UserProfileNotifier, UserEntity?>(() {
-      return UserProfileNotifier();
-    });
-
-final userByIdProvider =
-    FutureProvider.family<UserEntity?, int>((ref, userId) async {
+@Riverpod(keepAlive: true)
+Future<UserEntity?> userById(Ref ref, int userId) async {
   return ref.read(userRepositoryProvider).getUserById(userId);
-});
+}
 
-class UserProfileNotifier extends AsyncNotifier<UserEntity?> {
+@Riverpod(keepAlive: true)
+class UserProfile extends _$UserProfile {
   @override
   FutureOr<UserEntity?> build() async {
     final authState = ref.watch(authProvider);

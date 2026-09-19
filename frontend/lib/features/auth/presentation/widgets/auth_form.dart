@@ -4,11 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
-import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/core/utils/error_handler.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/auth/presentation/widgets/auth_card.dart';
-
 
 class AuthForm extends ConsumerStatefulWidget {
   const AuthForm({super.key});
@@ -124,6 +122,8 @@ class _AuthFormState extends ConsumerState<AuthForm> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+
     ref.listen(authProvider, (previous, next) {
       if (next.error != null && next.error != previous?.error) {
         _startErrorTimer();
@@ -143,14 +143,14 @@ class _AuthFormState extends ConsumerState<AuthForm> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: context.appBg,
+        backgroundColor: colors.authBg,
         body: Stack(
           children: [
-            // Background gradient
+            // Background gradient palette
             Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
-                  gradient: context.authBgGradient,
+                  gradient: colors.authGradient,
                 ),
               ),
             ),
@@ -226,7 +226,7 @@ class _AuthFormState extends ConsumerState<AuthForm> {
               ),
             ),
 
-            // Error Floating Snackbar
+            // Floating Error Banner
             Positioned(
               left: 20.w,
               right: 20.w,

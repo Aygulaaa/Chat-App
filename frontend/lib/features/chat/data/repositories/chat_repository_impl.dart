@@ -30,27 +30,24 @@ class ChatRepositoryImpl implements ChatRepository {
     int limit = 50,
     int? beforeId,
   }) {
-    return remote.getMessages(chatId);
+    return remote.getMessages(chatId, limit: limit, beforeId: beforeId);
   }
 
   @override
   Future<Message> sendMessage({
     required int chatId,
     required String text,
-  }) async {
-    try {
-      final message = MessageModel(
-        id: 0,
-        chatId: chatId,
-        senderId: 0,
-        text: text,
-        createdAt: DateTime.now(),
-      );
-      final response = await remote.sendMessageHttp(message);
-      return response;
-    } catch (e) {
-      rethrow;
-    }
+    ReplyPreview? replyTo,
+  }) {
+    final message = MessageModel(
+      id: 0,
+      chatId: chatId,
+      senderId: 0,
+      text: text,
+      createdAt: DateTime.now(),
+      replyTo: replyTo,
+    );
+    return remote.sendMessageHttp(message);
   }
 
   @override
@@ -96,20 +93,19 @@ class ChatRepositoryImpl implements ChatRepository {
     required Uint8List bytes,
     required String filename,
     required String mimeType,
+    int? replyToId,
     Function(int sent, int total)? onProgress,
-  }) async {
-    try {
-      final response = await remote.sendFileMessage(
-        chatId,
-        bytes,
-        filename,
-        mimeType,
-        onProgress: onProgress,
-      );
-      return response;
-    } catch (e) {
-      rethrow;
-    }
+    Future<void>? abortTrigger,
+  }) {
+    return remote.sendFileMessage(
+      chatId,
+      bytes,
+      filename,
+      mimeType,
+      replyToId: replyToId,
+      onProgress: onProgress,
+      abortTrigger: abortTrigger,
+    );
   }
 
   @override
@@ -168,5 +164,14 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<void> deleteMessage({required int chatId, required int messageId}) {
     return remote.deleteMessage(chatId, messageId);
+  }
+
+  @override
+  Future<List<MessageReaction>> setReaction({
+    required int chatId,
+    required int messageId,
+    required String emoji,
+  }) {
+    return remote.setReaction(chatId, messageId, emoji);
   }
 }

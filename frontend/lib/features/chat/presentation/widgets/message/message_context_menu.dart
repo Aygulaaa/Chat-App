@@ -15,7 +15,10 @@ Future<void> showMessageContextMenu({
   required bool isMe,
   required VoidCallback onCopy,
   required VoidCallback onDelete,
-  required void Function(String emoji) onStickerSend,
+  void Function(String emoji)? onReact,
+  String? myReaction,
+  VoidCallback? onReply,
+  ReceiptsLoader? loadReceipts,
 }) {
   return Navigator.of(context).push(
     _ContextMenuRoute(
@@ -23,7 +26,10 @@ Future<void> showMessageContextMenu({
       isMe: isMe,
       onCopy: onCopy,
       onDelete: onDelete,
-      onStickerSend: onStickerSend,
+      onReact: onReact,
+      myReaction: myReaction,
+      onReply: onReply,
+      loadReceipts: loadReceipts,
     ),
   );
 }
@@ -36,7 +42,10 @@ class _ContextMenuRoute extends RawDialogRoute<void> {
     required bool isMe,
     required VoidCallback onCopy,
     required VoidCallback onDelete,
-    required void Function(String emoji) onStickerSend,
+    void Function(String emoji)? onReact,
+    String? myReaction,
+    VoidCallback? onReply,
+    ReceiptsLoader? loadReceipts,
   }) : super(
           barrierDismissible: true,
           barrierLabel: 'Dismiss',
@@ -48,7 +57,10 @@ class _ContextMenuRoute extends RawDialogRoute<void> {
               isMe: isMe,
               onCopy: onCopy,
               onDelete: onDelete,
-              onStickerSend: onStickerSend,
+              onReact: onReact,
+              myReaction: myReaction,
+              onReply: onReply,
+              loadReceipts: loadReceipts,
               animation: animation,
             );
           },
@@ -79,7 +91,12 @@ class _ContextMenuPage extends StatefulWidget {
   final bool isMe;
   final VoidCallback onCopy;
   final VoidCallback onDelete;
-  final void Function(String emoji) onStickerSend;
+  final void Function(String emoji)? onReact;
+
+  /// The emoji I already put on this message, so the strip can show it picked.
+  final String? myReaction;
+  final VoidCallback? onReply;
+  final ReceiptsLoader? loadReceipts;
   final Animation<double> animation;
 
   const _ContextMenuPage({
@@ -87,8 +104,11 @@ class _ContextMenuPage extends StatefulWidget {
     required this.isMe,
     required this.onCopy,
     required this.onDelete,
-    required this.onStickerSend,
     required this.animation,
+    this.onReact,
+    this.myReaction,
+    this.onReply,
+    this.loadReceipts,
   });
 
   @override
@@ -136,14 +156,17 @@ class _ContextMenuPageState extends State<_ContextMenuPage> {
                       ? CrossAxisAlignment.end
                       : CrossAxisAlignment.start,
                   children: [
-                    StickerStrip(
-                      isMe: widget.isMe,
-                      onTap: (emoji) {
-                        context.pop();
-                        widget.onStickerSend(emoji);
-                      },
-                    ),
-                    SizedBox(height: 10.h),
+                    if (widget.onReact != null) ...[
+                      StickerStrip(
+                        isMe: widget.isMe,
+                        selected: widget.myReaction,
+                        onTap: (emoji) {
+                          context.pop();
+                          widget.onReact!(emoji);
+                        },
+                      ),
+                      SizedBox(height: 10.h),
+                    ],
                     AnimatedSize(
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.fastOutSlowIn,
@@ -154,6 +177,7 @@ class _ContextMenuPageState extends State<_ContextMenuPage> {
                                 isMe: widget.isMe,
                                 message: widget.message,
                                 formatTime: _formatTime,
+                                loadReceipts: widget.loadReceipts,
                               ),
                             )
                           : const SizedBox.shrink(),
@@ -199,7 +223,15 @@ class _ContextMenuPageState extends State<_ContextMenuPage> {
                                   ),
                                 )
                               : Text(
-                                  widget.message.text ?? '',
+                                  hasText &&
+                                          widget.message.fileType ==
+                                              MessageType.text
+                                      ? widget.message.text!
+                                      : ReplyPreview.fromMessage(
+                                          widget.message,
+                                        ).summary,
+                                  maxLines: 12,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: AppColors.darkTextPrimary,
                                     fontSize: 15.sp,
@@ -215,6 +247,12 @@ class _ContextMenuPageState extends State<_ContextMenuPage> {
                       isMe: widget.isMe,
                       hasText: hasText,
                       showingInfo: _showInfo,
+                      onReply: widget.onReply == null
+                          ? null
+                          : () {
+                              context.pop();
+                              widget.onReply!();
+                            },
                       onCopy: () {
                         context.pop();
                         widget.onCopy();

@@ -14,7 +14,7 @@ class UserRemoteDatasource {
   }
 
   Future<UserModel> updateProfile(Map<String, dynamic> updateData) async {
-    final response= await api.put(ApiEndpoints.me, updateData);
+    final response = await api.put(ApiEndpoints.me, updateData);
     return UserModel.fromJson(response);
   }
 
@@ -23,22 +23,25 @@ class UserRemoteDatasource {
     return UserModel.fromJson(response);
   }
 
-Future<UserModel> uploadAvatarFromBytes(Uint8List bytes, String filename) async {
-  final ext = filename.split('.').last.toLowerCase();
-  final mimeType = switch (ext) {
-    'jpg' || 'jpeg' => 'image/jpeg',
-    'png'           => 'image/png',
-    'webp'          => 'image/webp',
-    'gif'           => 'image/gif',
-    _               => 'image/jpeg', 
-  };
-  final response = await api.postMultipartBytes(
-    ApiEndpoints.uploadAvatar,
-    bytes: bytes,
-    filename: filename,
-    field: 'avatar',
-    mimeType:mimeType, 
-  );
-  return UserModel.fromJson(response);
-}
+  Future<UserModel> uploadAvatarFromBytes(
+    Uint8List bytes,
+    String filename,
+  ) async {
+    final ext = filename.split('.').last.toLowerCase();
+    final mimeType = switch (ext) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      'gif' => 'image/gif',
+      _ => 'image/jpeg',
+    };
+    final response = await api.postMultipartBytes(
+      ApiEndpoints.uploadAvatar,
+      bytes: bytes,
+      filename: filename,
+      field: 'avatar',
+      mimeType: mimeType,
+    );
+    return UserModel.fromJson(response);
+  }
 }

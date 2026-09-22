@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:my_chat_app/core/utils/error_handler.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 // Core imports
+import 'package:my_chat_app/core/constants/api_endpoints.dart';
 import 'package:my_chat_app/core/di/global_provider.dart';
+import 'package:my_chat_app/core/network/api_client.dart';
 
 // Data & Domain imports
 import 'package:my_chat_app/features/auth/data/datasources/auth_remote_datasource.dart';
@@ -19,7 +22,11 @@ import 'package:my_chat_app/features/auth/domain/usecases/register_user.dart';
 import 'package:my_chat_app/features/auth/domain/usecases/get_currect_user.dart';
 
 // Cross-feature providers
+import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.dart';
+import 'package:my_chat_app/features/chat/presentation/providers/send_queue.dart';
+import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
+import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:my_chat_app/features/notification/presentation/providers/notification_provider.dart';
 import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
 
@@ -69,8 +76,19 @@ GetCurrentUser getCurrentUser(Ref ref) =>
 
 @Riverpod(keepAlive: true)
 class AuthNotifier extends _$AuthNotifier {
+  bool _isLoggingOut = false;
+
   @override
   AuthState build() {
+    // Any authenticated request that comes back 401 means this session was
+    // revoked or expired — sign out instead of leaving the user in a broken,
+    // half-logged-in app where every screen shows an error.
+    final api = ref.watch(apiClientProvider);
+    api.onUnauthorized = () {
+      if (state.token != null) logout();
+    };
+    ref.onDispose(() => api.onUnauthorized = null);
+
     // Initialized directly via main.dart before UI mount
     return const AuthState(isLoading: true);
   }
@@ -199,21 +217,32 @@ class AuthNotifier extends _$AuthNotifier {
     } catch (e) {
       if (!ref.mounted) return;
 
-      final errStr = e.toString().toLowerCase();
-      final isNetworkError =
-          errStr.contains('internet connection') ||
-          errStr.contains('timed out') ||
-          errStr.contains('network error') ||
-          errStr.contains('socketexception');
-
-      if (!isNetworkError) {
+      // Only an explicit 401 means the session is dead. A 5xx, a timeout or
+      // the host's "waking up" HTML page must NOT sign the user out — stay on
+      // the cached session and let normal retries recover.
+      if (e is ApiException && e.isUnauthorized) {
         await logout();
       }
     }
   }
 
   Future<void> logout() async {
+    // A revoked session makes the logout request itself return 401, which
+    // would call logout() again through onUnauthorized.
+    if (_isLoggingOut) return;
+    _isLoggingOut = true;
+
     try {
+      // Detach this device's push token first (needs the session, so it must
+      // happen before the server-side logout). Otherwise the phone keeps
+      // receiving this account's messages after signing out.
+      final api = ref.read(apiClientProvider);
+      if (api.hasToken) {
+        try {
+          await api.delete(ApiEndpoints.sendFcmToken());
+        } catch (_) {}
+      }
+
       await ref.read(logoutUserProvider).call();
     } catch (_) {
     } finally {
@@ -232,6 +261,18 @@ class AuthNotifier extends _$AuthNotifier {
       ref.read(apiClientProvider).setToken('');
 
       state = const AuthState(isLoading: false);
+
+      // These providers are keepAlive: without a reset the NEXT account to log
+      // in on this device would see the previous user's chats, contacts and
+      // profile straight from memory.
+      ref.read(sendQueueProvider.notifier).clear();
+      ref.invalidate(chatProvider);
+      ref.invalidate(contactsProvider);
+      ref.invalidate(blockedContactsProvider);
+      ref.invalidate(userStatusProvider);
+      ref.invalidate(userProfileProvider);
+
+      _isLoggingOut = false;
     }
   }
 
@@ -291,11 +332,6 @@ class AuthNotifier extends _$AuthNotifier {
     }
   }
 
-  String _formatErrorMessage(Object e) {
-    final message = e.toString();
-    if (message.startsWith('Exception: ')) {
-      return message.replaceFirst('Exception: ', '');
-    }
-    return message;
-  }
+  String _formatErrorMessage(Object e) =>
+      ErrorHandler.getReadableErrorMessage(e);
 }

@@ -17,6 +17,11 @@ import 'package:my_chat_app/features/chat/presentation/widgets/message/fullscree
 import 'package:my_chat_app/features/contacts/presentation/pages/contacts_screen.dart';
 import 'package:my_chat_app/features/profile/presentation/pages/edit_profile_screen.dart';
 import 'package:my_chat_app/features/profile/presentation/pages/profile_screen.dart';
+import 'package:my_chat_app/features/settings/presentation/pages/app_lock_screen.dart';
+import 'package:my_chat_app/features/settings/presentation/pages/appearance_settings_screen.dart';
+import 'package:my_chat_app/features/settings/presentation/pages/change_password_screen.dart';
+import 'package:my_chat_app/features/settings/presentation/pages/notifications_settings_screen.dart';
+import 'package:my_chat_app/features/settings/presentation/pages/privacy_settings_screen.dart';
 import 'package:my_chat_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:my_chat_app/features/settings/presentation/widgets/blocked_contacts.dart';
 import 'package:my_chat_app/features/settings/presentation/pages/sessions_screen.dart';
@@ -142,6 +147,34 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const SettingsScreen(),
       ),
+      // Deliberately flat, not nested under /settings: these are opened with
+      // context.push(), and pushing a NESTED route also builds a second copy
+      // of its parent underneath — so Back would land on a duplicate page.
+      GoRoute(
+        path: '/settings/notifications',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const NotificationsSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/privacy',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const PrivacySettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/appearance',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AppearanceSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/change-password',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ChangePasswordScreen(),
+      ),
+      GoRoute(
+        path: '/settings/app-lock',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AppLockScreen(),
+      ),
       GoRoute(
         path: '/blocked-contacts',
         parentNavigatorKey: _rootNavigatorKey,
@@ -217,7 +250,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           final url = extra['url'] as String? ?? '';
           final title = extra['title'] as String?;
 
-          return FullscreenImageViewer(url: url, title: title);
+          // Saving is opt-in per call site: chat photos yes, someone else's
+          // profile photo no.
+          final canDownload = extra['canDownload'] == true;
+
+          return FullscreenImageViewer(
+            url: url,
+            title: title,
+            canDownload: canDownload,
+          );
         },
       ),
       GoRoute(

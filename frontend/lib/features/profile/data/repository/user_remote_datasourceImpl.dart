@@ -5,13 +5,13 @@ import 'package:my_chat_app/features/profile/data/datasources/user_remote_dataso
 import 'package:my_chat_app/features/profile/domain/repository/user_repository.dart';
 
 class UserRepositoryImpl implements UserRepository {
-  final UserRemoteDatasource  remoteDatasource;
+  final UserRemoteDatasource remoteDatasource;
 
   UserRepositoryImpl(this.remoteDatasource);
 
   @override
   Future<UserEntity> getMe() async {
-    final user= await remoteDatasource.getMe();
+    final user = await remoteDatasource.getMe();
     print("DEBUG: Repository mapped user: ${user.id}, ${user.username}");
     return user;
   }
@@ -22,7 +22,10 @@ class UserRepositoryImpl implements UserRepository {
   }
 
   @override
-  Future<UserEntity> uploadAvatarFromBytes(Uint8List bytes, String filename) async {
+  Future<UserEntity> uploadAvatarFromBytes(
+    Uint8List bytes,
+    String filename,
+  ) async {
     return await remoteDatasource.uploadAvatarFromBytes(bytes, filename);
   }
 
@@ -30,5 +33,4 @@ class UserRepositoryImpl implements UserRepository {
   Future<UserEntity> getUserById(int userId) async {
     return await remoteDatasource.getUserById(userId);
   }
-
 }

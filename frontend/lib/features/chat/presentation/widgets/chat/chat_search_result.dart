@@ -102,7 +102,7 @@ class ChatSearchResults extends ConsumerWidget {
             userId: otherUser?.id ?? 0,
             name: title,
             avatarUrl: avatar,
-            message: chat.lastMessage?.text ?? 'No messages yet',
+            message: chat.lastMessage?.preview ?? 'No messages yet',
             time: '',
             unread: chat.unreadCount > 0,
             unreadCount: chat.unreadCount,

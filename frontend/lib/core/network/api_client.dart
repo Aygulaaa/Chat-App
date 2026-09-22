@@ -7,8 +7,39 @@ import 'package:my_chat_app/core/constants/api_config.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
+/// Carries the HTTP status so callers can tell "you are logged out" (401)
+/// apart from "the server hiccuped" (5xx) instead of string-matching messages.
+/// `toString()` keeps the old `Exception: <message>` shape on purpose — a lot
+/// of UI code strips that prefix before showing the text.
+class ApiException implements Exception {
+  /// Pseudo status codes for failures that never reached the server.
+  static const int noConnection = 0;
+  static const int timedOut = -1;
+
+  final int statusCode;
+  final String message;
+
+  const ApiException(this.statusCode, this.message);
+
+  bool get isUnauthorized => statusCode == 401;
+
+  @override
+  String toString() => 'Exception: $message';
+}
+
+/// Thrown when the user cancels an upload. Not an error to report.
+class UploadCancelledException implements Exception {
+  const UploadCancelledException();
+  @override
+  String toString() => 'Upload cancelled';
+}
+
 class ApiClient {
   String? _token;
+
+  /// Invoked when an authenticated request comes back 401, i.e. the session
+  /// was revoked or expired. Wired to logout in the auth provider.
+  void Function()? onUnauthorized;
   String? _deviceName;
 
   // Increased timeouts for weak network stability
@@ -44,12 +75,15 @@ class ApiClient {
   }
 
   void setToken(String token) {
-    _token = token;
+    // An empty token must not be sent as "Authorization: Bearer "
+    _token = token.isEmpty ? null : token;
   }
 
   void clearToken() {
     _token = null;
   }
+
+  bool get hasToken => _token != null && _token!.isNotEmpty;
 
   Uri _uri(String path) {
     return Uri.parse('${ApiConfig.baseUrl}$path');
@@ -113,13 +147,18 @@ class ApiClient {
     try {
       final response = await requestFn().timeout(_timeout);
       return _handleResponse(response);
+    } on ApiException {
+      rethrow;
     } on TimeoutException {
-      throw Exception('Connection timed out due to slow network. Please try again.');
+      throw const ApiException(ApiException.timedOut, 'The request timed out.');
     } on SocketException {
-      throw Exception('No internet connection available.');
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Unexpected network error occurred: $e');
+      throw const ApiException(ApiException.noConnection, 'No internet connection.');
+    } on http.ClientException {
+      // What package:http throws for DNS failures, dropped connections…
+      // Its toString() is unreadable ("ClientException with SocketException…").
+      throw const ApiException(ApiException.noConnection, 'No internet connection.');
+    } on HandshakeException {
+      rethrow;
     }
   }
 
@@ -127,21 +166,34 @@ class ApiClient {
     _log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     _log('📡 URL: ${response.request?.url}');
     _log('📬 Status: ${response.statusCode}');
-    _log('📦 Body: ${response.body}');
     _log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     final contentType = response.headers['content-type'] ?? '';
 
     if (!contentType.contains('application/json')) {
-      throw Exception(
-        'Server returned non-JSON response (status ${response.statusCode}).',
+      // Typically the hosting provider's HTML error page while the server
+      // is waking up or redeploying.
+      throw ApiException(
+        response.statusCode,
+        'The server is temporarily unavailable. Please try again in a moment.',
       );
     }
-    
-    final data = response.body.isNotEmpty ? jsonDecode(response.body) : null;
+
+    dynamic data;
+    try {
+      data = response.body.isNotEmpty ? jsonDecode(response.body) : null;
+    } on FormatException {
+      throw ApiException(response.statusCode, 'Server returned an invalid response.');
+    }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return data;
+    }
+
+    // Only treat it as "session is dead" when we actually sent a session.
+    if (response.statusCode == 401 &&
+        response.request?.headers.containsKey('Authorization') == true) {
+      onUnauthorized?.call();
     }
 
     final errorMessage = (data is Map && data.containsKey('error'))
@@ -150,7 +202,7 @@ class ApiClient {
             ? data['message'].toString()
             : 'Request failed with status: ${response.statusCode}';
 
-    throw Exception(errorMessage);
+    throw ApiException(response.statusCode, errorMessage);
   }
 
   Future<dynamic> postMultipartBytes(
@@ -159,7 +211,11 @@ class ApiClient {
     required String filename,
     required String field,
     required String mimeType,
+    Map<String, String> fields = const {},
     Function(int sent, int total)? onProgress,
+
+    /// Complete this future to abort the upload mid-flight.
+    Future<void>? abortTrigger,
   }) async {
     _log('🌐 POST multipart: ${ApiConfig.baseUrl}$path');
 
@@ -172,6 +228,8 @@ class ApiClient {
       if (_deviceName != null) {
         request.headers['x-device-name'] = _deviceName!;
       }
+
+      request.fields.addAll(fields);
 
       request.files.add(
         http.MultipartFile.fromBytes(
@@ -199,7 +257,11 @@ class ApiClient {
           ),
         );
 
-        final streamedRequest = http.StreamedRequest('POST', _uri(path));
+        final streamedRequest = http.AbortableStreamedRequest(
+          'POST',
+          _uri(path),
+          abortTrigger: abortTrigger,
+        );
         streamedRequest.headers.addAll(request.headers);
         streamedRequest.contentLength = totalBytes;
 
@@ -218,13 +280,14 @@ class ApiClient {
       }
 
       return _handleResponse(response);
+    } on http.RequestAbortedException {
+      throw const UploadCancelledException();
     } on TimeoutException {
-      throw Exception('File upload took too long due to slow network. Please try again.');
+      throw const ApiException(ApiException.timedOut, 'The upload timed out.');
     } on SocketException {
-      throw Exception('No internet connection available during upload.');
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Multipart upload failed: $e');
+      throw const ApiException(ApiException.noConnection, 'No internet connection.');
+    } on http.ClientException {
+      throw const ApiException(ApiException.noConnection, 'No internet connection.');
     }
   }
 
@@ -266,10 +329,11 @@ class ApiClient {
 
       return _handleResponse(response);
     } on TimeoutException {
-      throw Exception('Upload timed out.');
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Patch multipart failed: $e');
+      throw const ApiException(ApiException.timedOut, 'The upload timed out.');
+    } on SocketException {
+      throw const ApiException(ApiException.noConnection, 'No internet connection.');
+    } on http.ClientException {
+      throw const ApiException(ApiException.noConnection, 'No internet connection.');
     }
   }
 

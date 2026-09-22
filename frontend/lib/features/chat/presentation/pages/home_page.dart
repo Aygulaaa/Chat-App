@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
+import 'package:my_chat_app/core/widgets/glass_backdrop.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
@@ -48,9 +49,13 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.appBg,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: context.appBg,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        backgroundColor: context.glassBar,
+        shape: context.glassBarShape,
         foregroundColor: context.textPrimary,
         title: AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),
@@ -81,27 +86,28 @@ class _HomePageState extends ConsumerState<HomePage> {
             ? []
             : [
                 IconButton(
-                  icon: Icon(Icons.search_rounded, color: context.textSecondary),
+                  icon: Icon(
+                    Icons.search_rounded,
+                    color: context.textSecondary,
+                  ),
                   onPressed: () => setState(() => _isSearching = true),
                 ),
                 IconButton(
-                  icon: Icon(Icons.group_add_outlined, color: context.textSecondary),
-                  onPressed: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => const CreateGroupModal(),
-                    );
-                  },
+                  icon: Icon(
+                    Icons.group_add_outlined,
+                    color: context.textSecondary,
+                  ),
+                  onPressed: () => showCreateGroupModal(context),
                 ),
               ],
       ),
-      body: Container(
-        decoration: BoxDecoration(gradient: context.appBgGradient),
-        child: _isSearching
-            ? ChatSearchResults(query: _query)
-            : const ChatList(),
+      body: GlassBackdrop(
+        child: SafeArea(
+          bottom: false,
+          child: _isSearching
+              ? ChatSearchResults(query: _query)
+              : const ChatList(),
+        ),
       ),
     );
   }

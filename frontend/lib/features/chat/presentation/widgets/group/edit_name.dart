@@ -40,7 +40,7 @@ class _EditNameDialogState extends State<EditNameDialog> {
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
       child: AlertDialog(
-        backgroundColor: context.cardBg.withValues(alpha: 0.85),
+        backgroundColor: context.modalBg,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24.r),
           side: BorderSide(
@@ -82,7 +82,7 @@ class _EditNameDialogState extends State<EditNameDialog> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.r),
-              borderSide: const BorderSide(
+              borderSide: BorderSide(
                 color: AppColors.primary,
                 width: 1.5,
               ),

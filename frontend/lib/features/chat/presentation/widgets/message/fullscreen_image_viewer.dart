@@ -7,10 +7,15 @@ class FullscreenImageViewer extends StatefulWidget {
   final String url;
   final String? title;
 
+  /// Shows the "save to Photos" button. Off for anything that isn't the
+  /// viewer's own picture — someone else's profile photo is theirs to keep.
+  final bool canDownload;
+
   const FullscreenImageViewer({
     super.key,
     required this.url,
     this.title,
+    this.canDownload = false,
   });
 
   @override
@@ -28,7 +33,7 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Saved to Photos'),
             backgroundColor: AppColors.primary,
           ),
@@ -60,22 +65,26 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
           style: const TextStyle(color: Colors.white, fontSize: 16),
         ),
         actions: [
-          _isDownloading
-              ? const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
+          if (widget.canDownload)
+            _isDownloading
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                  )
+                : IconButton(
+                    icon: const Icon(
+                      Icons.download_rounded,
                       color: Colors.white,
                     ),
+                    onPressed: _downloadImageToPhotos,
                   ),
-                )
-              : IconButton(
-                  icon: const Icon(Icons.download_rounded, color: Colors.white),
-                  onPressed: _downloadImageToPhotos,
-                ),
         ],
       ),
       body: Center(

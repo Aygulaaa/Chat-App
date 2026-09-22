@@ -28,6 +28,19 @@ extension ThemeExt on BuildContext {
   // Glassmorphic & Border Tokens
   // ==========================================
   Color get glassBg => colors.surface;
+
+  /// Fill of a frosted card sitting on a [GlassBackdrop].
+  Color get glassCard => colors.glass;
+
+  /// Tint of a title bar laid over a [GlassBackdrop].
+  Color get glassBar => glassCard.withValues(alpha: glassCard.a * 0.6);
+
+  /// Hairline under a glass title bar.
+  ShapeBorder get glassBarShape =>
+      Border(bottom: BorderSide(color: glassEdge, width: 0.5));
+
+  /// Hairline around a glass surface — just enough to catch the light.
+  Color get glassEdge => glassBorder.withValues(alpha: glassBorder.a * 0.5);
   Color get glassBorder => colors.glassBorder;
   Color get border => colors.border;
 
@@ -41,8 +54,8 @@ extension ThemeExt on BuildContext {
   // ==========================================
   // Brand Identity Tokens
   // ==========================================
-  Color get primaryColor => AppColors.primary;
-  Color get accentColor => AppColors.accent;
+  Color get primaryColor => colors.primary;
+  Color get accentColor => colors.accent;
   Color get onlineStatus => AppColors.online;
   Color get errorColor => AppColors.error;
 
@@ -52,7 +65,5 @@ extension ThemeExt on BuildContext {
   LinearGradient get appBgGradient => colors.bgGradient;
   LinearGradient get authBgGradient => colors.authGradient;
   LinearGradient get headerGradient => colors.headerGradient;
-  LinearGradient get primaryGradient => AppColors.primaryGradient;
+  LinearGradient get primaryGradient => colors.primaryGradient;
 }
-
-

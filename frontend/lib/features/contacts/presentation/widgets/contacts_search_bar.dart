@@ -91,7 +91,7 @@ class _ContactsSearchBarState extends State<ContactsSearchBar> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
             ),
             contentPadding: const EdgeInsets.symmetric(
               vertical: 14,

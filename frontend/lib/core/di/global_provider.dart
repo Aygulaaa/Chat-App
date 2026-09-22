@@ -9,7 +9,9 @@ part 'global_provider.g.dart';
 ApiClient apiClient(Ref ref) => ApiClient();
 
 @Riverpod(keepAlive: true)
-FlutterSecureStorage flutterSecureStorage(Ref ref) => const FlutterSecureStorage();
+// One shared configuration — see the warning on SecureStorageService.instance
+// before changing any option.
+FlutterSecureStorage flutterSecureStorage(Ref ref) => SecureStorageService.instance;
 
 @Riverpod(keepAlive: true)
 SecureStorageService secureStorage(Ref ref) {

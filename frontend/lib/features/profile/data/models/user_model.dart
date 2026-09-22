@@ -1,6 +1,5 @@
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 
-
 class UserModel extends UserEntity {
   const UserModel({
     required super.id,
@@ -19,9 +18,13 @@ class UserModel extends UserEntity {
       username: json['username'],
       avatar: json['avatar'],
       bio: json['bio'],
-      birthDate: json['birthDate'] != null ? DateTime.parse(json['birthDate']) : null,
+      birthDate: json['birthDate'] != null
+          ? DateTime.parse(json['birthDate'])
+          : null,
       status: json['status'],
-      lastSeen: json['lastSeen'] != null ? DateTime.parse(json['lastSeen']) : null,
+      lastSeen: json['lastSeen'] != null
+          ? DateTime.parse(json['lastSeen'])
+          : null,
       lastSeenFuzzy: json['lastSeenFuzzy'],
     );
   }

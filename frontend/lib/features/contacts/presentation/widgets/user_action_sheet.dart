@@ -150,7 +150,7 @@ void showUserActionSheet(BuildContext context, Contact contact) {
                     ),
 
                   ListTile(
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.chat_bubble_outline,
                       color: AppColors.primary,
                     ),

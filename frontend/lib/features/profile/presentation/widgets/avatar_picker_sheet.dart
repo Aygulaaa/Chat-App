@@ -1,10 +1,18 @@
 import 'dart:ui';
-import 'package:go_router/go_router.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:my_chat_app/core/theme/app_colors.dart';
 
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
+
+/// Action sheet for changing the profile photo.
+///
+/// iOS grouping: one frosted card holding the actions, Cancel on its own card
+/// below it. Deliberately flat — the rows *are* the interface, so there are no
+/// gradient tiles, no coloured glows and no chevrons competing with them.
+/// Every colour comes from the theme, so it follows the chosen palette instead
+/// of being hardcoded to the dark one.
 class AvatarPickerSheet extends StatelessWidget {
+  /// Reserved for a future "Remove Photo" row; nothing reads it yet.
   final bool hasAvatar;
   final VoidCallback onCamera;
   final VoidCallback onGallery;
@@ -19,180 +27,147 @@ class AvatarPickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      bottom: false,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24.r),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.darkCard,
-              borderRadius: BorderRadius.circular(24.r),
-              border: Border.all(color: AppColors.darkBorder, width: 1),
-            ),
-            child: Padding(
-              padding: .all(8.r),
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _GlassCard(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  SizedBox(height: 8.h),
-                  // Pill handle
-                  Container(
-                    width: 36.w,
-                    height: 4.h,
-                    decoration: BoxDecoration(
-                      color: AppColors.darkBorder,
-                      borderRadius: BorderRadius.circular(4.r),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    child: Text(
+                      'Profile Photo',
+                      style: TextStyle(
+                        color: context.textTertiary,
+                        fontSize: 13,
+                        letterSpacing: -0.1,
+                      ),
                     ),
                   ),
-                  SizedBox(height: 20.h),
-                  Text(
-                    'Profile Photo',
-                    style: TextStyle(
-                      color: AppColors.darkTextPrimary,
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    'Choose how to update your photo',
-                    style: TextStyle(
-                      color: AppColors.darkTextTertiary,
-                      fontSize: 13.sp,
-                    ),
-                  ),
-                  SizedBox(height: 24.h),
-              
-                  // Camera option
-                  _PickerOption(
-                    icon: Icons.camera_alt_rounded,
+                  const _Hairline(),
+                  _SheetAction(
+                    icon: Icons.photo_camera_outlined,
                     label: 'Take Photo',
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, AppColors.accent],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
                     onTap: onCamera,
                   ),
-                  SizedBox(height: 10.h),
-              
-                  // Gallery option
-                  _PickerOption(
-                    icon: Icons.photo_library_rounded,
+                  const _Hairline(),
+                  _SheetAction(
+                    icon: Icons.photo_library_outlined,
                     label: 'Choose from Gallery',
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF4CC9F0), AppColors.accent],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
                     onTap: onGallery,
                   ),
-                  SizedBox(height: 16.h),
-              
-                  // Cancel
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.symmetric(vertical: 14.h),
-                      margin: EdgeInsets.symmetric(horizontal: 0),
-                      decoration: BoxDecoration(
-                        color: AppColors.darkInputFill,
-                        borderRadius: BorderRadius.circular(16.r),
-                        border: Border.all(color: AppColors.darkBorder),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.darkTextSecondary,
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 20.h),
                 ],
               ),
             ),
-          ),
+            const SizedBox(height: 8),
+            _GlassCard(
+              child: _SheetAction(
+                label: 'Cancel',
+                centered: true,
+                weight: FontWeight.w600,
+                onTap: () => context.pop(),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
-class _PickerOption extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final LinearGradient gradient;
-  final VoidCallback onTap;
 
-  const _PickerOption({
-    required this.icon,
+/// Frosted rounded group. One blur per card, not per row.
+class _GlassCard extends StatelessWidget {
+  final Widget child;
+
+  const _GlassCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(16);
+
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: context.modalSurface,
+            borderRadius: radius,
+            border: Border.all(color: context.glassEdge, width: 0.5),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Hairline between rows, inset the way a grouped iOS list insets its
+/// separators.
+class _Hairline extends StatelessWidget {
+  const _Hairline();
+
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 0.5,
+      thickness: 0.5,
+      indent: 16,
+      color: context.glassEdge,
+    );
+  }
+}
+
+class _SheetAction extends StatelessWidget {
+  final IconData? icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool centered;
+  final FontWeight weight;
+
+  const _SheetAction({
     required this.label,
-    required this.gradient,
     required this.onTap,
+    this.icon,
+    this.centered = false,
+    this.weight = FontWeight.w400,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
-        decoration: BoxDecoration(
-          color: AppColors.darkInputFill,
-          borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(color: AppColors.darkBorder),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40.r,
-              height: 40.r,
-              decoration: BoxDecoration(
-                gradient: gradient,
-                borderRadius: BorderRadius.circular(12.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.4),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Icon(icon, color: Colors.white, size: 20.sp),
-            ),
-            SizedBox(width: 16.w),
-            Text(
-              label,
-              style: TextStyle(
-                color: AppColors.darkTextPrimary,
-                fontSize: 15.sp,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const Spacer(),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.darkTextTertiary,
-              size: 18,
-            ),
-          ],
+    final text = Text(
+      label,
+      style: TextStyle(
+        color: context.textPrimary,
+        fontSize: 16,
+        fontWeight: weight,
+        letterSpacing: -0.2,
+      ),
+    );
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: 54,
+          child: centered
+              ? Center(child: text)
+              : Row(
+                  children: [
+                    const SizedBox(width: 16),
+                    Icon(icon, size: 21, color: context.textSecondary),
+                    const SizedBox(width: 14),
+                    Expanded(child: text),
+                    const SizedBox(width: 16),
+                  ],
+                ),
         ),
       ),
     );
   }
 }
-

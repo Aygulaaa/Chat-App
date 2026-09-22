@@ -106,8 +106,14 @@ export async function sendPushToMembers(
     // currently has this chat open — if so, no push needed.
     if (io) {
       const recipientSockets = await io.in(`user_${memberId}`).fetchSockets();
+      // Only a device with the app in the FOREGROUND and this chat on screen
+      // sees the message without a push. A backgrounded app keeps its socket
+      // (and its open chat) for a while — it still needs the notification.
       const isInsideActiveChat = recipientSockets.some(
-        (s: any) => s.data.activeChatId != null && Number(s.data.activeChatId) === Number(chatId)
+        (s: any) =>
+          s.data.foreground !== false &&
+          s.data.activeChatId != null &&
+          Number(s.data.activeChatId) === Number(chatId)
       );
       if (isInsideActiveChat) continue;
     }

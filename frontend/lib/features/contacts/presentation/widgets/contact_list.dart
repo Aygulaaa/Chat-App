@@ -46,7 +46,7 @@ class ContactsList extends ConsumerWidget {
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: () => ref.read(contactsProvider.notifier).refresh(),
-                    child: const Text(
+                    child: Text(
                       'Retry',
                       style: TextStyle(color: AppColors.primary),
                     ),
@@ -89,7 +89,7 @@ class ContactsList extends ConsumerWidget {
                           padding: const EdgeInsets.fromLTRB(16, 16, 0, 4),
                           child: Text(
                             contact.username[0].toUpperCase(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.primary,
                               fontWeight: FontWeight.w700,
                               fontSize: 12,

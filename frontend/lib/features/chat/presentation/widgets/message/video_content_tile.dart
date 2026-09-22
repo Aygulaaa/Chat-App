@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/upload_progress.dart';
 
 class VideoContentTile extends StatefulWidget {
   final Message message;
@@ -14,6 +15,7 @@ class VideoContentTile extends StatefulWidget {
   final String formattedTime;
   final bool isMe;
   final Widget? statusIcon;
+  final VoidCallback? onCancelUpload;
 
   const VideoContentTile({
     super.key,
@@ -23,6 +25,7 @@ class VideoContentTile extends StatefulWidget {
     required this.formattedTime,
     required this.isMe,
     this.statusIcon,
+    this.onCancelUpload,
   });
 
   @override
@@ -42,7 +45,8 @@ class _VideoContentTileState extends State<VideoContentTile> {
       final tempDir = await getTemporaryDirectory();
       final ext = url.split('.').last.split('?').first;
       final tempFile = File(
-          '${tempDir.path}/temp_vid_${DateTime.now().millisecondsSinceEpoch}.$ext');
+        '${tempDir.path}/temp_vid_${DateTime.now().millisecondsSinceEpoch}.$ext',
+      );
       await tempFile.writeAsBytes(response.bodyBytes);
 
       await Gal.putVideo(tempFile.path);
@@ -50,7 +54,7 @@ class _VideoContentTileState extends State<VideoContentTile> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Video saved to Photos'),
             backgroundColor: AppColors.primary,
           ),
@@ -75,17 +79,22 @@ class _VideoContentTileState extends State<VideoContentTile> {
     return GestureDetector(
       onTap: () {
         if (widget.message.fileUrl == null || widget.isUploading) return;
-        context.push('/video-player', extra: {
-          'url': widget.message.fileUrl!,
-          'title': widget.message.originalName,
-        });
+        context.push(
+          '/video-player',
+          extra: {
+            'url': widget.message.fileUrl!,
+            'title': widget.message.originalName,
+          },
+        );
       },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Container(
           width: 250,
           height: 170,
-          color: const Color(0xFF1E2732), // Dark Telegram video placeholder background
+          color: const Color(
+            0xFF1E2732,
+          ), // Dark Telegram video placeholder background
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -105,9 +114,17 @@ class _VideoContentTileState extends State<VideoContentTile> {
               ),
 
               // 2. Centered Frosted Play / Cancel Button
+              // While uploading: a progress strip (bar · bytes · % · cancel)
+              if (widget.isUploading)
+                MediaUploadOverlay(
+                  uploadedBytes: widget.message.uploadedBytes,
+                  totalBytes: widget.message.fileSize,
+                  onCancel: widget.onCancelUpload,
+                ),
+
               Center(
                 child: widget.isUploading
-                    ? _buildUploadingIndicator()
+                    ? const SizedBox.shrink()
                     : Container(
                         width: 52,
                         height: 52,
@@ -225,38 +242,6 @@ class _VideoContentTileState extends State<VideoContentTile> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildUploadingIndicator() {
-    final uploaded = widget.message.uploadedBytes ?? 0;
-    final total = widget.message.fileSize ?? 1;
-    final progress = (uploaded / total).clamp(0.0, 1.0);
-
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.6),
-        shape: BoxShape.circle,
-      ),
-      padding: const EdgeInsets.all(6),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          CircularProgressIndicator(
-            value: progress > 0 ? progress : null,
-            strokeWidth: 3,
-            color: Colors.white,
-            backgroundColor: Colors.white24,
-          ),
-          const Icon(
-            Icons.close_rounded,
-            color: Colors.white,
-            size: 20,
-          ),
-        ],
       ),
     );
   }

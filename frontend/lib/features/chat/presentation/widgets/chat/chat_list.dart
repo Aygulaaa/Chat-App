@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
+import 'package:my_chat_app/core/utils/dialog_utils.dart';
+import 'package:my_chat_app/core/utils/error_handler.dart';
+import 'package:my_chat_app/core/utils/snackbar_utils.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/domain/entities/chat.dart';
-import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/chat/chat_tile.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
@@ -16,106 +19,165 @@ class ChatList extends ConsumerWidget {
   const ChatList({super.key});
 
   void _showChatOptions(BuildContext context, Chat chat, WidgetRef ref) {
+    HapticFeedback.selectionClick();
+
+    final currentUserId = ref.read(authProvider).user?.id;
+    UserModel? otherUser;
+    if (!chat.isGroup) {
+      final users = chat.participants.whereType<UserModel>().toList();
+      if (users.isNotEmpty) {
+        otherUser = users.firstWhere(
+          (u) => u.id != currentUserId,
+          orElse: () => users.first,
+        );
+      }
+    }
+    final title = chat.isGroup
+        ? (chat.name ?? 'Group')
+        : (otherUser?.username ?? 'Chat');
+    final iOwnGroup = chat.isGroup && chat.createdBy == currentUserId;
+
     showModalBottomSheet(
       context: context,
+      // Root navigator → the sheet is above the shell (and its nav bar)…
       useRootNavigator: true,
-      backgroundColor: AppColors.darkCard,
+      // …and an OPAQUE surface. The old background was a 12%-white "glass"
+      // color, so the nav bar underneath simply showed through the sheet.
+      backgroundColor: context.modalBg,
+      showDragHandle: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(20),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
-      builder: (_) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 8),
-
-            Container(
-              width: 36.w,
-              height: 4.h,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2.r),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-
+            Divider(height: 1, color: context.border),
             ListTile(
               leading: Icon(
                 chat.isMuted
                     ? Icons.notifications_active_outlined
                     : Icons.notifications_off_outlined,
-                color: Colors.white70,
+                color: context.textSecondary,
               ),
               title: Text(
                 chat.isMuted ? 'Unmute' : 'Mute',
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: context.textPrimary),
               ),
               onTap: () {
                 ref.read(chatProvider.notifier).toggleMute(chat.id);
-                context.pop();
+                Navigator.of(sheetContext).pop();
               },
             ),
-
+            if (otherUser != null)
+              ListTile(
+                leading: const Icon(Icons.block, color: Colors.redAccent),
+                title: const Text(
+                  'Block user',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _showBlockConfirmation(
+                    context,
+                    otherUser!.id,
+                    otherUser.username,
+                    chat.id,
+                    ref,
+                  );
+                },
+              ),
             ListTile(
-              leading: const Icon(
-                Icons.delete_outline,
+              leading: Icon(
+                chat.isGroup && !iOwnGroup
+                    ? Icons.logout_rounded
+                    : Icons.delete_outline,
                 color: Colors.redAccent,
               ),
-              title: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.redAccent),
+              title: Text(
+                !chat.isGroup
+                    ? 'Delete chat'
+                    : (iOwnGroup ? 'Delete group' : 'Leave group'),
+                style: const TextStyle(color: Colors.redAccent),
               ),
               onTap: () {
-                ref.read(chatProvider.notifier).deleteChat(chat.id);
-                context.pop();
+                Navigator.of(sheetContext).pop();
+                _confirmDelete(context, ref, chat, title, iOwnGroup);
               },
             ),
-
-            if (!chat.isGroup) ...[
-              Builder(builder: (ctx) {
-                final users = chat.participants.whereType<UserModel>().toList();
-                final currentUserId = ref.read(authProvider).user?.id;
-                UserModel? otherUser;
-                if (users.isNotEmpty) {
-                  otherUser = users.firstWhere(
-                    (u) => u.id != currentUserId,
-                    orElse: () => users.first,
-                  );
-                }
-
-                if (otherUser != null) {
-                  return ListTile(
-                    leading: const Icon(
-                      Icons.block,
-                      color: Colors.redAccent,
-                    ),
-                    title: const Text(
-                      'Block user',
-                      style: TextStyle(color: Colors.redAccent),
-                    ),
-                    onTap: () {
-                      context.pop(); // Close bottom sheet
-                      _showBlockConfirmation(
-                        context,
-                        otherUser!.id,
-                        otherUser.username,
-                        chat.id,
-                        ref,
-                      );
-                    },
-                  );
-                }
-                return const SizedBox.shrink();
-              }),
-            ],
-
             const SizedBox(height: 8),
           ],
         ),
       ),
     );
+  }
+
+  /// Deleting is permanent and affects other people, so say exactly what will
+  /// happen — the wording differs for a private chat, your own group, and a
+  /// group you are only a member of.
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    Chat chat,
+    String title,
+    bool iOwnGroup,
+  ) async {
+    final String heading;
+    final String body;
+    final String action;
+    if (!chat.isGroup) {
+      heading = 'Delete chat with $title?';
+      body =
+          'The whole conversation will be permanently deleted for both of '
+          "you. This can't be undone.";
+      action = 'Delete';
+    } else if (iOwnGroup) {
+      heading = 'Delete "$title"?';
+      body =
+          'The group and all of its messages will be permanently deleted for '
+          "every member. This can't be undone.";
+      action = 'Delete group';
+    } else {
+      heading = 'Leave "$title"?';
+      body =
+          "You'll stop receiving messages from this group. Someone in the "
+          'group can add you back later.';
+      action = 'Leave';
+    }
+
+    final confirmed = await DialogUtils.showConfirmDialog(
+      context: context,
+      title: heading,
+      message: body,
+      confirmLabel: action,
+      confirmColor: Colors.redAccent,
+    );
+    if (!confirmed || !context.mounted) return;
+
+    try {
+      await ref.read(chatProvider.notifier).deleteChat(chat.id);
+    } catch (e) {
+      if (context.mounted) {
+        SnackBarUtils.showSnack(
+          context,
+          ErrorHandler.getReadableErrorMessage(e),
+          isError: true,
+        );
+      }
+    }
   }
 
   void _showBlockConfirmation(
@@ -131,7 +193,7 @@ class ChatList extends ConsumerWidget {
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) {
           return AlertDialog(
-            backgroundColor: context.cardBg,
+            backgroundColor: context.modalBg,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(color: context.glassBorder),
@@ -239,7 +301,7 @@ class ChatList extends ConsumerWidget {
     Widget body;
 
     if (state.isLoading && state.chats.isEmpty) {
-      body = const Center(
+      body = Center(
         child: CircularProgressIndicator(
           color: AppColors.primary,
         ),
@@ -312,16 +374,7 @@ class ChatList extends ConsumerWidget {
             final avatar = isGroup ? chat.avatar : otherUser?.avatar;
 
             final lastMsg = chat.lastMessage;
-            String subtitle = 'No messages yet';
-            if (lastMsg != null) {
-              if (lastMsg.fileType == MessageType.audio) {
-                subtitle = 'audio message';
-              } else if (lastMsg.fileType != MessageType.text) {
-                subtitle = lastMsg.originalName ?? 'file';
-              } else {
-                subtitle = lastMsg.text ?? '';
-              }
-            }
+            final subtitle = lastMsg?.preview ?? 'No messages yet';
 
             return Padding(
               padding: EdgeInsets.only(bottom: 8.h),

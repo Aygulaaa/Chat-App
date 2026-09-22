@@ -1,3 +1,4 @@
+import 'package:my_chat_app/core/utils/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -9,6 +10,7 @@ import 'package:my_chat_app/core/utils/snackbar_utils.dart';
 import 'package:my_chat_app/features/auth/domain/entity/user_session.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/settings/presentation/providers/sessions_provider.dart';
+import 'package:my_chat_app/features/settings/presentation/widgets/settings_scaffold.dart';
 
 class SessionsScreen extends ConsumerWidget {
   const SessionsScreen({super.key});
@@ -90,31 +92,22 @@ class SessionsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(sessionsProvider);
 
-    return Scaffold(
-      backgroundColor: context.appBg,
-      appBar: AppBar(
-        backgroundColor: context.appBg,
-        elevation: 0,
-        title: Text(
-          'Active Sessions',
-          style: TextStyle(
-            color: context.textPrimary,
-            fontWeight: FontWeight.w700,
-            fontSize: 17.sp,
-          ),
+    return SettingsScaffold(
+      title: 'Devices',
+      actions: [
+        IconButton(
+          icon: Icon(Icons.refresh_rounded, color: AppColors.primary),
+          tooltip: 'Refresh',
+          onPressed: () => ref.read(sessionsProvider.notifier).refresh(),
         ),
-        iconTheme: IconThemeData(color: context.textPrimary),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh_rounded, color: AppColors.primary),
-            tooltip: 'Refresh',
-            onPressed: () => ref.read(sessionsProvider.notifier).refresh(),
-          ),
-        ],
-      ),
+      ],
       body: sessionsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _buildError(context, ref, e.toString()),
+        error: (e, _) => _buildError(
+          context,
+          ref,
+          ErrorHandler.getReadableErrorMessage(e),
+        ),
         data: (sessions) {
           final currentSessions = sessions.where((s) => s.isCurrentDevice).toList();
           final otherSessions = sessions.where((s) => !s.isCurrentDevice).toList();
@@ -298,7 +291,7 @@ class _SessionCard extends StatelessWidget {
       margin: EdgeInsets.only(bottom: 10.h),
       padding: EdgeInsets.all(14.w),
       decoration: BoxDecoration(
-        color: context.cardBg,
+        color: context.glassCard,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isCurrent ? AppColors.primary.withValues(alpha: 0.35) : context.glassBorder,

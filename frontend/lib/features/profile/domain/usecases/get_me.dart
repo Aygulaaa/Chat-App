@@ -6,7 +6,7 @@ class GetMe {
 
   const GetMe(this.repository);
 
-  Future<UserEntity> call(){
+  Future<UserEntity> call() {
     return repository.getMe();
   }
 }

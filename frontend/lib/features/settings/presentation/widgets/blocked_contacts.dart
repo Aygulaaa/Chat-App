@@ -4,6 +4,7 @@ import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/contact_tile.dart';
+import 'package:my_chat_app/features/settings/presentation/widgets/settings_scaffold.dart';
 
 class BlockedContactsPage extends ConsumerWidget {
   const BlockedContactsPage({super.key});
@@ -11,37 +12,18 @@ class BlockedContactsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final blockedAsync = ref.watch(blockedContactsProvider);
-    ref.listen(blockedContactsProvider, (previous, next) {
-      print("Blocked list updated! New count: ${next.value?.length}");
-    });
 
-    return Scaffold(
-      backgroundColor: context.appBg,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: context.appBg,
-        foregroundColor: context.textPrimary,
-        title: Text(
-          'Blocked Users',
-          style: TextStyle(
-            color: context.textPrimary,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
-        ),
-      ),
+    return SettingsScaffold(
+      title: 'Blocked Users',
       body: Container(
-        decoration: BoxDecoration(
-          gradient: context.appBgGradient,
-        ),
         child: blockedAsync.when(
-          loading: () => const Center(
+          loading: () => Center(
             child: CircularProgressIndicator(color: AppColors.primary),
           ),
           error: (err, _) => Center(
             child: Text(
-              'Error: $err',
-              style: const TextStyle(color: AppColors.error),
+              "Couldn't load blocked users",
+              style: TextStyle(color: context.textTertiary),
             ),
           ),
           data: (blocked) {
@@ -77,7 +59,7 @@ class BlockedContactsPage extends ConsumerWidget {
 
                 return Container(
                   decoration: BoxDecoration(
-                    color: context.cardBg,
+                    color: context.glassCard,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: context.glassBorder),
                   ),

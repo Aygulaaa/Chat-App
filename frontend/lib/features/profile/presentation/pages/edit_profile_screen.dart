@@ -2,14 +2,21 @@ import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
+import 'package:my_chat_app/core/widgets/glass_backdrop.dart';
+import 'package:my_chat_app/core/utils/dialog_utils.dart';
+import 'package:my_chat_app/core/utils/error_handler.dart';
 import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
 import 'package:my_chat_app/features/profile/presentation/widgets/profile_avatar.dart';
-import 'package:go_router/go_router.dart';
+import 'package:my_chat_app/features/settings/presentation/widgets/settings_section.dart';
+import 'package:my_chat_app/features/settings/presentation/widgets/settings_tile.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   final UserEntity user;
@@ -20,335 +27,362 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
-  late final TextEditingController _usernameController;
-  late final TextEditingController _bioController;
-  DateTime? _selectedDate;
-  bool _isSaving = false;
+  static const _maxBio = 150;
+
+  late final TextEditingController _username;
+  late final TextEditingController _bio;
+  DateTime? _birthday;
+  bool _saving = false;
+  String? _usernameError;
+  String? _saveError;
 
   @override
   void initState() {
     super.initState();
-    _usernameController = TextEditingController(text: widget.user.username);
-    _bioController = TextEditingController(text: widget.user.bio ?? '');
-    _selectedDate = widget.user.birthDate;
+    _username = TextEditingController(text: widget.user.username)
+      ..addListener(_onEdited);
+    _bio = TextEditingController(text: widget.user.bio ?? '')
+      ..addListener(_onEdited);
+    _birthday = widget.user.birthDate;
   }
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _bioController.dispose();
+    _username.dispose();
+    _bio.dispose();
     super.dispose();
   }
 
+  void _onEdited() => setState(() {
+    _usernameError = null;
+    _saveError = null;
+  });
+
+  bool get _dirty =>
+      _username.text.trim() != widget.user.username ||
+      _bio.text.trim() != (widget.user.bio ?? '').trim() ||
+      _birthday != widget.user.birthDate;
+
   Future<void> _pickDate() async {
-    FocusScope.of(
-      context,
-    ).unfocus(); // Dismiss keyboard before opening date picker
+    FocusScope.of(context).unfocus();
     final picked = await showModalBottomSheet<DateTime>(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) =>
-          _BirthdayPickerSheet(initialDate: _selectedDate ?? DateTime(1995)),
+          _BirthdayPickerSheet(initialDate: _birthday ?? DateTime(2000)),
     );
-    if (picked != null) setState(() => _selectedDate = picked);
+    if (picked != null) setState(() => _birthday = picked);
   }
 
   Future<void> _save() async {
+    if (_saving || !_dirty) return;
     FocusScope.of(context).unfocus();
-    final username = _usernameController.text.trim();
-    if (username.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Username cannot be empty')));
+
+    // Same rules the server enforces → instant feedback, no round trip
+    final username = _username.text.trim();
+    if (username.length < 3 || username.length > 30) {
+      HapticFeedback.heavyImpact();
+      setState(() => _usernameError = 'Use between 3 and 30 characters');
       return;
     }
-    setState(() => _isSaving = true);
+
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
     try {
       await ref.read(userProfileProvider.notifier).updateInfo({
         'username': username,
-        'bio': _bioController.text.trim(),
-        if (_selectedDate != null)
-          'birthDate': _selectedDate!.toIso8601String(),
+        'bio': _bio.text.trim(),
+        'birthDate': _birthday?.toIso8601String(),
       });
       if (mounted) context.pop();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to save: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (!mounted) return;
+      HapticFeedback.heavyImpact();
+      final message = ErrorHandler.getReadableErrorMessage(e);
+      setState(() {
+        _saving = false;
+        // A username problem belongs under the username field
+        if (message.toLowerCase().contains('username')) {
+          _usernameError = message;
+        } else {
+          _saveError = message;
+        }
+      });
     }
   }
 
+  Future<void> _confirmDiscard() async {
+    final discard = await DialogUtils.showConfirmDialog(
+      context: context,
+      title: 'Discard changes?',
+      message: "Your edits haven't been saved.",
+      confirmLabel: 'Discard',
+      confirmColor: Colors.redAccent,
+    );
+    if (discard && mounted) context.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        backgroundColor: context.appBg,
-        appBar: AppBar(
+    final canSave = _dirty && !_saving;
+
+    return PopScope(
+      canPop: !_dirty || _saving,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmDiscard();
+      },
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
           backgroundColor: context.appBg,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          iconTheme: IconThemeData(color: context.textPrimary),
-          title: Text(
-            'Edit Profile',
-            style: TextStyle(
-              color: context.textPrimary,
-              fontWeight: FontWeight.w600,
-              fontSize: 17.sp,
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            backgroundColor: context.glassBar,
+            shape: context.glassBarShape,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            centerTitle: true,
+            leadingWidth: 84,
+            leading: TextButton(
+              onPressed: _saving
+                  ? null
+                  : () => Navigator.of(context).maybePop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: context.textSecondary, fontSize: 15.5),
+              ),
             ),
-          ),
-          actions: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              child: _isSaving
-                  ? Padding(
-                      key: const ValueKey('saving'),
-                      padding: EdgeInsets.all(16.r),
-                      child: SizedBox(
-                        width: 18.r,
-                        height: 18.r,
-                        child: const CircularProgressIndicator(
-                          color: AppColors.primary,
-                          strokeWidth: 2,
-                        ),
-                      ),
-                    )
-                  : TextButton(
-                      key: const ValueKey('save'),
-                      onPressed: _save,
-                      child: Text(
-                        'Save',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15.sp,
-                        ),
-                      ),
-                    ),
+            title: Text(
+              'Edit Profile',
+              style: TextStyle(
+                color: context.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 17,
+                letterSpacing: -0.3,
+              ),
             ),
-          ],
-        ),
-        body: SingleChildScrollView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: EdgeInsets.fromLTRB(20.r, 12.r, 20.r, 40.r),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Avatar with a small edit badge instead of caption text
-              Center(
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    ProfileAvatar(
-                      username: widget.user.username,
-                      imageUrl: widget.user.avatar,
-                      isMe: true,
-                    ),
-                    Positioned(
-                      right: -2.r,
-                      bottom: -2.r,
-                      child: Container(
-                        padding: EdgeInsets.all(6.r),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: context.appBg, width: 2.5),
+            actions: [
+              SizedBox(
+                width: 72,
+                child: _saving
+                    ? Center(
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                            strokeWidth: 2,
+                          ),
                         ),
-                        child: Icon(
-                          Icons.camera_alt_rounded,
-                          size: 13.sp,
-                          color: Colors.white,
+                      )
+                    : TextButton(
+                        onPressed: canSave ? _save : null,
+                        child: Text(
+                          'Done',
+                          style: TextStyle(
+                            color: canSave
+                                ? AppColors.primary
+                                : context.textTertiary.withValues(alpha: 0.6),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15.5,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
               ),
-              SizedBox(height: 36.h),
-
-              _SectionLabel('About you'),
-              SizedBox(height: 10.h),
-              _GlassGroup(
-                children: [
-                  _GroupField(
-                    label: 'Username',
-                    controller: _usernameController,
-                    hint: 'Add a username',
-                  ),
-                  const _GroupDivider(),
-                  _GroupField(
-                    label: 'Bio',
-                    controller: _bioController,
-                    hint: 'Say something about yourself',
-                    maxLines: 4,
-                    maxLength: 150,
-                  ),
-                ],
-              ),
-
-              SizedBox(height: 24.h),
-              _SectionLabel('Birthday'),
-              SizedBox(height: 10.h),
-              _GlassGroup(
-                children: [
-                  _GroupRow(
-                    onTap: _pickDate,
-                    leading: Icons.cake_rounded,
-                    label: _selectedDate != null
-                        ? '${_selectedDate!.day} / ${_selectedDate!.month} / ${_selectedDate!.year}'
-                        : 'Set your birthday',
-                    isPlaceholder: _selectedDate == null,
-                  ),
-                ],
-              ),
-              SizedBox(height: 12.h),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4.w),
-                child: Text(
-                  "Only you can see your birthday. It's never shown on your profile.",
-                  style: TextStyle(
-                    color: context.textTertiary,
-                    fontSize: 12.sp,
-                    height: 1.4,
-                  ),
-                ),
-              ),
+              const SizedBox(width: 4),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
+          body: GlassBackdrop(
+            child: SafeArea(
+              bottom: false,
+              child: ListView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.only(top: 20, bottom: 40),
+                children: [
+                  Center(
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        ProfileAvatar(
+                          username: widget.user.username,
+                          imageUrl: widget.user.avatar,
+                          isMe: true,
+                        ),
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: IgnorePointer(
+                            child: Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: context.appBg,
+                                  width: 2.5,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt_rounded,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Center(
+                    child: Text(
+                      'Tap the photo to change it',
+                      style: TextStyle(
+                        color: context.textTertiary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 26),
 
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
+                  SettingsSection(
+                    dividerIndent: 16,
+                    footer:
+                        _usernameError ??
+                        'People find you by your username. 3–30 characters, '
+                            'saved in lowercase.',
+                    footerIsError: _usernameError != null,
+                    children: [
+                      _Field(
+                        controller: _username,
+                        hint: 'Username',
+                        prefix: '@',
+                        enabled: !_saving,
+                        maxLength: 30,
+                        textInputAction: TextInputAction.next,
+                      ),
+                    ],
+                  ),
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 4.w),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: context.textTertiary,
-          fontSize: 13.sp,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-}
+                  SettingsSection(
+                    dividerIndent: 16,
+                    footer:
+                        'A few words about you. '
+                        '${_bio.text.characters.length}/$_maxBio',
+                    children: [
+                      _Field(
+                        controller: _bio,
+                        hint: 'Bio',
+                        enabled: !_saving,
+                        maxLength: _maxBio,
+                        maxLines: 4,
+                        capitalization: TextCapitalization.sentences,
+                      ),
+                    ],
+                  ),
 
-/// A frosted container in the spirit of an iOS grouped list: real backdrop
-/// blur, a single hairline edge, and no drop shadow — glass, not a card.
-class _GlassGroup extends StatelessWidget {
-  final List<Widget> children;
-  const _GlassGroup({required this.children});
+                  SettingsSection(
+                    dividerIndent: 16,
+                    footer: 'Only shown on your profile.',
+                    children: [
+                      SettingsTile(
+                        title: 'Birthday',
+                        value: _birthday == null
+                            ? 'Add'
+                            : DateFormat.yMMMMd().format(_birthday!),
+                        onTap: _saving ? null : _pickDate,
+                      ),
+                      if (_birthday != null)
+                        SettingsTile(
+                          title: 'Remove Birthday',
+                          destructive: true,
+                          onTap: _saving
+                              ? null
+                              : () => setState(() => _birthday = null),
+                        ),
+                    ],
+                  ),
 
-  @override
-  Widget build(BuildContext context) {
-    final radius = 18.r;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
-          decoration: BoxDecoration(
-            color: context.glassBg,
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: context.glassBorder, width: 1),
+                  if (_saveError != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(32, 0, 32, 0),
+                      child: Text(
+                        _saveError!,
+                        style: const TextStyle(
+                          color: Color(0xFFFF5A52),
+                          fontSize: 13.5,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
-          child: Column(children: children),
         ),
       ),
     );
   }
 }
 
-class _GroupDivider extends StatelessWidget {
-  const _GroupDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(left: 16.w),
-      child: Divider(height: 1, thickness: 0.6, color: context.glassBorder),
-    );
-  }
-}
-
-class _GroupField extends StatelessWidget {
-  final String label;
+/// A borderless text field that sits inside a [SettingsSection] card.
+class _Field extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
+  final String? prefix;
+  final bool enabled;
+  final int maxLength;
   final int maxLines;
-  final int? maxLength;
+  final TextInputAction? textInputAction;
+  final TextCapitalization capitalization;
 
-  const _GroupField({
-    required this.label,
+  const _Field({
     required this.controller,
     required this.hint,
+    required this.maxLength,
+    this.prefix,
+    this.enabled = true,
     this.maxLines = 1,
-    this.maxLength,
+    this.textInputAction,
+    this.capitalization = TextCapitalization.none,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-      child: Row(
-        crossAxisAlignment: maxLines > 1
-            ? CrossAxisAlignment.start
-            : CrossAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 100.w,
-            child: Padding(
-              padding: EdgeInsets.only(top: maxLines > 1 ? 14.h : 0),
-              child: Text(
-                label,
-                style: TextStyle(color: context.textSecondary, fontSize: 15.sp),
-              ),
-            ),
-          ),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              maxLines: maxLines,
-              maxLength: maxLength,
-              style: TextStyle(color: context.textPrimary, fontSize: 15.sp),
-              cursorColor: AppColors.primary,
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: hint,
-                hintStyle: TextStyle(color: context.textTertiary),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                counterStyle: TextStyle(
-                  color: context.textTertiary,
-                  fontSize: 11.sp,
-                ),
-              ),
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      child: TextField(
+        controller: controller,
+        enabled: enabled,
+        minLines: 1,
+        maxLines: maxLines,
+        maxLength: maxLength,
+        autocorrect: maxLines > 1,
+        textCapitalization: capitalization,
+        textInputAction: textInputAction,
+        cursorColor: AppColors.primary,
+        style: TextStyle(color: context.textPrimary, fontSize: 16),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: context.textTertiary, fontSize: 16),
+          prefixText: prefix,
+          prefixStyle: TextStyle(color: context.textTertiary, fontSize: 16),
+          counterText: '',
+          border: InputBorder.none,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 13),
+        ),
       ),
     );
   }
 }
 
-/// Bottom sheet with a spinning wheel date picker, styled like the native
-/// iOS "Date of Birth" picker: drag handle, Cancel / Done bar, frosted
-/// backdrop, rounded top corners, no shadow.
 class _BirthdayPickerSheet extends StatefulWidget {
   final DateTime initialDate;
   const _BirthdayPickerSheet({required this.initialDate});
@@ -454,52 +488,6 @@ class _BirthdayPickerSheetState extends State<_BirthdayPickerSheet> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GroupRow extends StatelessWidget {
-  final VoidCallback onTap;
-  final IconData leading;
-  final String label;
-  final bool isPlaceholder;
-
-  const _GroupRow({
-    required this.onTap,
-    required this.leading,
-    required this.label,
-    this.isPlaceholder = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-        child: Row(
-          children: [
-            Icon(leading, size: 18.sp, color: context.textTertiary),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: isPlaceholder
-                      ? context.textTertiary
-                      : context.textPrimary,
-                  fontSize: 15.sp,
-                ),
-              ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 18.sp,
-              color: context.textTertiary,
-            ),
-          ],
         ),
       ),
     );

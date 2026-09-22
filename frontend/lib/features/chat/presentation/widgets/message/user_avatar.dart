@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 
 class UserAvatar extends StatelessWidget {
   final String name;
@@ -7,12 +8,17 @@ class UserAvatar extends StatelessWidget {
   final bool isOnline;
   final double size;
 
+  /// What the online dot's ring is cut out of. Defaults to the page
+  /// background; pass the real surface colour when the avatar sits on one.
+  final Color? ringColor;
+
   const UserAvatar({
     super.key,
     required this.name,
     this.imageUrl,
     required this.isOnline,
     this.size = 48,
+    this.ringColor,
   });
 
   @override
@@ -51,27 +57,22 @@ class UserAvatar extends StatelessWidget {
                   ),
           ),
 
+          // A plain dot punched out of the background. No glow: the ring is
+          // what separates it from the photo, so the colour can stay calm.
           if (isOnline)
             Positioned(
               bottom: 0,
               right: 0,
               child: Container(
-                width: size * 0.25,
-                height: size * 0.25,
+                width: size * 0.24,
+                height: size * 0.24,
                 decoration: BoxDecoration(
                   color: AppColors.online,
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: AppColors.darkCardAlt,
-                    width: 2,
+                    color: ringColor ?? context.appBg,
+                    width: size * 0.045,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.online.withValues(alpha: 0.5),
-                      blurRadius: 4,
-                      spreadRadius: 1,
-                    )
-                  ],
                 ),
               ),
             ),

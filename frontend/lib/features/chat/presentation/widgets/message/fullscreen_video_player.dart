@@ -107,7 +107,7 @@ class _FullscreenVideoPlayerState extends State<FullscreenVideoPlayer> {
                       aspectRatio: _controller.value.aspectRatio,
                       child: VideoPlayer(_controller),
                     )
-                  : const CircularProgressIndicator(color: AppColors.primary),
+                  : CircularProgressIndicator(color: AppColors.primary),
             ),
 
             // Top bar

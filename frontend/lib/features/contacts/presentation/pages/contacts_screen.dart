@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
+import 'package:my_chat_app/core/widgets/glass_backdrop.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/contact_list.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/contacts_search_bar.dart';
 import 'package:my_chat_app/features/contacts/presentation/widgets/search_results_list.dart';
@@ -28,8 +29,13 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
     final isSearching = _query.isNotEmpty;
 
     return Scaffold(
+      backgroundColor: context.appBg,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: context.glassBar,
+        shape: context.glassBarShape,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
         elevation: 0,
         title: Text(
           'Contacts',
@@ -55,13 +61,15 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
           ),
         ),
       ),
-      body: Container(
-        decoration: BoxDecoration(gradient: context.appBgGradient),
-        child: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) => [],
-          body: isSearching
-              ? SearchResultsList(query: _query)
-              : const ContactsList(),
+      body: GlassBackdrop(
+        child: SafeArea(
+          bottom: false,
+          child: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [],
+            body: isSearching
+                ? SearchResultsList(query: _query)
+                : const ContactsList(),
+          ),
         ),
       ),
     );

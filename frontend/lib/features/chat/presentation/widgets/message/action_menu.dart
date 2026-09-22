@@ -10,6 +10,7 @@ class ActionMenu extends StatelessWidget {
   final VoidCallback onCopy;
   final VoidCallback onInfo;
   final VoidCallback onDelete;
+  final VoidCallback? onReply;
 
   const ActionMenu({
     super.key,
@@ -19,11 +20,19 @@ class ActionMenu extends StatelessWidget {
     required this.onCopy,
     required this.onInfo,
     required this.onDelete,
+    this.onReply,
   });
 
   @override
   Widget build(BuildContext context) {
     final List<_TileSpec> tiles = [
+      if (onReply != null)
+        _TileSpec(
+          icon: Icons.reply_rounded,
+          label: 'Reply',
+          onTap: onReply!,
+          iconColor: AppColors.primary,
+        ),
       if (hasText)
         _TileSpec(
           icon: Icons.content_copy_rounded,

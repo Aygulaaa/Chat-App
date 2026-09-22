@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
@@ -20,14 +21,14 @@ class ApiConfig {
       socketUrl = _cleanUrl(envSocket);
     } else {
       // 2. Otherwise, check platform target
+      // ApiEndpoints already start with /api — appending it here as well
+      // produced /api/api/... whenever the .env values were missing.
       final host = await _resolveHost();
-      baseUrl = '${_cleanUrl(host)}/api';
+      baseUrl = _cleanUrl(host);
       socketUrl = _cleanUrl(host);
     }
 
-    print('✅ ApiConfig initialized successfully!');
-    print('🔗 API URL: $baseUrl');
-    print('🔗 Socket URL: $socketUrl');
+    debugPrint('✅ ApiConfig initialized: $baseUrl');
   }
 
   /// Resolves target host dynamically
@@ -53,7 +54,7 @@ class ApiConfig {
         }
       }
     } catch (e) {
-      print('⚠️ Device info lookup failed ($e), falling back to live server.');
+      debugPrint('⚠️ Device info lookup failed ($e), falling back to live server.');
     }
 
     return _liveBackendUrl;

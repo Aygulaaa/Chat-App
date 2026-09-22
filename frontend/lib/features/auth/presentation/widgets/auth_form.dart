@@ -1,12 +1,12 @@
-import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
+import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/core/utils/error_handler.dart';
+import 'package:my_chat_app/core/widgets/secure_flow_widgets.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
-import 'package:my_chat_app/features/auth/presentation/widgets/auth_card.dart';
+import 'package:my_chat_app/features/auth/presentation/widgets/auth_text_field.dart';
 
 class AuthForm extends ConsumerStatefulWidget {
   const AuthForm({super.key});
@@ -16,276 +16,409 @@ class AuthForm extends ConsumerStatefulWidget {
 }
 
 class _AuthFormState extends ConsumerState<AuthForm> {
-  final usernameController = TextEditingController();
-  final passwordController = TextEditingController();
-  final confirmPasswordController = TextEditingController();
+  // Mirrors the server's rules so mistakes are caught before a round trip
+  static const _minUsername = 3;
+  static const _maxUsername = 30;
+  static const _minPassword = 6;
+  static const _maxPassword = 72;
 
-  final usernameFocusNode = FocusNode();
-  final passwordFocusNode = FocusNode();
-  final confirmPasswordFocusNode = FocusNode();
+  final _username = TextEditingController();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  final _passwordFocus = FocusNode();
+  final _confirmFocus = FocusNode();
 
-  Timer? _errorTimer;
+  bool _isLogin = true;
 
-  bool isLogin = true;
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
+  /// Field errors stay hidden until the first submit attempt — nobody wants
+  /// to be told "too short" while typing the second character.
+  bool _submitted = false;
 
   @override
   void initState() {
     super.initState();
-
-    usernameController.addListener(_onFieldChanged);
-    passwordController.addListener(_onFieldChanged);
-    confirmPasswordController.addListener(_onFieldChanged);
-
-    usernameFocusNode.addListener(_onFocusChanged);
-    passwordFocusNode.addListener(_onFocusChanged);
-    confirmPasswordFocusNode.addListener(_onFocusChanged);
-  }
-
-  void _startErrorTimer() {
-    _errorTimer?.cancel();
-    _errorTimer = Timer(const Duration(seconds: 10), () {
-      _clearErrorIfPresent();
-    });
-  }
-
-  void _onFieldChanged() {
-    _clearErrorIfPresent();
-    setState(() {}); // Re-evaluates form validity for button state
-  }
-
-  void _onFocusChanged() {
-    if (usernameFocusNode.hasFocus ||
-        passwordFocusNode.hasFocus ||
-        confirmPasswordFocusNode.hasFocus) {
-      _clearErrorIfPresent();
+    for (final c in [_username, _password, _confirm]) {
+      c.addListener(_onFieldChanged);
     }
-  }
-
-  void _clearErrorIfPresent() {
-    _errorTimer?.cancel();
-    if (ref.read(authProvider).error != null) {
-      ref.read(authProvider.notifier).clearError();
-    }
-  }
-
-  bool get _isFormValid {
-    final username = usernameController.text.trim();
-    final password = passwordController.text.trim();
-    final confirmPassword = confirmPasswordController.text.trim();
-
-    if (username.isEmpty || password.isEmpty) {
-      return false;
-    }
-
-    if (!isLogin) {
-      if (confirmPassword.isEmpty || password != confirmPassword) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  void login() {
-    if (!_isFormValid) return;
-    FocusScope.of(context).unfocus();
-    ref.read(authProvider.notifier).login(
-          usernameController.text.trim(),
-          passwordController.text.trim(),
-        );
-  }
-
-  void register() {
-    if (!_isFormValid) return;
-    FocusScope.of(context).unfocus();
-    ref.read(authProvider.notifier).register(
-          usernameController.text.trim(),
-          passwordController.text.trim(),
-        );
   }
 
   @override
   void dispose() {
-    _errorTimer?.cancel();
-
-    usernameController.dispose();
-    passwordController.dispose();
-    confirmPasswordController.dispose();
-
-    usernameFocusNode.dispose();
-    passwordFocusNode.dispose();
-    confirmPasswordFocusNode.dispose();
+    _username.dispose();
+    _password.dispose();
+    _confirm.dispose();
+    _passwordFocus.dispose();
+    _confirmFocus.dispose();
     super.dispose();
+  }
+
+  void _onFieldChanged() {
+    // Typing is the user's answer to a server error — clear it
+    if (ref.read(authProvider).error != null) {
+      ref.read(authProvider.notifier).clearError();
+    }
+    setState(() {});
+  }
+
+  String? get _usernameError {
+    final value = _username.text.trim();
+    if (value.isEmpty) return 'Enter your username';
+    if (_isLogin) return null;
+    if (value.length < _minUsername) {
+      return 'At least $_minUsername characters';
+    }
+    if (value.length > _maxUsername) return 'At most $_maxUsername characters';
+    return null;
+  }
+
+  String? get _passwordError {
+    final value = _password.text.trim();
+    if (value.isEmpty) return 'Enter your password';
+    if (_isLogin) return null;
+    if (value.length < _minPassword) {
+      return 'At least $_minPassword characters';
+    }
+    if (value.length > _maxPassword) return 'At most $_maxPassword characters';
+    return null;
+  }
+
+  String? get _confirmError {
+    if (_isLogin) return null;
+    if (_confirm.text.trim() != _password.text.trim()) {
+      return "Passwords don't match";
+    }
+    return null;
+  }
+
+  bool get _hasInput =>
+      _username.text.trim().isNotEmpty &&
+      _password.text.isNotEmpty &&
+      (_isLogin || _confirm.text.isNotEmpty);
+
+  void _submit() {
+    if (ref.read(authProvider).isLoading) return;
+
+    setState(() => _submitted = true);
+    if (_usernameError != null ||
+        _passwordError != null ||
+        _confirmError != null) {
+      HapticFeedback.heavyImpact();
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    final notifier = ref.read(authProvider.notifier);
+    final username = _username.text.trim();
+    final password = _password.text.trim();
+    _isLogin
+        ? notifier.login(username, password)
+        : notifier.register(username, password);
+  }
+
+  void _setMode(bool login) {
+    ref.read(authProvider.notifier).clearError();
+    setState(() {
+      _isLogin = login;
+      _submitted = false;
+      // Keep the username (people often hit the wrong tab first); passwords
+      // are re-entered.
+      _password.clear();
+      _confirm.clear();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final colors = AppColors.of(context);
-
-    ref.listen(authProvider, (previous, next) {
-      if (next.error != null && next.error != previous?.error) {
-        _startErrorTimer();
-      }
-    });
-
     final state = ref.watch(authProvider);
-
-    String? readableErrorMessage;
-    if (state.error != null) {
-      readableErrorMessage = ErrorHandler.getReadableErrorMessage(state.error);
-    }
-
-    final bool isFormDisabled = state.isLoading;
-    final bool hasError = readableErrorMessage != null && readableErrorMessage.isNotEmpty;
+    final loading = state.isLoading;
+    final serverError = state.error == null
+        ? null
+        : ErrorHandler.getReadableErrorMessage(state.error);
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: colors.authBg,
-        body: Stack(
-          children: [
-            // Background gradient palette
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: colors.authGradient,
-                ),
-              ),
-            ),
-
-            // Glow effect
-            Positioned(
-              bottom: -100.h,
-              left: 0,
-              right: 0,
-              child: Container(
-                height: 400.h,
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment.bottomCenter,
-                    radius: 0.8,
-                    colors: [
-                      AppColors.primary.withValues(alpha: 0.4),
-                      AppColors.accent.withValues(alpha: 0.2),
-                      Colors.transparent,
-                    ],
+        backgroundColor: context.colors.authBg,
+        body: DecoratedBox(
+          decoration: BoxDecoration(gradient: context.authBgGradient),
+          child: Stack(
+            children: [
+              const Positioned(top: -120, right: -90, child: _Glow(size: 320)),
+              SafeArea(
+                child: LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: ConstrainedBox(
+                      // Vertically centered when there's room, scrollable
+                      // when the keyboard is up
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 420),
+                          child: _buildContent(context, loading, serverError),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-            // Backdrop blur layer
-            Positioned.fill(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                child: const SizedBox.expand(),
-              ),
+  Widget _buildContent(
+    BuildContext context,
+    bool loading,
+    String? serverError,
+  ) {
+    return AutofillGroup(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 32),
+          const Center(child: _BrandMark()),
+          const SizedBox(height: 26),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: Column(
+              key: ValueKey(_isLogin),
+              children: [
+                Text(
+                  _isLogin ? 'Welcome back' : 'Create your account',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.8,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _isLogin
+                      ? 'Log in to pick up your conversations.'
+                      : 'Pick a username and start chatting in seconds.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 15,
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ),
-
-            // Form Content
-            Center(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.only(bottom: hasError ? 80.h : 0),
-                child: AuthCard(
-                  isLogin: isLogin,
-                  state: state,
-                  usernameController: usernameController,
-                  passwordController: passwordController,
-                  confirmPasswordController: confirmPasswordController,
-                  usernameFocusNode: usernameFocusNode,
-                  passwordFocusNode: passwordFocusNode,
-                  confirmPasswordFocusNode: confirmPasswordFocusNode,
-                  obscurePassword: _obscurePassword,
-                  obscureConfirmPassword: _obscureConfirmPassword,
-                  onTogglePasswordVisibility: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword;
-                    });
-                  },
-                  onToggleConfirmPasswordVisibility: () {
-                    setState(() {
-                      _obscureConfirmPassword = !_obscureConfirmPassword;
-                    });
-                  },
-                  isFormValid: _isFormValid,
-                  isFormDisabled: isFormDisabled,
-                  onLogin: login,
-                  onRegister: register,
-                  onToggle: () {
-                    _clearErrorIfPresent();
-                    setState(() {
-                      isLogin = !isLogin;
-                      usernameController.clear();
-                      passwordController.clear();
-                      confirmPasswordController.clear();
-                    });
-                  },
+          ),
+          const SizedBox(height: 30),
+          AuthModeSwitch(
+            isLogin: _isLogin,
+            enabled: !loading,
+            onChanged: _setMode,
+          ),
+          const SizedBox(height: 22),
+          AuthTextField(
+            controller: _username,
+            hint: 'Username',
+            icon: Icons.alternate_email_rounded,
+            enabled: !loading,
+            errorText: _submitted ? _usernameError : null,
+            autofillHints: [
+              _isLogin ? AutofillHints.username : AutofillHints.newUsername,
+            ],
+            onSubmitted: (_) => _passwordFocus.requestFocus(),
+          ),
+          const SizedBox(height: 12),
+          AuthTextField(
+            controller: _password,
+            focusNode: _passwordFocus,
+            hint: 'Password',
+            icon: Icons.lock_outline_rounded,
+            isPassword: true,
+            enabled: !loading,
+            errorText: _submitted ? _passwordError : null,
+            textInputAction: _isLogin
+                ? TextInputAction.done
+                : TextInputAction.next,
+            autofillHints: [
+              _isLogin ? AutofillHints.password : AutofillHints.newPassword,
+            ],
+            onSubmitted: (_) =>
+                _isLogin ? _submit() : _confirmFocus.requestFocus(),
+          ),
+          // Sign-up extras slide open instead of popping in
+          AnimatedSize(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: _isLogin
+                ? const SizedBox(width: double.infinity)
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: PasswordStrengthMeter(
+                          password: _password.text.trim(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      AuthTextField(
+                        controller: _confirm,
+                        focusNode: _confirmFocus,
+                        hint: 'Repeat password',
+                        icon: Icons.verified_user_outlined,
+                        isPassword: true,
+                        enabled: !loading,
+                        errorText: _submitted ? _confirmError : null,
+                        textInputAction: TextInputAction.done,
+                        autofillHints: const [AutofillHints.newPassword],
+                        onSubmitted: (_) => _submit(),
+                      ),
+                    ],
+                  ),
+          ),
+          // Server errors appear right above the button they relate to
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: serverError == null || serverError.isEmpty
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: _ErrorBanner(message: serverError),
+                  ),
+          ),
+          const SizedBox(height: 22),
+          FlowPrimaryButton(
+            label: _isLogin ? 'Log In' : 'Create Account',
+            loading: loading,
+            onPressed: _hasInput ? _submit : null,
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: TextButton(
+              onPressed: loading ? null : () => _setMode(!_isLogin),
+              child: Text.rich(
+                TextSpan(
+                  text: _isLogin ? 'New here? ' : 'Already have an account? ',
+                  style: TextStyle(color: context.textSecondary, fontSize: 14),
+                  children: [
+                    TextSpan(
+                      text: _isLogin ? 'Create an account' : 'Log in',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+}
 
-            // Floating Error Banner
-            Positioned(
-              left: 20.w,
-              right: 20.w,
-              bottom: 24.h,
-              child: SafeArea(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  transitionBuilder: (child, animation) {
-                    return SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, 1),
-                        end: Offset.zero,
-                      ).animate(animation),
-                      child: FadeTransition(
-                        opacity: animation,
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: hasError
-                      ? Container(
-                          key: ValueKey(readableErrorMessage),
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 16.w,
-                            vertical: 14.h,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.error,
-                            borderRadius: BorderRadius.circular(14.r),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.3),
-                                blurRadius: 16,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.error_outline_rounded,
-                                color: Colors.white,
-                                size: 22.sp,
-                              ),
-                              SizedBox(width: 12.w),
-                              Expanded(
-                                child: Text(
-                                  readableErrorMessage,
-                                  style: TextStyle(
-                                    fontSize: 13.sp,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : const SizedBox.shrink(),
+class _BrandMark extends StatelessWidget {
+  const _BrandMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 76,
+      height: 76,
+      decoration: BoxDecoration(
+        gradient: AppColors.primaryGradient,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: const Icon(
+        Icons.chat_bubble_rounded,
+        color: Colors.white,
+        size: 36,
+      ),
+    );
+  }
+}
+
+/// Soft brand-colored light in a corner. A plain radial gradient — the old
+/// full-screen BackdropFilter blur cost a lot of GPU for the same effect.
+class _Glow extends StatelessWidget {
+  final double size;
+
+  const _Glow({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [
+              AppColors.primary.withValues(
+                alpha: context.isLight ? 0.22 : 0.20,
+              ),
+              AppColors.accent.withValues(alpha: 0.08),
+              AppColors.accent.withValues(alpha: 0),
+            ],
+            stops: const [0, 0.55, 1],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+
+  const _ErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    const color = Color(0xFFFF5A52);
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.error_outline_rounded, color: color, size: 19),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontSize: 13.5,
+                  height: 1.35,
                 ),
               ),
             ),

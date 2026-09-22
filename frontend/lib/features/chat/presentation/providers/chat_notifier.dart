@@ -3,8 +3,9 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:my_chat_app/core/utils/error_handler.dart';
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:overlay_support/overlay_support.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -29,6 +30,7 @@ class ChatNotifier extends _$ChatNotifier {
   StreamSubscription? _readSub;
   StreamSubscription? _deliveredSub;
   StreamSubscription? _groupDeletedSub;
+  StreamSubscription? _messageDeletedSub;
 
   final Set<int> _blockedUserIds = {};
 
@@ -70,6 +72,7 @@ class ChatNotifier extends _$ChatNotifier {
     _readSub?.cancel();
     _deliveredSub?.cancel();
     _groupDeletedSub?.cancel();
+    _messageDeletedSub?.cancel();
   }
 
   /// Centralized cache helper to ensure Hive stays perfectly synced with `state`
@@ -77,9 +80,10 @@ class ChatNotifier extends _$ChatNotifier {
     try {
       if (!Hive.isBoxOpen('chats_cache')) return;
       final box = Hive.box<String>('chats_cache');
+      // copyWith() yields plain `Chat`s; `whereType<ChatModel>()` used to drop
+      // every chat that had ever received a message from the cache.
       final toCache = state.chats
-          .whereType<ChatModel>()
-          .map((e) => e.toJson())
+          .map((e) => ChatModel.fromEntity(e).toJson())
           .toList();
       await box.put('all_chats', jsonEncode(toCache));
     } catch (_) {}
@@ -148,9 +152,6 @@ class ChatNotifier extends _$ChatNotifier {
             _blockedUserIds.contains(message.senderId)) {
           return;
         }
-        print("message sender id  $message");
-        print("my id: $myId");
-
         if (message.senderId != myId) {
           datasource.emitMessageReceived(message.id);
         }
@@ -211,12 +212,12 @@ class ChatNotifier extends _$ChatNotifier {
                                   end: Alignment.bottomRight,
                                 ),
                                 border: Border.all(
-                                  color: AppColors.accent.withOpacity(0.25),
+                                  color: AppColors.accent.withValues(alpha: 0.25),
                                   width: 1,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.primary.withOpacity(0.28),
+                                    color: AppColors.primary.withValues(alpha: 0.28),
                                     blurRadius: 24,
                                     spreadRadius: -4,
                                     offset: const Offset(0, 6),
@@ -231,7 +232,7 @@ class ChatNotifier extends _$ChatNotifier {
                                     height: 42,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      gradient: const LinearGradient(
+                                      gradient: LinearGradient(
                                         colors: [
                                           AppColors.primary,
                                           AppColors.accent,
@@ -241,9 +242,7 @@ class ChatNotifier extends _$ChatNotifier {
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: AppColors.primary.withOpacity(
-                                            0.5,
-                                          ),
+                                          color: AppColors.primary.withValues(alpha: 0.5),
                                           blurRadius: 12,
                                           spreadRadius: -2,
                                         ),
@@ -278,7 +277,7 @@ class ChatNotifier extends _$ChatNotifier {
                                           msgText,
                                           style: TextStyle(
                                             color: AppColors.darkTextSecondary
-                                                .withOpacity(0.9),
+                                                .withValues(alpha: 0.9),
                                             fontSize: 13,
                                             fontWeight: FontWeight.w400,
                                             height: 1.3,
@@ -294,7 +293,7 @@ class ChatNotifier extends _$ChatNotifier {
                                     padding: const EdgeInsets.only(top: 2),
                                     child: Icon(
                                       Icons.keyboard_arrow_up_rounded,
-                                      color: AppColors.accent.withOpacity(0.6),
+                                      color: AppColors.accent.withValues(alpha: 0.6),
                                       size: 20,
                                     ),
                                   ),
@@ -323,24 +322,34 @@ class ChatNotifier extends _$ChatNotifier {
         final int chatId = int.tryParse(rawChatId?.toString() ?? '') ?? 0;
         if (chatId == 0) return;
 
-        final List<int> messageIds = (data['messageIds'] as List? ?? [])
+        final myId = ref.read(authProvider).user?.id;
+        final readBy = int.tryParse(data['readBy']?.toString() ?? '');
+        final bool iReadIt = readBy != null && readBy == myId;
+
+        final messageIds = ((data['messageIds'] as List?) ?? const [])
             .map((e) => int.tryParse(e.toString()))
             .whereType<int>()
-            .toList();
+            .toSet();
 
         final updatedChats = state.chats.map((chat) {
           if (chat.id != chatId) return chat;
 
-          final last = chat.lastMessage;
-          final bool isLastMessageRead =
-              last != null &&
-              (messageIds.isEmpty || messageIds.contains(last.id));
+          // I read it (on any of my devices) → MY badge clears.
+          // Someone else read it → my badge is none of their business; only
+          // the tick on my own last message may change.
+          if (iReadIt) return chat.copyWith(unreadCount: 0);
 
+          final last = chat.lastMessage;
+          if (last == null ||
+              last.senderId != myId ||
+              !messageIds.contains(last.id)) {
+            return chat;
+          }
           return chat.copyWith(
-            unreadCount: 0,
-            lastMessage: isLastMessageRead
-                ? last.copyWith(readAt: last.readAt ?? DateTime.now())
-                : last,
+            lastMessage: last.copyWith(
+              status: MessageStatus.read,
+              readAt: last.readAt ?? DateTime.now(),
+            ),
           );
         }).toList();
 
@@ -377,10 +386,21 @@ class ChatNotifier extends _$ChatNotifier {
       } catch (_) {}
     });
 
-    /// ✅ GROUP DELETED
+    /// ✅ CHAT GONE (group deleted, removed from a group, private chat deleted)
     _groupDeletedSub = datasource.onGroupDeleted().listen((deletedChatId) {
       if (!ref.mounted) return;
       removeChatFromList(deletedChatId);
+    });
+
+    /// ✅ MESSAGE DELETED — if it was the one shown in the chat list preview,
+    /// refetch so the row doesn't keep displaying a message that no longer exists
+    _messageDeletedSub = datasource.onMessageDeleted().listen((data) {
+      if (!ref.mounted) return;
+      final messageId = int.tryParse(data['messageId']?.toString() ?? '');
+      if (messageId == null) return;
+      if (state.chats.any((c) => c.lastMessage?.id == messageId)) {
+        loadChats();
+      }
     });
   }
 
@@ -424,15 +444,17 @@ class ChatNotifier extends _$ChatNotifier {
       final chats = await ref.read(getChatsProvider).call();
       if (!ref.mounted) return;
 
-      // Merge server chats with existing local state by ID
-      // Server chats take priority, but any locally-present chats
-      // not returned by the server are preserved to avoid disappearing
-      final serverChatMap = {for (final c in chats) c.id: c};
-      final existingChatMap = {for (final c in state.chats) c.id: c};
-
-      // Start with all server chats, then add any local-only chats
-      final mergedMap = {...existingChatMap, ...serverChatMap};
-      final mergedChats = mergedMap.values.toList();
+      // A successful response IS the list. Keeping "local-only" chats meant a
+      // chat deleted on another device (or a group you were removed from)
+      // stayed in the list forever. Only the device-local mute flag carries over.
+      final mutedIds = {
+        for (final c in state.chats)
+          if (c.isMuted) c.id,
+      };
+      final mergedChats = [
+        for (final c in chats)
+          mutedIds.contains(c.id) ? c.copyWith(isMuted: true) : c,
+      ];
 
       mergedChats.sort((a, b) {
         final aDate = a.lastMessage?.createdAt ?? DateTime(0);
@@ -445,7 +467,7 @@ class ChatNotifier extends _$ChatNotifier {
     } catch (e) {
       if (!ref.mounted) return;
       if (state.chats.isEmpty) {
-        state = state.copyWith(isLoading: false, error: e.toString());
+        state = state.copyWith(isLoading: false, error: ErrorHandler.getReadableErrorMessage(e));
       } else {
         state = state.copyWith(isLoading: false);
       }

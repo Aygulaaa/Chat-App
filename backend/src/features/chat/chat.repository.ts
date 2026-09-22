@@ -40,7 +40,43 @@ const messageColumns = (viewerParam: string) => `
           'text', LEFT(r.text, 200),
           'fileType', r.file_type,
           'originalName', r.original_name
-        ) END AS "replyTo"`;
+        ) END AS "replyTo",
+        -- Reactions, oldest first. People the viewer has a block with are
+        -- left out, the same way their messages are.
+        COALESCE((
+          SELECT json_agg(json_build_object('userId', mr.user_id, 'emoji', mr.emoji)
+                          ORDER BY mr.created_at)
+            FROM message_reactions mr
+           WHERE mr.message_id = m.id
+             AND NOT EXISTS (
+               SELECT 1 FROM contacts rc
+                WHERE ((rc.user_id = ${viewerParam} AND rc.contact_user_id = mr.user_id)
+                    OR (rc.user_id = mr.user_id AND rc.contact_user_id = ${viewerParam}))
+                  AND rc.status = 'blocked'
+             )
+        ), '[]'::json) AS "reactions"`;
+
+/**
+ * true when message `alias` was sent while `viewerParam` and its sender had a
+ * block between them. That is recorded on the message itself (`hidden_from`),
+ * so it stays hidden from that person after an unblock — see migration 004.
+ */
+export const hiddenFrom = (alias: string, viewerParam: string) =>
+  `${viewerParam}::bigint = ANY(${alias}.hidden_from)`;
+
+/** The members a new message from `senderParam` must never reach. */
+const blockedMembersOf = (chatParam: string, senderParam: string) => `
+        ARRAY(
+          SELECT cm.user_id::bigint FROM chat_members cm
+           WHERE cm.chat_id = ${chatParam}
+             AND cm.user_id <> ${senderParam}
+             AND EXISTS (
+               SELECT 1 FROM contacts hb
+                WHERE ((hb.user_id = cm.user_id AND hb.contact_user_id = ${senderParam})
+                    OR (hb.user_id = ${senderParam} AND hb.contact_user_id = cm.user_id))
+                  AND hb.status = 'blocked'
+             )
+        )`;
 
 /**
  * Joins the quoted message. The quote is withheld when the viewer and the
@@ -50,6 +86,7 @@ const messageColumns = (viewerParam: string) => `
 const replyJoins = (viewerParam: string) => `
       LEFT JOIN messages r
         ON r.id = m.reply_to_id
+       AND NOT ${hiddenFrom('r', viewerParam)}
        AND NOT EXISTS (
          SELECT 1 FROM contacts rb
          WHERE ((rb.user_id = ${viewerParam} AND rb.contact_user_id = r.sender_id)
@@ -142,6 +179,7 @@ export const chatRepository = {
           m.created_at
         FROM messages m
         WHERE m.chat_id = c.id
+          AND NOT ${hiddenFrom('m', '$1')}
           AND NOT EXISTS (
             SELECT 1 FROM contacts block_c
             WHERE ((block_c.user_id = $1 AND block_c.contact_user_id = m.sender_id)
@@ -160,6 +198,7 @@ export const chatRepository = {
           AND m.id > COALESCE((
             SELECT me.last_read_message_id FROM chat_members me
              WHERE me.chat_id = c.id AND me.user_id = $1), 0)
+          AND NOT ${hiddenFrom('m', '$1')}
           AND NOT EXISTS (
             SELECT 1 FROM contacts block_c
             WHERE ((block_c.user_id = $1 AND block_c.contact_user_id = m.sender_id)
@@ -226,6 +265,7 @@ export const chatRepository = {
         ) AS last_message
         FROM messages m
         WHERE m.chat_id = c.id
+          AND NOT ${hiddenFrom('m', '$2')}
           AND NOT EXISTS (
             SELECT 1 FROM contacts block_c
             WHERE ((block_c.user_id = $2 AND block_c.contact_user_id = m.sender_id)
@@ -244,6 +284,7 @@ export const chatRepository = {
           AND m.id > COALESCE((
             SELECT me.last_read_message_id FROM chat_members me
              WHERE me.chat_id = c.id AND me.user_id = $2), 0)
+          AND NOT ${hiddenFrom('m', '$2')}
           AND NOT EXISTS (
             SELECT 1 FROM contacts block_c
             WHERE ((block_c.user_id = $2 AND block_c.contact_user_id = m.sender_id)
@@ -274,6 +315,7 @@ export const chatRepository = {
           SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2
         )
         AND ($3::bigint IS NULL OR m.id < $3::bigint)
+        AND NOT ${hiddenFrom('m', '$2')}
         AND NOT EXISTS (
           SELECT 1 FROM contacts c 
           WHERE ((c.user_id = $2 AND c.contact_user_id = m.sender_id)
@@ -295,6 +337,7 @@ export const chatRepository = {
       FROM messages m
       ${replyJoins('$2')}
       WHERE m.id = $1
+        AND NOT ${hiddenFrom('m', '$2')}
         AND EXISTS (
           SELECT 1 FROM chat_members WHERE chat_id = m.chat_id AND user_id = $2
         )
@@ -313,9 +356,9 @@ export const chatRepository = {
     const result = await db.query(
       `
       WITH m AS (
-        INSERT INTO messages (chat_id, sender_id, text, reply_to_id)
+        INSERT INTO messages (chat_id, sender_id, text, reply_to_id, hidden_from)
         SELECT $1, $2, $3,
-               (SELECT id FROM messages WHERE id = $4::bigint AND chat_id = $1)
+               (SELECT id FROM messages WHERE id = $4::bigint AND chat_id = $1),${blockedMembersOf('$1', '$2')}
         WHERE EXISTS (
           SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2
         )
@@ -345,10 +388,11 @@ export const chatRepository = {
       WITH m AS (
         INSERT INTO messages (
           chat_id, sender_id,
-          file_url, file_type, original_name, mime_type, file_size, reply_to_id
+          file_url, file_type, original_name, mime_type, file_size, reply_to_id,
+          hidden_from
         )
         SELECT $1, $2, $3, $4, $5, $6, $7,
-               (SELECT id FROM messages WHERE id = $8::bigint AND chat_id = $1)
+               (SELECT id FROM messages WHERE id = $8::bigint AND chat_id = $1),${blockedMembersOf('$1', '$2')}
         WHERE EXISTS (
           SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2
         )
@@ -642,6 +686,111 @@ export const chatRepository = {
     } finally {
       client.release();
     }
+  },
+
+  /**
+   * Adds, replaces or removes `userId`'s reaction on a message (one per person,
+   * Telegram-style). Tapping the emoji that is already there removes it.
+   *
+   * Returns the message's full reaction list plus the members who may be told
+   * about it — or `null` when the user may not touch that message at all
+   * (not a member, or it was hidden from them by a block).
+   */
+  async setReaction(messageId: number, userId: number, emoji: string) {
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+
+      const target = await client.query(
+        `SELECT m.chat_id AS "chatId"
+           FROM messages m
+           JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = $2
+          WHERE m.id = $1
+            AND NOT ${hiddenFrom('m', '$2')}`,
+        [messageId, userId]
+      );
+      if (target.rowCount === 0) {
+        await client.query("ROLLBACK");
+        return null;
+      }
+      const chatId = Number(target.rows[0].chatId);
+
+      const existing = await client.query(
+        `SELECT emoji FROM message_reactions
+          WHERE message_id = $1 AND user_id = $2
+          FOR UPDATE`,
+        [messageId, userId]
+      );
+      const current = existing.rows[0]?.emoji ?? null;
+
+      if (current === emoji) {
+        await client.query(
+          `DELETE FROM message_reactions WHERE message_id = $1 AND user_id = $2`,
+          [messageId, userId]
+        );
+      } else {
+        await client.query(
+          `INSERT INTO message_reactions (message_id, user_id, emoji)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (message_id, user_id)
+           DO UPDATE SET emoji = EXCLUDED.emoji, created_at = NOW()`,
+          [messageId, userId, emoji]
+        );
+      }
+
+      const reactions = await client.query(
+        `SELECT user_id AS "userId", emoji
+           FROM message_reactions
+          WHERE message_id = $1
+          ORDER BY created_at`,
+        [messageId]
+      );
+
+      // Everyone who can see the message. The caller filters each recipient's
+      // copy of the list (you never see a reaction from someone you block).
+      const recipients = await client.query(
+        `SELECT cm.user_id AS "userId"
+           FROM chat_members cm
+           JOIN messages m ON m.id = $1
+          WHERE cm.chat_id = m.chat_id
+            AND NOT (cm.user_id::bigint = ANY(m.hidden_from))`,
+        [messageId]
+      );
+
+      await client.query("COMMIT");
+      return {
+        chatId,
+        removed: current === emoji,
+        reactions: reactions.rows as { userId: number; emoji: string }[],
+        recipientIds: recipients.rows.map((r: any) => Number(r.userId)),
+      };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("DB ERROR setReaction:", err);
+      throw err;
+    } finally {
+      client.release();
+    }
+  },
+
+  /** Pairs of users with a block between them, among `userIds`. */
+  async blockedPairs(userIds: number[]): Promise<Set<string>> {
+    if (userIds.length < 2) return new Set();
+    const result = await db.query(
+      `SELECT user_id, contact_user_id FROM contacts
+        WHERE status = 'blocked'
+          AND user_id = ANY($1::bigint[])
+          AND contact_user_id = ANY($1::bigint[])`,
+      [userIds]
+    );
+    const pairs = new Set<string>();
+    for (const row of result.rows) {
+      const a = Number(row.user_id);
+      const b = Number(row.contact_user_id);
+      pairs.add(`${a}:${b}`);
+      pairs.add(`${b}:${a}`);
+    }
+    return pairs;
   },
 
   async deleteGroup(chatId: number, requesterId: number) {

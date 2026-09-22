@@ -89,7 +89,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
             height: 100.r,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 colors: [AppColors.primary, AppColors.accent],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -107,7 +107,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
                         )
                       : null,
                   gradient: latestUrl == null
-                      ? const LinearGradient(
+                      ? LinearGradient(
                           colors: [AppColors.primary, AppColors.accent],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -117,7 +117,9 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
                 child: latestUrl == null
                     ? Center(
                         child: Text(
-                          widget.username[0].toUpperCase(),
+                          widget.username.isEmpty
+                              ? '?'
+                              : widget.username[0].toUpperCase(),
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 34.sp,
@@ -161,7 +163,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
                 width: 30.r,
                 height: 30.r,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     colors: [AppColors.primary, AppColors.accent],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -191,5 +193,3 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
     );
   }
 }
-
-

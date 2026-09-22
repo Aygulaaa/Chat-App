@@ -156,6 +156,22 @@ export const chatService = {
     return await chatRepository.isMember(chatId, userId);
   },
 
+  /** One emoji per person per message; sending the same one again clears it. */
+  async setReaction(messageId: number, userId: number, emoji: string) {
+    // Emoji are 1–2 code points (plus skin tone / ZWJ sequences). A cap keeps
+    // someone from storing a paragraph in the reaction pill.
+    const clean = emoji.trim();
+    if (!clean || [...clean].length > 8 || clean.length > 16) {
+      throw new ChatError(400, 'Invalid reaction');
+    }
+
+    const result = await chatRepository.setReaction(messageId, userId, clean);
+    if (!result) {
+      throw new ChatError(404, 'Message not found');
+    }
+    return result;
+  },
+
   async deleteMessage(messageId: number, senderId: number) {
     return await chatRepository.deleteMessage(messageId, senderId);
   },

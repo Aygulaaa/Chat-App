@@ -1,38 +1,25 @@
-
 import 'package:flutter/material.dart';
 import 'package:my_chat_app/core/theme/app_colors.dart';
 
 abstract final class AppTheme {
-  static ThemeData get light => ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.light,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primary,
-          brightness: Brightness.light,
-        ),
-        scaffoldBackgroundColor: const LightColors().bg,
-        appBarTheme: AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-          backgroundColor: const LightColors().appBar,
-          foregroundColor: const LightColors().textPrimary,
-        ),
-      );
+  static ThemeData get light => of(const LightColors());
+  static ThemeData get dark => of(const DarkColors());
 
-  static ThemeData get dark => ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primary,
-          brightness: Brightness.dark,
-        ),
-        scaffoldBackgroundColor: const DarkColors().bg,
-        appBarTheme: AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-          backgroundColor: const DarkColors().appBar,
-          foregroundColor: const DarkColors().textPrimary,
-        ),
-        
-      );
+  /// Material theme for one of [AppColors.palettes].
+  static ThemeData of(AppColorScheme scheme) => ThemeData(
+    useMaterial3: true,
+    brightness: scheme.brightness,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: scheme.primary,
+      brightness: scheme.brightness,
+    ),
+    scaffoldBackgroundColor: scheme.bg,
+    appBarTheme: AppBarTheme(
+      centerTitle: true,
+      elevation: 0,
+      backgroundColor: scheme.appBar,
+      foregroundColor: scheme.textPrimary,
+    ),
+    extensions: [AppPalette(scheme)],
+  );
 }

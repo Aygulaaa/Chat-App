@@ -4,13 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:overlay_support/overlay_support.dart';
 
 import 'package:my_chat_app/core/constants/api_config.dart';
 import 'package:my_chat_app/core/network/fcm_service.dart';
 import 'package:my_chat_app/core/router/app_router.dart';
+import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/app_theme.dart';
+import 'package:my_chat_app/core/theme/palette_provider.dart';
+import 'package:my_chat_app/core/theme/palette_rebuilder.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.dart';
 import 'package:my_chat_app/features/notification/presentation/providers/notification_provider.dart';
@@ -34,7 +37,8 @@ void main() async {
     debugPrint('⚠️ .env load warning: $e');
   }
 
-  ApiConfig.init();
+  // Must be awaited: baseUrl is `late final`, and auto-login below uses it.
+  await ApiConfig.init();
 
   // 3. Initialize Firebase & Register Background Handler Isolate
   try {
@@ -46,14 +50,10 @@ void main() async {
 
   // 4. Create explicit ProviderContainer to attempt Auto-Login before mounting UI
   final container = ProviderContainer();
+  await container.read(darkPaletteProvider.notifier).load();
   await container.read(authProvider.notifier).tryAutoLogin();
 
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const MyApp(),
-    ),
-  );
+  runApp(UncontrolledProviderScope(container: container, child: const MyApp()));
 }
 
 class MyApp extends ConsumerStatefulWidget {
@@ -63,16 +63,28 @@ class MyApp extends ConsumerStatefulWidget {
   ConsumerState<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends ConsumerState<MyApp> {
+class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   StreamSubscription<void>? _sessionRevokedSub;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initFcm();
       _listenForSessionRevocation();
     });
+  }
+
+  /// The socket survives the app going to the background, so without this the
+  /// server still thinks the open chat is on screen: no notification is sent,
+  /// and arriving messages are marked as read behind the user's back. On the
+  /// way back in, the open chat is re-announced and its messages are read.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    final foreground = state == AppLifecycleState.resumed;
+    ref.read(chatSocketDataSourceProvider).setAppForeground(foreground);
   }
 
   void _listenForSessionRevocation() {
@@ -82,22 +94,23 @@ class _MyAppState extends ConsumerState<MyApp> {
         .read(chatSocketDataSourceProvider)
         .onSessionRevoked()
         .listen((_) {
-      if (!mounted) return;
-      // This device's session was revoked remotely — force logout.
-      debugPrint('🚫 session_revoked received — logging out');
-      ref.read(authProvider.notifier).logout();
-    });
+          if (!mounted) return;
+          // This device's session was revoked remotely — force logout.
+          debugPrint('🚫 session_revoked received — logging out');
+          ref.read(authProvider.notifier).logout();
+        });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _sessionRevokedSub?.cancel();
     super.dispose();
   }
 
   Future<void> _initFcm() async {
     final fcmService = ref.read(fcmServiceProvider);
-    
+
     // Initialize notification channels, permissions, and click listeners
     await fcmService.initialize(
       onNotificationTap: (data) {
@@ -147,7 +160,10 @@ class _MyAppState extends ConsumerState<MyApp> {
 
     final settingsAsync = ref.watch(settingsProvider);
     final themeStr = settingsAsync.value?.theme ?? 'dark';
-    final themeMode = themeStr == 'light' ? ThemeMode.light : ThemeMode.dark;
+    final darkPalette = AppColors.byId(ref.watch(darkPaletteProvider));
+    final palette = themeStr == 'light' ? const LightColors() : darkPalette;
+    // Context-less color lookups (AppColors.primary) follow the same palette
+    AppColors.active = palette;
     final router = ref.watch(routerProvider);
 
     return ScreenUtilInit(
@@ -155,14 +171,15 @@ class _MyAppState extends ConsumerState<MyApp> {
       minTextAdapt: true,
       splitScreenMode: true,
       builder: (context, child) {
-        return OverlaySupport.global(
-          child: MaterialApp.router(
-            routerConfig: router,
-            debugShowCheckedModeBanner: false,
-            title: 'Navihat Chat',
-            themeMode: themeMode,
-            theme: AppTheme.light,
-            darkTheme: AppTheme.dark,
+        return PaletteRebuilder(
+          paletteId: palette.id,
+          child: OverlaySupport.global(
+            child: MaterialApp.router(
+              routerConfig: router,
+              debugShowCheckedModeBanner: false,
+              title: 'Navihat Chat',
+              theme: AppTheme.of(palette),
+            ),
           ),
         );
       },

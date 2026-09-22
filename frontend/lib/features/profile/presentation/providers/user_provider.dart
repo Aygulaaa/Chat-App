@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
 import 'package:my_chat_app/core/di/global_provider.dart';
 import 'package:my_chat_app/features/auth/data/models/user_model.dart';
@@ -45,7 +45,9 @@ class UserProfile extends _$UserProfile {
 
     UserEntity? cached;
     try {
-      final cachedStr = Hive.box<String>('user_profile_cache').get('my_profile');
+      final cachedStr = Hive.box<String>(
+        'user_profile_cache',
+      ).get('my_profile');
       if (cachedStr != null) {
         cached = UserModel.fromJson(jsonDecode(cachedStr));
       }
@@ -81,7 +83,9 @@ class UserProfile extends _$UserProfile {
         lastSeen: user.lastSeen,
         lastSeenFuzzy: user.lastSeenFuzzy,
       );
-      await Hive.box<String>('user_profile_cache').put('my_profile', jsonEncode(model.toJson()));
+      await Hive.box<String>(
+        'user_profile_cache',
+      ).put('my_profile', jsonEncode(model.toJson()));
     } catch (_) {}
   }
 
@@ -105,14 +109,14 @@ class UserProfile extends _$UserProfile {
     }
   }
 
+  /// Throws on failure. It used to swallow the error (restore the old state,
+  /// return normally), so the edit screen closed as if the save had worked
+  /// even when the server said e.g. "username already taken".
   Future<void> updateInfo(Map<String, dynamic> data) async {
-    final previous = state;
-    state = await AsyncValue.guard(() async {
-      final updated = await ref.read(userRepositoryProvider).updateProfile(data);
-      _cacheProfile(updated);
-      return updated;
-    });
-    if (state.hasError) state = previous;
+    final updated = await ref.read(userRepositoryProvider).updateProfile(data);
+    if (!ref.mounted) return;
+    state = AsyncValue.data(updated);
+    _cacheProfile(updated);
   }
 
   Future<UserEntity> getUserById(int userId) async {

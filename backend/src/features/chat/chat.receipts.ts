@@ -33,6 +33,16 @@ const blockedBetween = (a: string, b: string) => `
       AND bl.status = 'blocked'
   )`;
 
+/**
+ * true when the message aliased `m` must never reach member `user` — it was
+ * sent while the two of them had a block (migration 004). Unlike
+ * [blockedBetween] this does not change when the block is lifted: messages
+ * sent during a block stay undelivered and unread forever, so unblocking
+ * someone can't silently mark a backlog you were never shown as read.
+ */
+const hiddenFromMember = (user: string, m: string) =>
+  `${user}::bigint = ANY(${m}.hidden_from)`;
+
 const toFlipped = (rows: any[]): FlippedMessage[] =>
   rows.map((r) => ({
     id: Number(r.id),
@@ -53,6 +63,7 @@ async function flipDelivered(client: PoolClient, messageIds: number[]) {
           SELECT 1 FROM chat_members cm
            WHERE cm.chat_id = m.chat_id
              AND cm.user_id <> m.sender_id
+             AND NOT ${hiddenFromMember("cm.user_id", "m")}
              AND NOT ${blockedBetween("cm.user_id", "m.sender_id")}
              AND NOT EXISTS (
                SELECT 1 FROM message_receipts r
@@ -78,6 +89,7 @@ async function flipRead(client: PoolClient, messageIds: number[]) {
   const sharing = `
     cm.chat_id = m.chat_id
     AND cm.user_id <> m.sender_id
+    AND NOT ${hiddenFromMember("cm.user_id", "m")}
     AND NOT ${blockedBetween("cm.user_id", "m.sender_id")}
     AND NOT EXISTS (
       SELECT 1 FROM user_settings us
@@ -131,6 +143,7 @@ export const receipts = {
             AND m.delivered_at IS NULL
             AND ($2::bigint IS NULL OR m.chat_id = $2::bigint)
             AND ($3::bigint IS NULL OR m.id = $3::bigint)
+            AND NOT ${hiddenFromMember("$1", "m")}
             AND NOT ${blockedBetween("$1", "m.sender_id")}
          ON CONFLICT (message_id, user_id) DO UPDATE
             SET delivered_at = EXCLUDED.delivered_at
@@ -171,6 +184,7 @@ export const receipts = {
           WHERE m.chat_id = $2
             AND m.sender_id <> $1
             AND m.id > COALESCE(me.last_read_message_id, 0)
+            AND NOT ${hiddenFromMember("$1", "m")}
             AND NOT ${blockedBetween("$1", "m.sender_id")}
          ON CONFLICT (message_id, user_id) DO UPDATE
             SET read_at = EXCLUDED.read_at,
@@ -227,6 +241,7 @@ export const receipts = {
          LEFT JOIN user_settings mine  ON mine.user_id = $2
         WHERE m.id = $1
           AND m.sender_id = $2
+          AND NOT ${hiddenFromMember("cm.user_id", "m")}
           AND NOT ${blockedBetween("cm.user_id", "m.sender_id")}
         ORDER BY r.read_at NULLS LAST, r.delivered_at NULLS LAST, u.username`,
       [messageId, requesterId]

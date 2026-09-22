@@ -1,3 +1,4 @@
+import 'package:my_chat_app/core/utils/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -38,8 +39,10 @@ class _LockScreenState extends ConsumerState<LockScreen> {
   Future<void> _forgotPassword() async {
     showModalBottomSheet(
       context: context,
+      // Above the app shell, so the bottom nav bar can't sit on top of it
+      useRootNavigator: true,
       isScrollControlled: true,
-      backgroundColor: context.cardBg,
+      backgroundColor: context.modalBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -114,7 +117,11 @@ class _LockScreenState extends ConsumerState<LockScreen> {
                         } catch (e) {
                           if (ctx.mounted) {
                             ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(content: Text(e.toString())),
+                              SnackBar(
+                                content: Text(
+                                  ErrorHandler.getReadableErrorMessage(e),
+                                ),
+                              ),
                             );
                           }
                         } finally {

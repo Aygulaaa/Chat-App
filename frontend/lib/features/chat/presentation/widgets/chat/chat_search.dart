@@ -45,7 +45,7 @@ class SearchChats extends ConsumerWidget {
     }).toList();
 
     if (state.isLoading) {
-      return const Center(
+      return Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       );
     }
@@ -86,7 +86,7 @@ class SearchChats extends ConsumerWidget {
             userId: other?.id ?? 0,
             name: title,
             avatarUrl: avatar,
-            message: chat.lastMessage?.text ?? 'No messages yet',
+            message: chat.lastMessage?.preview ?? 'No messages yet',
             time: '',
             unread: chat.unreadCount > 0,
             unreadCount: chat.unreadCount,

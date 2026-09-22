@@ -15,6 +15,23 @@ class ChatModel extends Chat {
     super.isMuted,
   });
 
+  /// `Chat.copyWith` returns a plain [Chat]; this turns it back into something
+  /// that can be written to the cache.
+  factory ChatModel.fromEntity(Chat c) {
+    if (c is ChatModel) return c;
+    return ChatModel(
+      id: c.id,
+      type: c.type,
+      name: c.name,
+      avatar: c.avatar,
+      createdBy: c.createdBy,
+      unreadCount: c.unreadCount,
+      participants: c.participants,
+      lastMessage: c.lastMessage,
+      isMuted: c.isMuted,
+    );
+  }
+
   factory ChatModel.fromJson(Map<String, dynamic> json) {
     return ChatModel(
       id: json['id'] ?? 0,
@@ -34,6 +51,9 @@ class ChatModel extends Chat {
       participants: (json['participants'] as List? ?? [])
           .map((p) => UserModel.fromJson(p))
           .toList(),
+
+      // Only ever present in the local cache — mute is a per-device setting
+      isMuted: json['isMuted'] == true,
     );
   }
 
@@ -45,8 +65,8 @@ class ChatModel extends Chat {
       'avatar': avatar,
       'createdBy': createdBy,
       'unreadCount': unreadCount,
-      'lastMessage': (lastMessage is MessageModel) 
-          ? (lastMessage as MessageModel).toJson() 
+      'lastMessage': lastMessage != null
+          ? MessageModel.fromEntity(lastMessage!).toJson()
           : null,
       'participants': participants.map((p) {
         if (p is UserModel) return p.toJson();

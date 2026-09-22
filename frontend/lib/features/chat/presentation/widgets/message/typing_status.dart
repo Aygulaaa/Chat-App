@@ -29,7 +29,7 @@ class TypingStatusText extends ConsumerWidget {
     final lastSeenFuzzy = userStatus.lastSeenFuzzy[otherUserId];
 
     if (typingStatus != null) {
-      return const Text(
+      return Text(
         'typing...',
         style: TextStyle(fontSize: 12, color: AppColors.accent),
       );

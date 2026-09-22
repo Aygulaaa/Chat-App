@@ -42,7 +42,9 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: context.appBg,
+      backgroundColor: context.glassBar,
+      shape: context.glassBarShape,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
       iconTheme: IconThemeData(color: context.textPrimary),
@@ -117,22 +119,34 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (!isContact)
                   PopupMenuItem<String>(
                     value: 'add_contact',
-                    child: Text('Add to contacts', style: TextStyle(color: context.textPrimary)),
+                    child: Text(
+                      'Add to contacts',
+                      style: TextStyle(color: context.textPrimary),
+                    ),
                   )
                 else
                   PopupMenuItem<String>(
                     value: 'remove_contact',
-                    child: Text('Remove from contacts', style: TextStyle(color: context.textPrimary)),
+                    child: Text(
+                      'Remove from contacts',
+                      style: TextStyle(color: context.textPrimary),
+                    ),
                   ),
                 const PopupMenuDivider(),
                 const PopupMenuItem<String>(
                   value: 'block',
-                  child: Text('Block user', style: TextStyle(color: Colors.redAccent)),
+                  child: Text(
+                    'Block user',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
                 ),
               ] else
                 const PopupMenuItem<String>(
                   value: 'unblock',
-                  child: Text('Unblock user', style: TextStyle(color: Colors.green)),
+                  child: Text(
+                    'Unblock user',
+                    style: TextStyle(color: Colors.green),
+                  ),
                 ),
             ],
           ),

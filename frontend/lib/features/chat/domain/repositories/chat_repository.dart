@@ -24,6 +24,7 @@ abstract class ChatRepository {
   Future<Message> sendMessage({
     required int chatId,
     required String text,
+    ReplyPreview? replyTo,
   });
 
   Future<Message> sendFileMessage({
@@ -31,7 +32,9 @@ abstract class ChatRepository {
     required Uint8List bytes,
     required String filename,
     required String mimeType,
+    int? replyToId,
     Function(int sent, int total)? onProgress,
+    Future<void>? abortTrigger,
   });
 
   Stream<Message> listenMessages();
@@ -54,4 +57,11 @@ abstract class ChatRepository {
   Future<void> deleteGroup(int chatId);
   Stream<int> onGroupDeleted();
   Future<void> deleteMessage({required int chatId, required int messageId});
+
+  /// Adds, replaces or clears my emoji reaction; returns the new full list.
+  Future<List<MessageReaction>> setReaction({
+    required int chatId,
+    required int messageId,
+    required String emoji,
+  });
 }

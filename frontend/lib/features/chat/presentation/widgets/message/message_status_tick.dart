@@ -14,6 +14,18 @@ class MessageStatusTick extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 0. Still on its way to the server. An optimistic message has the default
+    //    status `sent`, so without this it showed a ✓ before it was sent at all.
+    if (message.isPending &&
+        message.status != MessageStatus.error &&
+        message.status != MessageStatus.uploading) {
+      return Icon(
+        Icons.access_time_rounded,
+        size: size,
+        color: AppColors.of(context).textTertiary,
+      );
+    }
+
     // 1. Read / Seen (Double Blue Checks)
     if (message.status == MessageStatus.read || message.readAt != null) {
       return Icon(
@@ -28,7 +40,7 @@ class MessageStatusTick extends StatelessWidget {
       return Icon(
         Icons.done_all_rounded,
         size: size,
-        color: AppColors.darkTextTertiary,
+        color: AppColors.of(context).textTertiary,
       );
     }
 
@@ -37,7 +49,7 @@ class MessageStatusTick extends StatelessWidget {
       return Icon(
         Icons.check_rounded,
         size: size,
-        color: AppColors.darkTextTertiary,
+        color: AppColors.of(context).textTertiary,
       );
     }
 

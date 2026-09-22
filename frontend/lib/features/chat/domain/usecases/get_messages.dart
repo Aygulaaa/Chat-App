@@ -6,7 +6,15 @@ class GetMessages {
 
   const GetMessages(this.repository);
 
-  Future<List<Message>> call({required int chatId}) {
-    return repository.getMessages(chatId: chatId);
+  Future<List<Message>> call({
+    required int chatId,
+    int limit = 50,
+    int? beforeId,
+  }) {
+    return repository.getMessages(
+      chatId: chatId,
+      limit: limit,
+      beforeId: beforeId,
+    );
   }
 }

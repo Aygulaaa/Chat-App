@@ -1,20 +1,26 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:my_chat_app/core/common/entities/user_entity.dart';
-import 'package:my_chat_app/core/theme/app_colors.dart';
 import 'package:my_chat_app/core/theme/theme_ext.dart';
+import 'package:my_chat_app/core/utils/dialog_utils.dart';
+import 'package:my_chat_app/core/utils/error_handler.dart';
+import 'package:my_chat_app/core/utils/snackbar_utils.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/domain/entities/chat.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/group/add_member.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/group/edit_name.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/group/member_list.dart';
-import 'package:my_chat_app/features/chat/presentation/widgets/group/profile_header.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/user_avatar.dart';
+import 'package:my_chat_app/features/profile/presentation/widgets/profile_page_scaffold.dart';
+import 'package:my_chat_app/features/profile/presentation/widgets/profile_photo_header.dart';
+import 'package:my_chat_app/features/settings/presentation/widgets/settings_section.dart';
+import 'package:my_chat_app/features/settings/presentation/widgets/settings_tile.dart';
 
+/// A group's page. Same layout as a person's profile: the photo on top,
+/// then plain scrolling sections — actions, members, and (for the creator)
+/// deleting the group.
 class GroupProfileScreen extends ConsumerStatefulWidget {
   final int chatId;
   const GroupProfileScreen({super.key, required this.chatId});
@@ -25,7 +31,21 @@ class GroupProfileScreen extends ConsumerStatefulWidget {
 
 class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
   bool _isUploading = false;
-  double _sheetExtent = 0.5; // Default starts at 50% of screen
+
+  /// Runs a group action; failures are explained, not lost.
+  Future<void> _run(Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (e) {
+      if (mounted) {
+        SnackBarUtils.showSnack(
+          context,
+          ErrorHandler.getReadableErrorMessage(e),
+          isError: true,
+        );
+      }
+    }
+  }
 
   Future<void> _pickAndUploadPhoto() async {
     final XFile? image = await ImagePicker().pickImage(
@@ -35,110 +55,87 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
     if (image == null || !mounted) return;
 
     setState(() => _isUploading = true);
-    try {
+    await _run(() async {
       final bytes = await image.readAsBytes();
-      await ref.read(chatProvider.notifier).updateGroupInfo(
+      await ref
+          .read(chatProvider.notifier)
+          .updateGroupInfo(
             widget.chatId,
             avatarBytes: bytes,
             filename: image.name,
             mimeType: 'image/jpeg',
           );
-    } finally {
-      if (mounted) setState(() => _isUploading = false);
-    }
+    });
+    if (mounted) setState(() => _isUploading = false);
   }
 
-  void _editName(BuildContext context, Chat chat) {
+  void _editName(Chat chat) {
     showDialog(
       context: context,
       builder: (ctx) => EditNameDialog(
         initialName: chat.name ?? '',
-        onSave: (newName) async {
-          await ref
+        onSave: (newName) => _run(
+          () => ref
               .read(chatProvider.notifier)
-              .updateGroupInfo(widget.chatId, name: newName);
-        },
+              .updateGroupInfo(widget.chatId, name: newName),
+        ),
       ),
     );
   }
 
-  void _showAddMemberDialog(
-    BuildContext context,
-    List<UserEntity> currentMembers,
-  ) {
+  void _addMembers() {
     showModalBottomSheet(
       context: context,
+      // Above the app shell, so the bottom nav bar can't sit on top of it
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) => AddMembersBottomSheet(
-        chatId: widget.chatId,
-        currentMembers: currentMembers,
-      ),
+      builder: (ctx) => AddMembersBottomSheet(chatId: widget.chatId),
     );
   }
 
-  void _confirmDeleteGroup(BuildContext context) {
-    showDialog(
+  Future<void> _removeMember(UserEntity member) async {
+    final confirmed = await DialogUtils.showConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.appBg,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: context.glassBorder),
-        ),
-        title: Text(
-          'Delete Group?',
-          style: TextStyle(
-            color: context.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: Text(
-          'This will permanently delete the group and all its messages for everyone. This cannot be undone.',
-          style: TextStyle(
-            color: context.textSecondary,
-            fontSize: 14,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => ctx.pop(),
-            child: Text('Cancel', style: TextStyle(color: context.textSecondary)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () async {
-              ctx.pop(); // close dialog
-              await ref
-                  .read(chatProvider.notifier)
-                  .deleteGroup(widget.chatId);
-              if (mounted) {
-                // Navigate back to home root using GoRouter
-                context.go('/');
-              }
-            },
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
+      title: 'Remove ${member.username}?',
+      message: 'They will stop receiving messages from this group.',
+      confirmLabel: 'Remove',
+      confirmColor: Colors.redAccent,
     );
+    if (!confirmed) return;
+    await _run(
+      () => ref
+          .read(chatProvider.notifier)
+          .removeMember(widget.chatId, member.id),
+    );
+  }
+
+  Future<void> _deleteGroup() async {
+    final confirmed = await DialogUtils.showConfirmDialog(
+      context: context,
+      title: 'Delete Group?',
+      message:
+          'This permanently deletes the group and all its messages for '
+          "everyone. This can't be undone.",
+      confirmLabel: 'Delete',
+      confirmColor: Colors.redAccent,
+    );
+    if (!confirmed) return;
+    await _run(() async {
+      await ref.read(chatProvider.notifier).deleteGroup(widget.chatId);
+      if (mounted) context.go('/');
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final chatState = ref.watch(chatProvider);
-    final chats = chatState.chats.where((c) => c.id == widget.chatId).toList();
+    final chat = ref.watch(
+      chatProvider.select(
+        (s) => s.chats.where((c) => c.id == widget.chatId).firstOrNull,
+      ),
+    );
 
-    if (chats.isEmpty) {
+    if (chat == null) {
       return Scaffold(
         backgroundColor: context.appBg,
         body: Center(
@@ -147,143 +144,141 @@ class _GroupProfileScreenState extends ConsumerState<GroupProfileScreen> {
       );
     }
 
-    final chat = chats.first;
-    final myId = ref.read(authProvider).user?.id;
-    final totalHeight = MediaQuery.of(context).size.height;
+    final myId = ref.watch(authProvider.select((s) => s.user?.id));
+    final isCreator = myId != null && chat.createdBy == myId;
 
-    // Image height dynamically squeezes as sheet moves from 50% (0.5) to 65% (0.65)
-    final imageHeight = totalHeight * (1.0 - _sheetExtent);
+    // Me first, then everyone else by name
+    final members = [...chat.participants]
+      ..sort((a, b) {
+        if (a.id == myId) return -1;
+        if (b.id == myId) return 1;
+        return a.username.toLowerCase().compareTo(b.username.toLowerCase());
+      });
+    final count = members.length;
 
-    return Scaffold(
-      backgroundColor: context.appBg,
-      body: NotificationListener<DraggableScrollableNotification>(
-        onNotification: (notification) {
-          setState(() {
-            _sheetExtent = notification.extent;
-          });
-          return true;
-        },
-        child: Stack(
+    return ProfilePageScaffold(
+      title: chat.name ?? 'Group',
+      subtitle: count == 1 ? '1 member' : '$count members',
+      imageUrl: chat.avatar,
+      leading: PhotoGlassButton(
+        icon: Icons.arrow_back_ios_new_rounded,
+        tooltip: 'Back',
+        onTap: () => Navigator.of(context).maybePop(),
+      ),
+      trailing: PhotoGlassButton(
+        icon: Icons.edit_rounded,
+        tooltip: 'Edit name',
+        onTap: () => _editName(chat),
+      ),
+      onChangePhoto: _pickAndUploadPhoto,
+      uploadingPhoto: _isUploading,
+      children: [
+        SettingsSection(
           children: [
-            // 1. Top Telegram-Style Image Header (occupies top ~50% and squeezes up to 35%)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: imageHeight,
-              child: ProfileHeaderImage(
-                avatarUrl: chat.avatar,
-                fallbackName: chat.name,
-                chatName: chat.name ?? 'Group',
-                memberCount: chat.participants.length,
-                isUploading: _isUploading,
-                onCameraTap: _pickAndUploadPhoto,
-                onAddMemberTap: () =>
-                    _showAddMemberDialog(context, chat.participants),
-                onEditNameTap: () => _editName(context, chat),
+            SettingsTile(
+              icon: Icons.person_add_alt_1_rounded,
+              iconColor: SettingsColors.blue,
+              title: 'Add Members',
+              onTap: _addMembers,
+            ),
+          ],
+        ),
+        SettingsSection(
+          title: 'Members',
+          dividerIndent: 70,
+          footer: isCreator
+              ? null
+              : 'Only the person who created the group can remove members.',
+          children: [
+            for (final member in members)
+              _MemberRow(
+                member: member,
+                isMe: member.id == myId,
+                isCreator: member.id == chat.createdBy,
+                onRemove: isCreator && member.id != myId
+                    ? () => _removeMember(member)
+                    : null,
+              ),
+          ],
+        ),
+        if (isCreator)
+          SettingsSection(
+            children: [
+              SettingsTile(
+                icon: Icons.delete_rounded,
+                iconColor: SettingsColors.red,
+                title: 'Delete Group',
+                destructive: true,
+                onTap: _deleteGroup,
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _MemberRow extends StatelessWidget {
+  final UserEntity member;
+  final bool isMe;
+  final bool isCreator;
+  final VoidCallback? onRemove;
+
+  const _MemberRow({
+    required this.member,
+    required this.isMe,
+    required this.isCreator,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: isMe ? null : () => context.push('/user-profile', extra: member),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+        child: Row(
+          children: [
+            UserAvatar(
+              name: member.username,
+              imageUrl: member.avatar,
+              isOnline: false,
+              size: 42,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                isMe ? 'You' : member.username,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontSize: 16,
+                  letterSpacing: -0.2,
+                ),
               ),
             ),
-
-            // 2. Back Navigation Button
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 8.h,
-              left: 12.w,
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => context.pop(),
+            if (isCreator)
+              Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: Text(
+                  'owner',
+                  style: TextStyle(color: context.textTertiary, fontSize: 13.5),
+                ),
               ),
-            ),
-
-            // 3. Telegram-Style Draggable Sheet (Initial: 50%, Max: 65%)
-            DraggableScrollableSheet(
-              initialChildSize: 0.5,
-              minChildSize: 0.5,
-              maxChildSize: 0.65,
-              builder: (context, scrollController) {
-                return Container(
-                  decoration: BoxDecoration(
-                    color: context.appBg,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(24.r),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        blurRadius: 16,
-                        offset: const Offset(0, -4),
-                      ),
-                    ],
-                  ),
-                  child: ListView(
-                    controller: scrollController,
-                    padding: EdgeInsets.zero,
-                    children: [
-                      SizedBox(height: 12.h),
-                      Center(
-                        child: Container(
-                          width: 36.w,
-                          height: 4.h,
-                          decoration: BoxDecoration(
-                            color: context.textTertiary.withValues(alpha: 0.4),
-                            borderRadius: BorderRadius.circular(2.r),
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 16.h),
-                      MemberListSection(
-                        participants: chat.participants,
-                        currentUserId: myId,
-                        onAddPressed: () =>
-                            _showAddMemberDialog(context, chat.participants),
-                        onRemoveMember: (memberId) async {
-                          await ref
-                              .read(chatProvider.notifier)
-                              .removeMember(widget.chatId, memberId);
-                        },
-                      ),
-
-                      // Delete Group — only for the creator
-                      if (myId != null && chat.createdBy == myId) ...[  
-                        SizedBox(height: 8.h),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16.w),
-                          child: Divider(
-                            color: context.glassBorder,
-                            height: 1,
-                          ),
-                        ),
-                        SizedBox(height: 4.h),
-                        ListTile(
-                          leading: Container(
-                            width: 36.r,
-                            height: 36.r,
-                            decoration: BoxDecoration(
-                              color: AppColors.error.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(10.r),
-                            ),
-                            child: const Icon(
-                              Icons.delete_rounded,
-                              color: AppColors.error,
-                              size: 20,
-                            ),
-                          ),
-                          title: Text(
-                            'Delete Group',
-                            style: TextStyle(
-                              color: AppColors.error,
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          onTap: () => _confirmDeleteGroup(context),
-                        ),
-                        SizedBox(height: 8.h),
-                      ],
-                    ],
-                  ),
-                );
-              },
-            ),
+            if (onRemove != null)
+              IconButton(
+                tooltip: 'Remove from group',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(
+                  Icons.remove_circle_outline_rounded,
+                  color: Color(0xFFFF5A52),
+                  size: 22,
+                ),
+                onPressed: onRemove,
+              )
+            else
+              const SizedBox(width: 8),
           ],
         ),
       ),

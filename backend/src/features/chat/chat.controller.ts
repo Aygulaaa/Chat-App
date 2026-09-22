@@ -212,6 +212,52 @@ export const chatController = {
     }
   },
 
+  /**
+   * Add / replace / remove my emoji reaction on a message. Everyone who can
+   * see the message is told, each of them getting the list with reactions
+   * from people they block left out.
+   */
+  async setReaction(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+      const messageId = Number(req.params.messageId);
+      const emoji = typeof req.body?.emoji === 'string' ? req.body.emoji : '';
+
+      const requesterId = req.user.id;
+      const result = await chatService.setReaction(messageId, requesterId, emoji);
+
+      // Everyone gets the list with reactions from people they block removed
+      // — including the person who just reacted, whose HTTP answer would
+      // otherwise race (and win) against their own filtered socket event.
+      const reactorIds = result.reactions.map((r) => Number(r.userId));
+      const blocked = await chatRepository.blockedPairs([
+        ...new Set([...result.recipientIds, ...reactorIds, requesterId]),
+      ]);
+      const visibleTo = (memberId: number) =>
+        result.reactions.filter(
+          (r) => !blocked.has(`${memberId}:${Number(r.userId)}`)
+        );
+
+      res.json({
+        messageId,
+        chatId: result.chatId,
+        reactions: visibleTo(requesterId),
+      });
+
+      const io = req.app.get('io');
+      if (!io) return;
+      for (const memberId of result.recipientIds) {
+        io.to(`user_${memberId}`).emit('message_reaction', {
+          chatId: result.chatId,
+          messageId,
+          reactions: visibleTo(memberId),
+        });
+      }
+    } catch (err) {
+      fail(res, err, 'Failed to react to message', 'setReaction');
+    }
+  },
+
   /** "Message Info": who has received / read one of MY messages. */
   async getMessageReceipts(req: AuthRequest, res: Response) {
     try {

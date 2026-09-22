@@ -8,10 +8,15 @@ class StickerStrip extends StatelessWidget {
   final bool isMe;
   final void Function(String emoji) onTap;
 
+  /// The emoji already on the message from me — drawn with a filled circle
+  /// behind it, so tapping it again clearly means "take it off".
+  final String? selected;
+
   const StickerStrip({
     super.key,
     required this.isMe,
     required this.onTap,
+    this.selected,
   });
 
   @override
@@ -45,6 +50,7 @@ class StickerStrip extends StatelessWidget {
           itemBuilder: (context, index) {
             return _StickerButton(
               emoji: kStickers[index],
+              isSelected: kStickers[index] == selected,
               onTap: () => onTap(kStickers[index]),
             );
           },
@@ -57,8 +63,13 @@ class StickerStrip extends StatelessWidget {
 class _StickerButton extends StatefulWidget {
   final String emoji;
   final VoidCallback onTap;
+  final bool isSelected;
 
-  const _StickerButton({required this.emoji, required this.onTap});
+  const _StickerButton({
+    required this.emoji,
+    required this.onTap,
+    this.isSelected = false,
+  });
 
   @override
   State<_StickerButton> createState() => _StickerButtonState();
@@ -99,9 +110,18 @@ class _StickerButtonState extends State<_StickerButton>
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 4.h),
           child: Center(
-            child: Text(
-              widget.emoji,
-              style: TextStyle(fontSize: 22.sp),
+            child: Container(
+              padding: EdgeInsets.all(5.r),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: widget.isSelected
+                    ? context.primaryColor.withValues(alpha: 0.22)
+                    : Colors.transparent,
+              ),
+              child: Text(
+                widget.emoji,
+                style: TextStyle(fontSize: 22.sp),
+              ),
             ),
           ),
         ),

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/upload_progress.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message/uploading_file_tile.dart';
 
 import 'package:my_chat_app/core/theme/app_colors.dart';
@@ -13,10 +14,14 @@ class MessageContent extends StatelessWidget {
   final Message message;
   final bool isMe;
 
+  /// Cancels this message's upload (shown as ✕ on the progress bar).
+  final VoidCallback? onCancelUpload;
+
   const MessageContent({
     super.key,
     required this.message,
     required this.isMe,
+    this.onCancelUpload,
   });
 
   bool get _isUploading => message.status == MessageStatus.uploading;
@@ -89,21 +94,26 @@ class MessageContent extends StatelessWidget {
           formattedTime: formattedTime,
           isMe: isMe,
           statusIcon: isMe ? _buildStatusIcon(colors) : null,
+          onCancelUpload: onCancelUpload,
         );
 
       case MessageType.audio:
         if (_isUploading) {
           return _withPadding(
             UploadingFileTile(
-              icon: Icons.audiotrack_rounded,
-              label: message.originalName ?? 'Audio',
+              icon: Icons.mic_rounded,
+              label: (message.originalName ?? '').startsWith('recording_')
+                  ? 'Voice message'
+                  : (message.originalName ?? 'Audio'),
               fileSize: message.fileSize,
               uploadedBytes: message.uploadedBytes,
+              onCancel: onCancelUpload,
               color: const Color(0xFF4CC9F0),
             ),
           );
         }
-        if (_isError) {
+        // A row without a URL (bad data) must not crash the whole list
+        if (_isError || message.fileUrl == null) {
           return _withPadding(
             FileTile(
               icon: Icons.audiotrack_rounded,
@@ -129,6 +139,7 @@ class MessageContent extends StatelessWidget {
               label: message.originalName ?? 'Document.pdf',
               fileSize: message.fileSize,
               uploadedBytes: message.uploadedBytes,
+              onCancel: onCancelUpload,
               color: AppColors.error,
             ),
           );
@@ -151,6 +162,7 @@ class MessageContent extends StatelessWidget {
               label: message.originalName ?? 'Archive',
               fileSize: message.fileSize,
               uploadedBytes: message.uploadedBytes,
+              onCancel: onCancelUpload,
               color: Colors.orangeAccent,
             ),
           );
@@ -173,6 +185,7 @@ class MessageContent extends StatelessWidget {
               label: message.originalName ?? 'File',
               fileSize: message.fileSize,
               uploadedBytes: message.uploadedBytes,
+              onCancel: onCancelUpload,
               color: colors.textSecondary,
             ),
           );
@@ -203,6 +216,8 @@ class MessageContent extends StatelessWidget {
   Widget _buildImageContent(BuildContext context, String formattedTime, AppColorScheme colors) {
     Widget imageWidget;
 
+    final hasUrl = message.fileUrl != null && message.fileUrl!.isNotEmpty;
+
     if ((_isUploading || _isError) && message.localPath != null) {
       imageWidget = Image.file(
         File(message.localPath!),
@@ -210,7 +225,7 @@ class MessageContent extends StatelessWidget {
         height: 190,
         fit: BoxFit.cover,
       );
-    } else if (_isUploading || _isError) {
+    } else if (_isUploading || _isError || !hasUrl) {
       imageWidget = Container(
         width: 260,
         height: 190,
@@ -237,16 +252,31 @@ class MessageContent extends StatelessWidget {
                   ),
                 ),
               ),
+        // A dead link used to render Flutter's red error box in the chat
+        errorBuilder: (_, _, _) => Container(
+          width: 260,
+          height: 190,
+          color: colors.card,
+          child: Center(
+            child: Icon(
+              Icons.broken_image_outlined,
+              color: colors.textTertiary,
+              size: 36,
+            ),
+          ),
+        ),
       );
     }
 
     return GestureDetector(
-      onTap: (_isUploading || _isError)
+      onTap: (_isUploading || _isError || !hasUrl)
           ? null
           : () {
               context.push('/image-viewer', extra: {
                 'url': message.fileUrl!,
                 'title': message.originalName,
+                // A photo someone sent you in a chat is yours to keep
+                'canDownload': true,
               });
             },
       child: ClipRRect(
@@ -254,7 +284,12 @@ class MessageContent extends StatelessWidget {
         child: Stack(
           children: [
             imageWidget,
-            if (_isUploading) _buildUploadOverlay(colors),
+            if (_isUploading)
+              MediaUploadOverlay(
+                uploadedBytes: message.uploadedBytes,
+                totalBytes: message.fileSize,
+                onCancel: onCancelUpload,
+              ),
             if (!_isUploading) _buildTimeOverlay(formattedTime, colors),
           ],
         ),
@@ -278,7 +313,8 @@ class MessageContent extends StatelessWidget {
             Text(
               formattedTime,
               style: TextStyle(
-                color: colors.textPrimary.withValues(alpha: 0.9),
+                // Always white — the pill is black in both themes
+                color: Colors.white.withValues(alpha: 0.92),
                 fontSize: 11,
                 fontWeight: FontWeight.w400,
               ),
@@ -288,44 +324,6 @@ class MessageContent extends StatelessWidget {
               _buildStatusIcon(colors),
             ],
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUploadOverlay(AppColorScheme colors) {
-    final uploaded = message.uploadedBytes ?? 0;
-    final total = message.fileSize ?? 1;
-    final progress = (uploaded / total).clamp(0.0, 1.0);
-
-    return Positioned.fill(
-      child: Container(
-        color: Colors.black.withValues(alpha: 0.6),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 36,
-                height: 36,
-                child: CircularProgressIndicator(
-                  value: progress > 0 ? progress : null,
-                  strokeWidth: 2.5,
-                  color: colors.textPrimary,
-                  backgroundColor: Colors.white24,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${_formatBytes(uploaded)} / ${_formatBytes(total)}',
-                style: TextStyle(
-                  color: colors.textPrimary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

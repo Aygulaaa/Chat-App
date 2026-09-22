@@ -13,7 +13,7 @@ abstract class DialogUtils {
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: context.cardBg,
+        backgroundColor: context.modalBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           title,

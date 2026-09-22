@@ -14,7 +14,7 @@ class BlockedList extends ConsumerWidget {
     final blockedAsync = ref.watch(blockedContactsProvider);
 
     return blockedAsync.when(
-      loading: () => const Center(
+      loading: () => Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       ),
       error: (e, _) => Center(

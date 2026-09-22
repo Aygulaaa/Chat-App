@@ -142,6 +142,8 @@ export const chatSocket = (io: Server) => {
       }
 
       socket.data.user = socket.user;
+      // Until the client says otherwise, a fresh connection is a live app.
+      socket.data.foreground = true;
 
       if (disconnectTimers.has(userId)) {
         clearTimeout(disconnectTimers.get(userId));
@@ -168,14 +170,16 @@ export const chatSocket = (io: Server) => {
       // Every payload below comes straight from the client: it may be null,
       // a string, or have any shape. Never destructure it in the signature —
       // a `null` payload would throw before our try/catch even starts.
+      // Joining is only about receiving a chat's events. It must NOT mark the
+      // chat as the one on screen: the client re-joins EVERY chat it has open
+      // after a reconnect, which used to leave activeChatId pointing at
+      // whichever chat happened to be last — and silenced that chat's pushes.
       socket.on("join_chat", async (payload: { chatId?: unknown } | null) => {
         try {
           const chatId = parseId(payload?.chatId);
           if (!socket.user || !chatId) return;
-          // Only members may mark a chat as "open" (it suppresses their pushes)
           if (!(await chatRepository.isMember(chatId, socket.user.id))) return;
           socket.join(`chat_${chatId}`);
-          socket.data.activeChatId = chatId;
         } catch (error) {
           console.error("join_chat error:", error);
         }
@@ -184,7 +188,33 @@ export const chatSocket = (io: Server) => {
       socket.on("leave_chat", (payload: { chatId?: unknown } | null) => {
         const chatId = parseId(payload?.chatId);
         if (chatId) socket.leave(`chat_${chatId}`);
-        socket.data.activeChatId = null;
+        if (chatId == null || socket.data.activeChatId === chatId) {
+          socket.data.activeChatId = null;
+        }
+      });
+
+      // The chat this device currently has ON SCREEN (null = none). It is the
+      // only thing that suppresses a push, so the client sends it when a
+      // conversation opens and clears it when it closes.
+      socket.on("active_chat", async (payload: { chatId?: unknown } | null) => {
+        try {
+          const chatId = parseId(payload?.chatId);
+          if (!chatId) {
+            socket.data.activeChatId = null;
+            return;
+          }
+          if (!socket.user) return;
+          if (!(await chatRepository.isMember(chatId, socket.user.id))) return;
+          socket.data.activeChatId = chatId;
+        } catch (error) {
+          console.error("active_chat error:", error);
+        }
+      });
+
+      // Backgrounded apps keep their socket alive for a while. While that
+      // lasts the open chat is NOT on screen, so pushes must still be sent.
+      socket.on("app_state", (payload: { foreground?: unknown } | null) => {
+        socket.data.foreground = payload?.foreground !== false;
       });
 
       socket.on("typing", (payload: { chatId?: unknown } | null) => {

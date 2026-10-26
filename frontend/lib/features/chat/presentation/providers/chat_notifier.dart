@@ -17,6 +17,7 @@ import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_state.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
+import 'package:my_chat_app/features/notification/presentation/providers/notification_provider.dart';
 
 part 'chat_notifier.g.dart';
 
@@ -325,6 +326,12 @@ class ChatNotifier extends _$ChatNotifier {
         final myId = ref.read(authProvider).user?.id;
         final readBy = int.tryParse(data['readBy']?.toString() ?? '');
         final bool iReadIt = readBy != null && readBy == myId;
+
+        // I read this chat — here or on another device. Either way its
+        // notifications are stale now, so clear them from the tray.
+        if (iReadIt) {
+          ref.read(fcmServiceProvider).cancelChatNotifications(chatId);
+        }
 
         final messageIds = ((data['messageIds'] as List?) ?? const [])
             .map((e) => int.tryParse(e.toString()))

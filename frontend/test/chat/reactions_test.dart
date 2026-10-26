@@ -7,6 +7,7 @@ import 'package:my_chat_app/features/chat/data/models/message_model.dart';
 import 'package:my_chat_app/features/chat/domain/entities/message.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message/message_bubble.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message/reaction_row.dart';
+import 'package:my_chat_app/features/chat/presentation/widgets/message/sticker_strip.dart';
 
 const me = 1;
 const them = 2;
@@ -178,6 +179,39 @@ void main() {
         MessageBubble(message: msg(), isMe: false, currentUserId: me, time: '10:10'),
       );
       expect(find.byType(ReactionRow), findsNothing);
+    });
+  });
+
+  // Reacting is a TOGGLE on the server: the same emoji twice means "take it
+  // off". A single tap that reaches the callback twice therefore added the
+  // reaction and immediately removed it again.
+  group('one tap = one reaction', () {
+    testWidgets('the sticker strip reports a tap exactly once', (tester) async {
+      final tapped = <String>[];
+      await pump(
+        tester,
+        StickerStrip(isMe: false, onTap: tapped.add),
+      );
+
+      await tester.tap(find.text('❤️'));
+      await tester.pumpAndSettle();
+
+      expect(tapped, ['❤️']);
+    });
+
+    testWidgets('a second tap on the same button is swallowed', (tester) async {
+      final tapped = <String>[];
+      await pump(
+        tester,
+        StickerStrip(isMe: false, onTap: tapped.add),
+      );
+
+      // An impatient double tap must not add-then-remove the reaction.
+      await tester.tap(find.text('👍'));
+      await tester.tap(find.text('👍'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      expect(tapped, ['👍']);
     });
   });
 }

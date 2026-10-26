@@ -344,8 +344,17 @@ class MessageNotifier extends _$MessageNotifier {
     final myId = ref.read(authProvider).user?.id;
     if (myId == null) return;
 
-    final before = message.reactions;
-    final mine = message.reactionOf(myId);
+    // The server call is a TOGGLE, so sending it twice for one tap adds the
+    // reaction and then takes it straight back off. A repeat tap that lands
+    // while the first is still in flight is therefore dropped, not queued.
+    if (!_reactionsInFlight.add(message.id)) return;
+
+    // Read the current reactions from state, not from `message`: the widget
+    // that handed us this object may have been built before the last update.
+    final current =
+        state.messages.where((m) => m.id == message.id).firstOrNull ?? message;
+    final before = current.reactions;
+    final mine = current.reactionOf(myId);
     final optimistic = [
       for (final r in before)
         if (r.userId != myId) r,
@@ -362,8 +371,13 @@ class MessageNotifier extends _$MessageNotifier {
     } catch (_) {
       // Put back exactly what was there before the tap
       if (ref.mounted) _applyReactions(message.id, before);
+    } finally {
+      _reactionsInFlight.remove(message.id);
     }
   }
+
+  /// Message ids with a reaction request on the wire right now.
+  final Set<int> _reactionsInFlight = {};
 
   /// Removes a message and clears the quote on any reply that pointed at it
   /// (mirrors the database's ON DELETE SET NULL).

@@ -16,6 +16,7 @@ import 'package:my_chat_app/features/chat/presentation/widgets/message/message_i
 import 'package:my_chat_app/features/chat/presentation/widgets/message/message_input.dart';
 import 'package:my_chat_app/features/chat/presentation/widgets/message/message_list.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
+import 'package:my_chat_app/features/notification/presentation/providers/notification_provider.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final int chatId;
@@ -39,6 +40,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       await _socketDataSource.joinChat(widget.chatId);
       await _socketDataSource.markChatAsRead(widget.chatId);
       ref.read(chatProvider.notifier).resetUnreadCount(widget.chatId);
+      // Opening the chat reads it, so its notifications have served their
+      // purpose — take them out of the tray.
+      await ref.read(fcmServiceProvider).cancelChatNotifications(widget.chatId);
     });
   }
 

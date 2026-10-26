@@ -20,20 +20,30 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       const InitializationSettings(android: androidSettings, iOS: iosSettings),
     );
 
-    const androidDetails = AndroidNotificationDetails(
+    // Same per-chat tag the server puts on notification-type pushes, so a
+    // chat has ONE notification however it was posted — and one that the app
+    // can clear by tag once the chat is read.
+    final chatId = int.tryParse(message.data['chatId']?.toString() ?? '');
+    final tag = message.data['tag']?.toString() ??
+        (chatId != null ? FcmService.chatTag(chatId) : null);
+
+    final androidDetails = AndroidNotificationDetails(
       'chat_messages',
       'Chat Messages',
       channelDescription: 'Notifications for incoming chat messages',
       importance: Importance.max,
       priority: Priority.high,
       icon: '@mipmap/ic_notification',
+      tag: tag,
     );
 
     final title = message.data['title'] ?? 'New Message';
     final body = message.data['body'] ?? message.data['text'] ?? '';
 
     await localNotifications.show(
-      message.hashCode,
+      // Keyed by chat so a later message replaces this one instead of
+      // stacking, and so cancelling by chat id finds it.
+      chatId ?? message.hashCode,
       title,
       body,
       NotificationDetails(android: androidDetails, iOS: const DarwinNotificationDetails()),
@@ -59,6 +69,32 @@ class FcmService {
 
   static void registerBackgroundHandler() {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
+
+  /// The tag every notification for one chat carries. Must match the server's
+  /// `chatNotificationTag` in notificationService.ts.
+  static String chatTag(int chatId) => 'chat_$chatId';
+
+  /// Clears the notification tray for one chat — call it once the messages in
+  /// it have actually been read, so a chat the user has already opened does
+  /// not keep sitting in the shade.
+  ///
+  /// Android: notifications are addressed by (tag, id). The Firebase SDK posts
+  /// notification-type pushes as `notify(tag, 0)`, while the background
+  /// handler above posts data-only ones under the chat id — so both are
+  /// cancelled here.
+  ///
+  /// iOS: only notifications this app posted itself can be removed by
+  /// identifier. Ones the system displayed from an APNs payload are replaced
+  /// (via `apns-collapse-id`) rather than removed, and clear when tapped.
+  Future<void> cancelChatNotifications(int chatId) async {
+    final tag = chatTag(chatId);
+    try {
+      await _localNotifications.cancel(0, tag: tag);
+      await _localNotifications.cancel(chatId, tag: tag);
+    } catch (e) {
+      debugPrint('❌ Failed to clear notifications for chat $chatId: $e');
+    }
   }
 
   Future<void> initialize({

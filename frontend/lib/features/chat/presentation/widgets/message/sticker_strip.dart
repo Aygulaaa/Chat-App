@@ -98,12 +98,20 @@ class _StickerButtonState extends State<_StickerButton>
     super.dispose();
   }
 
+  /// One tap = one reaction. The callback toggles on the server, so a second
+  /// delivery would undo the first; the pop animation must not gate it.
+  bool _tapped = false;
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
+        if (_tapped) return;
+        _tapped = true;
         _ctrl.forward().then((_) => _ctrl.reverse());
-        Future.delayed(const Duration(milliseconds: 80), widget.onTap);
+        // Fired immediately: the 80ms delay this used to wait out only
+        // widened the window for a second tap to land.
+        widget.onTap();
       },
       child: ScaleTransition(
         scale: _scale,

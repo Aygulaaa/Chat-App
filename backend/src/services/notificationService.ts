@@ -12,8 +12,18 @@ interface SendChatPushPayload {
   senderId: number | string;
 }
 
+/**
+ * All notifications for one chat share this key. It makes a chat's messages
+ * collapse into a single notification instead of stacking, and — the reason it
+ * exists — gives the app a handle it can use to clear that chat's notification
+ * once the messages have actually been read.
+ */
+const chatNotificationTag = (chatId: number | string) => `chat_${chatId}`;
+
 export async function sendChatPushNotification(payload: SendChatPushPayload): Promise<void> {
   if (!messaging || !payload.fcmToken) return;
+
+  const tag = chatNotificationTag(payload.chatId);
 
   try {
     await messaging.send({
@@ -27,6 +37,7 @@ export async function sendChatPushNotification(payload: SendChatPushPayload): Pr
         senderId: String(payload.senderId),
         title: String(payload.title),
         body: String(payload.body),
+        tag,
         click_action: 'FLUTTER_NOTIFICATION_CLICK',
       },
       android: {
@@ -35,13 +46,20 @@ export async function sendChatPushNotification(payload: SendChatPushPayload): Pr
           sound: 'default',
           channelId: 'chat_messages',
           priority: 'max',
+          // Posted as notify(tag, 0) — one notification per chat, and the
+          // client cancels it by this exact tag when the chat is read.
+          tag,
         },
       },
       apns: {
+        // Replaces this chat's previous notification rather than adding to it.
+        headers: { 'apns-collapse-id': tag },
         payload: {
           aps: {
             sound: 'default',
             badge: 1,
+            // Groups a chat's notifications together in the iOS tray.
+            'thread-id': tag,
           },
         },
       },

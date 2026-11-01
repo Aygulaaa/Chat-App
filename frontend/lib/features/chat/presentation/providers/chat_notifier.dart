@@ -37,9 +37,17 @@ class ChatNotifier extends _$ChatNotifier {
 
   @override
   ChatState build() {
-    ref.onDispose(() {
-      _cancelSubscriptions();
-    });
+    // Keep this provider independent from AuthNotifier: AuthNotifier must
+    // never invalidate us (that is a CircularDependencyError). Watching the
+    // auth state instead makes Riverpod rebuild us on login AND logout.
+    final auth = ref.watch(authProvider);
+    final userId = auth.user?.id;
+
+    ref.onDispose(_cancelSubscriptions);
+
+    // Logged out: drop the previous account's chats. AuthNotifier has already
+    // cleared the Hive cache, so the next login starts from a clean slate.
+    if (auth.isLoading || userId == null) return const ChatState();
 
     Future.microtask(() => _initBlocked());
 
@@ -98,6 +106,9 @@ class ChatNotifier extends _$ChatNotifier {
     } catch (_) {}
 
     if (!ref.mounted) return;
+
+    // The user may have logged out while the blocked list was loading.
+    if (ref.read(authProvider).user == null) return;
 
     ref.listen<AsyncValue<List<dynamic>>>(blockedContactsProvider, (_, next) {
       if (!ref.mounted) return;
@@ -414,6 +425,9 @@ class ChatNotifier extends _$ChatNotifier {
   // ─────────────────────────── LOAD CHATS ──────────────────────────────────
 
   Future<void> loadChats() async {
+    // Never talk to the server (or the socket) while logged out.
+    if (ref.read(authProvider).user == null) return;
+
     bool hasCache = false;
     if (Hive.isBoxOpen('chats_cache')) {
       final box = Hive.box<String>('chats_cache');

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/user_status_state.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
@@ -20,10 +21,19 @@ class UserStatusNotifier extends _$UserStatusNotifier {
 
   @override
   UserStatusState build() {
+    // Watching the auth state keeps this provider reset automatically on
+    // logout/login. AuthNotifier must not invalidate it: blockedContactsProvider
+    // already depends on authProvider, so invalidating us from auth would throw
+    // a CircularDependencyError.
+    final auth = ref.watch(authProvider);
+
     ref.onDispose(() {
       _statusSub?.cancel();
       _initialOnlineSub?.cancel();
     });
+
+    // Logged out: stay idle and never touch the socket.
+    if (auth.isLoading || auth.user == null) return const UserStatusState();
 
     Future.microtask(() => _initBlocked());
     return const UserStatusState();
@@ -37,6 +47,9 @@ class UserStatusNotifier extends _$UserStatusNotifier {
     } catch (_) {}
 
     if (!ref.mounted) return;
+
+    // The user may have logged out while the blocked list was loading.
+    if (ref.read(authProvider).user == null) return;
 
     ref.listen<AsyncValue<List<dynamic>>>(blockedContactsProvider, (_, next) {
       if (!ref.mounted) return;
@@ -63,10 +76,17 @@ class UserStatusNotifier extends _$UserStatusNotifier {
     });
 
     _init();
+
+    // The user may have logged out while the blocked list was loading.
+    if (ref.read(authProvider).user == null) return;
+
     ref.read(chatSocketDataSourceProvider).requestOnlineUsers();
   }
 
   void _init() {
+    // Logged out (or before auth restored the session) — stay idle.
+    if (ref.read(authProvider).user == null) return;
+
     final datasource = ref.read(chatSocketDataSourceProvider);
 
     _statusSub?.cancel();

@@ -22,13 +22,9 @@ import 'package:my_chat_app/features/auth/domain/usecases/register_user.dart';
 import 'package:my_chat_app/features/auth/domain/usecases/get_currect_user.dart';
 
 // Cross-feature providers
-import 'package:my_chat_app/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.dart';
 import 'package:my_chat_app/features/chat/presentation/providers/send_queue.dart';
-import 'package:my_chat_app/features/chat/presentation/providers/user_status_notifier.dart';
-import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:my_chat_app/features/notification/presentation/providers/notification_provider.dart';
-import 'package:my_chat_app/features/profile/presentation/providers/user_provider.dart';
 
 import 'auth_state.dart';
 
@@ -106,12 +102,12 @@ class AuthNotifier extends _$AuthNotifier {
         }
       } catch (_) {}
 
-      ref.invalidate(userProfileProvider);
+      // FCM token synced; userProfileProvider automatically updates via authProvider watch.
     } catch (_) {}
   }
 
   Future<void> login(String username, String password) async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(isLoading: true, error: null, retryAfterSeconds: 0);
     try {
       final user = await ref
           .read(loginUserProvider)
@@ -124,12 +120,16 @@ class AuthNotifier extends _$AuthNotifier {
         await _initializePostAuthSession(token);
       }
     } catch (e) {
-      state = state.copyWith(error: _formatErrorMessage(e), isLoading: false);
+      state = state.copyWith(
+        error: _formatErrorMessage(e),
+        isLoading: false,
+        retryAfterSeconds: e is ApiException ? e.retryAfter : null,
+      );
     }
   }
 
   Future<void> register(String username, String password) async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(isLoading: true, error: null, retryAfterSeconds: 0);
     try {
       final user = await ref
           .read(registerUserProvider)
@@ -142,7 +142,11 @@ class AuthNotifier extends _$AuthNotifier {
         await _initializePostAuthSession(token);
       }
     } catch (e) {
-      state = state.copyWith(error: _formatErrorMessage(e), isLoading: false);
+      state = state.copyWith(
+        error: _formatErrorMessage(e),
+        isLoading: false,
+        retryAfterSeconds: e is ApiException ? e.retryAfter : null,
+      );
     }
   }
 
@@ -260,17 +264,18 @@ class AuthNotifier extends _$AuthNotifier {
       await ref.read(secureStorageProvider).deleteToken();
       ref.read(apiClientProvider).setToken('');
 
+      // AuthNotifier must stay at the TOP of the dependency graph: it may
+      // never invalidate a provider that watches it (directly or through
+      // another provider). Riverpod throws CircularDependencyError for that,
+      // and every such provider would race the state change anyway.
+      // Instead, each consumer watches authProvider and resets itself:
+      //   contactsProvider / blockedContactsProvider / userProfileProvider /
+      //   settingsProvider / chatProvider / userStatusProvider.
       state = const AuthState(isLoading: false);
 
-      // These providers are keepAlive: without a reset the NEXT account to log
-      // in on this device would see the previous user's chats, contacts and
-      // profile straight from memory.
+      // sendQueueProvider does not depend on authProvider, so clearing it here
+      // is safe. It just drops outgoing work that belongs to the old account.
       ref.read(sendQueueProvider.notifier).clear();
-      ref.invalidate(chatProvider);
-      ref.invalidate(contactsProvider);
-      ref.invalidate(blockedContactsProvider);
-      ref.invalidate(userStatusProvider);
-      ref.invalidate(userProfileProvider);
 
       _isLoggingOut = false;
     }
@@ -328,7 +333,7 @@ class AuthNotifier extends _$AuthNotifier {
 
   void clearError() {
     if (state.error != null) {
-      state = state.copyWith(clearError: true);
+      state = state.copyWith(clearError: true, retryAfterSeconds: 0);
     }
   }
 

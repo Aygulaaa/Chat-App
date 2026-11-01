@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +8,7 @@ import 'package:my_chat_app/core/theme/theme_ext.dart';
 import 'package:my_chat_app/core/utils/error_handler.dart';
 import 'package:my_chat_app/core/widgets/secure_flow_widgets.dart';
 import 'package:my_chat_app/features/auth/presentation/providers/auth_provider.dart';
+import 'package:my_chat_app/features/auth/presentation/providers/auth_state.dart';
 import 'package:my_chat_app/features/auth/presentation/widgets/auth_text_field.dart';
 
 class AuthForm extends ConsumerStatefulWidget {
@@ -30,6 +33,11 @@ class _AuthFormState extends ConsumerState<AuthForm> {
 
   bool _isLogin = true;
 
+  /// Seconds left on the server-side brute-force lockout countdown.
+  int _lockoutSeconds = 0;
+
+  Timer? _lockoutTimer;
+
   /// Field errors stay hidden until the first submit attempt — nobody wants
   /// to be told "too short" while typing the second character.
   bool _submitted = false;
@@ -44,6 +52,7 @@ class _AuthFormState extends ConsumerState<AuthForm> {
 
   @override
   void dispose() {
+    _lockoutTimer?.cancel();
     _username.dispose();
     _password.dispose();
     _confirm.dispose();
@@ -97,6 +106,8 @@ class _AuthFormState extends ConsumerState<AuthForm> {
 
   void _submit() {
     if (ref.read(authProvider).isLoading) return;
+    // Still cooling down from a brute-force lockout — the server said wait.
+    if (ref.read(authProvider).isLockedOut) return;
 
     setState(() => _submitted = true);
     if (_usernameError != null ||
@@ -135,6 +146,25 @@ class _AuthFormState extends ConsumerState<AuthForm> {
         ? null
         : ErrorHandler.getReadableErrorMessage(state.error);
 
+    // Brute-force lockout countdown — the server tells us how long to wait.
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      final seconds = next.retryAfterSeconds;
+      if (seconds != null && seconds > 0) {
+        if (seconds != _lockoutSeconds) setState(() => _lockoutSeconds = seconds);
+        _lockoutTimer?.cancel();
+        _lockoutTimer = Timer(Duration(seconds: seconds), () {
+          if (!mounted) return;
+          setState(() => _lockoutSeconds = 0);
+          final error = ref.read(authProvider).error;
+          if (error != null) ref.read(authProvider.notifier).clearError();
+        });
+      } else {
+        if (_lockoutSeconds > 0) setState(() => _lockoutSeconds = 0);
+        _lockoutTimer?.cancel();
+        _lockoutTimer = null;
+      }
+    });
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
@@ -159,7 +189,12 @@ class _AuthFormState extends ConsumerState<AuthForm> {
                       child: Center(
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 420),
-                          child: _buildContent(context, loading, serverError),
+                          child: _buildContent(
+                        context,
+                        loading,
+                        serverError,
+                        lockoutSeconds: _lockoutSeconds,
+                      ),
                         ),
                       ),
                     ),
@@ -176,8 +211,9 @@ class _AuthFormState extends ConsumerState<AuthForm> {
   Widget _buildContent(
     BuildContext context,
     bool loading,
-    String? serverError,
-  ) {
+    String? serverError, {
+    int lockoutSeconds = 0,
+  }) {
     return AutofillGroup(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -290,18 +326,26 @@ class _AuthFormState extends ConsumerState<AuthForm> {
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOutCubic,
             alignment: Alignment.topCenter,
-            child: serverError == null || serverError.isEmpty
-                ? const SizedBox(width: double.infinity)
-                : Padding(
+            child: lockoutSeconds > 0
+                ? Padding(
                     padding: const EdgeInsets.only(top: 16),
-                    child: _ErrorBanner(message: serverError),
-                  ),
+                    child: _ErrorBanner(
+                      message:
+                          'Too many failed attempts. Try again in ${lockoutSeconds} seconds.',
+                    ),
+                  )
+                : serverError == null || serverError.isEmpty
+                    ? const SizedBox(width: double.infinity)
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: _ErrorBanner(message: serverError),
+                      ),
           ),
           const SizedBox(height: 22),
           FlowPrimaryButton(
             label: _isLogin ? 'Log In' : 'Create Account',
             loading: loading,
-            onPressed: _hasInput ? _submit : null,
+            onPressed: (_hasInput && lockoutSeconds <= 0) ? _submit : null,
           ),
           const SizedBox(height: 20),
           Center(

@@ -11,6 +11,9 @@ import 'package:device_info_plus/device_info_plus.dart';
 /// apart from "the server hiccuped" (5xx) instead of string-matching messages.
 /// `toString()` keeps the old `Exception: <message>` shape on purpose — a lot
 /// of UI code strips that prefix before showing the text.
+///
+/// `retryAfter` is set for throttling-style responses (429 Too Many Attempts)
+/// and carries the server's suggested wait time in seconds.
 class ApiException implements Exception {
   /// Pseudo status codes for failures that never reached the server.
   static const int noConnection = 0;
@@ -18,8 +21,9 @@ class ApiException implements Exception {
 
   final int statusCode;
   final String message;
+  final int? retryAfter;
 
-  const ApiException(this.statusCode, this.message);
+  const ApiException(this.statusCode, this.message, {this.retryAfter});
 
   bool get isUnauthorized => statusCode == 401;
 
@@ -202,7 +206,12 @@ class ApiClient {
             ? data['message'].toString()
             : 'Request failed with status: ${response.statusCode}';
 
-    throw ApiException(response.statusCode, errorMessage);
+    final retryAfter =
+        data is Map && data['retryAfter'] != null
+            ? (data['retryAfter'] as num?)?.toInt()
+            : null;
+
+    throw ApiException(response.statusCode, errorMessage, retryAfter: retryAfter);
   }
 
   Future<dynamic> postMultipartBytes(

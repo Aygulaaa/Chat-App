@@ -41,8 +41,8 @@ class ContactsNotifier extends _$ContactsNotifier {
   Future<List<Contact>> build() async {
     final auth = ref.watch(authProvider);
 
-    if (auth.isLoading) {
-      throw Exception("Auth loading");
+    if (auth.isLoading || auth.user == null) {
+      return [];
     }
 
     final repo = ref.read(contactsRepositoryProvider);
@@ -138,6 +138,11 @@ class BlockedContactsNotifier extends _$BlockedContactsNotifier {
 
   @override
   Future<List<Contact>> build() async {
+    final auth = ref.watch(authProvider);
+    if (auth.isLoading || auth.user == null) {
+      return [];
+    }
+
     final repo = ref.read(contactsRepositoryProvider);
     _getBlocked = GetBlockedContacts(repo);
     return _fetchData();

@@ -76,6 +76,8 @@ class MessageNotifier extends _$MessageNotifier {
 
   Future<void> _init() async {
     if (!ref.mounted) return;
+    // Logged out (or auth still restoring): never join/fetch while unauthenticated.
+    if (ref.read(authProvider).user == null) return;
 
     final datasource = ref.read(chatSocketDataSourceProvider);
 
@@ -455,6 +457,9 @@ class MessageNotifier extends _$MessageNotifier {
   // ─────────────────────────── LOAD MESSAGES ───────────────────────────────
 
   Future<void> loadMessages() async {
+    // Logged out: nothing to load (and the server token is gone anyway).
+    if (ref.read(authProvider).user == null) return;
+
     state = state.copyWith(isLoading: state.messages.isEmpty, error: null);
 
     try {

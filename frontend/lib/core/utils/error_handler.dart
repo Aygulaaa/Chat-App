@@ -131,6 +131,18 @@ class ErrorHandler {
   }
 
   static String _fromApi(ApiException e) {
+    // Throttled / brute-force locked out: use the server's wait time.
+    if (e.statusCode == 429) {
+      final seconds = e.retryAfter ?? 900;
+      final minutes = (seconds / 60).round();
+      if (minutes > 0) {
+        return 'Too many failed login attempts. Wait about $minutes minutes '
+            'before trying again.';
+      }
+      return 'Too many failed login attempts. Wait a moment before trying '
+          'again.';
+    }
+
     final known = _knownMessage(e.message);
     if (known != null) return known;
 
@@ -149,9 +161,6 @@ class ErrorHandler {
       case 413:
         return 'That file is too large. The limit is 50 MB — try a smaller '
             'file or compress it first.';
-      case 429:
-        return 'Too many attempts. Please wait about 15 minutes before '
-            'trying again.';
     }
     if (e.statusCode >= 500) return _serverDown;
 
@@ -176,8 +185,7 @@ class ErrorHandler {
       return "That password isn't right. Check Caps Lock and try again.";
     }
     if (m.contains('too many')) {
-      return 'Too many attempts. Please wait about 15 minutes before trying '
-          'again.';
+      return 'Too many attempts. Please wait before trying again.';
     }
     if (m.contains('session invalid') ||
         m.contains('session expired') ||

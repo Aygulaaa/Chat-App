@@ -36,7 +36,7 @@ class UserProfile extends _$UserProfile {
   @override
   FutureOr<UserEntity?> build() async {
     final authState = ref.watch(authProvider);
-    if (authState.isLoading) return null;
+    if (authState.isLoading || authState.token == null) return null;
 
     if (authState.user != null) {
       _fetchServerProfile();

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { authService } from "./auth.service";
+import { authService, LoginLockedError } from "./auth.service";
 import { AuthRequest } from "../../middleware/auth.middleware";
 import { getIo } from "../../config/io";
 
@@ -68,7 +68,17 @@ export const login = async (req: Request, res: Response) => {
     res.json(result);
   } catch (error: any) {
     // Only a real credential mismatch is a 401. A DB outage must not look
-    // like "wrong password" to the client.
+    // like "wrong password" to the client. A brute-force lockout is a 429.
+    if (error instanceof LoginLockedError) {
+      const retryAfterSeconds =
+        Number.isFinite(error.retryAfterSeconds) && error.retryAfterSeconds > 0
+          ? Math.ceil(error.retryAfterSeconds)
+          : 300;
+      return res.status(429).json({
+        error: error.message,
+        retryAfter: retryAfterSeconds,
+      });
+    }
     if (error?.message === "Invalid username or password") {
       return res.status(401).json({ error: error.message });
     }

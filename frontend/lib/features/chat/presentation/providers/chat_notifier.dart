@@ -18,6 +18,7 @@ import 'package:my_chat_app/features/chat/presentation/providers/chat_provider.d
 import 'package:my_chat_app/features/chat/presentation/providers/chat_state.dart';
 import 'package:my_chat_app/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:my_chat_app/features/notification/presentation/providers/notification_provider.dart';
+import 'package:my_chat_app/features/settings/presentation/providers/settings_provider.dart';
 
 part 'chat_notifier.g.dart';
 
@@ -187,7 +188,13 @@ class ChatNotifier extends _$ChatNotifier {
               }
             }
 
-            if (!isMuted) {
+            // Honor the global push toggle too — "mute all notifications" in
+            // Settings should silence the in-app overlay just as much as it
+            // silences the OS-level push the server sends.
+            final globalSettings = ref.read(settingsProvider).value;
+            final bool notificationsEnabled = globalSettings?.notificationsEnabled ?? true;
+
+            if (!isMuted && notificationsEnabled) {
               final msgText = message.text?.isNotEmpty == true
                   ? message.text!
                   : '📎 Attachment';

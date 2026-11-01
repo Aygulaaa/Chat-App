@@ -177,7 +177,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             child: MaterialApp.router(
               routerConfig: router,
               debugShowCheckedModeBanner: false,
-              title: 'Navihat Chat',
+              title: 'Teleflow',
               theme: AppTheme.of(palette),
             ),
           ),

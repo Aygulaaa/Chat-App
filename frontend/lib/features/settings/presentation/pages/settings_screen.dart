@@ -92,7 +92,7 @@ class SettingsScreen extends ConsumerWidget {
 
           Center(
             child: Text(
-              'Navihat Chat · v1.0.0',
+              'Teleflow · v1.0.0',
               style: TextStyle(color: context.textTertiary, fontSize: 12.5),
             ),
           ),
